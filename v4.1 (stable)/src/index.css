@@ -709,10 +709,6 @@
     height: 100vh;
   }
 
-  .h-d-screen {
-    height: 100dvh;
-  }
-  
   .min-h-screen {
     min-height: 100vh;
   }
@@ -2842,4 +2838,22 @@ html {
 }
 .ol-overviewmap .ol-viewport:hover {
   cursor: pointer;
+}
+/* Add this to the end of index.css */
+@layer utilities {
+  /* Dynamic Viewport Height for mobile browsers */
+  .h-d-screen {
+    height: 100dvh;
+  }
+
+  /* Support for mobile safe areas (notches/home indicators) */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Glass effect for dark mode headers/navs */
+  .glass-effect {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
 }
