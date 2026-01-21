@@ -57,7 +57,7 @@ export function Dashboard({ onLogout, onNavigateHome }: DashboardProps) {
   };
 
   return (
-    <div className={`min-h-screen w-full flex flex-col ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
+    <div className={`min-h-screen w-full flex sticky ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
       {/* Header */}
       <header className={`shadow-sm border-b relative z-10 sticky top-0 ${
         isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-gray-200'}`}>
