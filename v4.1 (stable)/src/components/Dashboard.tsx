@@ -51,7 +51,7 @@ export function Dashboard({ onLogout, onNavigateHome }: DashboardProps) {
 
   return (
     /* Changed min-h-screen to h-[100dvh] and added overflow-hidden to prevent the "white block" */
-    <div className={`h-[100dvh] w-full flex flex-col overflow-hidden ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
+    <div className={`h-d-screen w-full flex flex-col overflow-hidden ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
       
       {/* Header */}
       <header className={`shrink-0 shadow-sm border-b z-30 ${
