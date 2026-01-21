@@ -40,8 +40,6 @@
 
   ## Running the code
 
-  Run `npm i` to install the dependencies.
-
-  Run `npm install maplibre-gl` to install mapslibre-gl.
+  Run `npm ci` to install the dependencies.
 
   Run `npm run dev` to start the development server.
