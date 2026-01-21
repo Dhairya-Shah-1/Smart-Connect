@@ -57,9 +57,9 @@ export function Dashboard({ onLogout, onNavigateHome }: DashboardProps) {
   };
 
   return (
-    <div className={`h-screen flex flex-col ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
+    <div className={`min-h-screen w-full flex flex-col ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
       {/* Header */}
-      <header className={`shadow-sm border-b relative z-10 ${
+      <header className={`shadow-sm border-b relative z-10 sticky top-0 ${
         isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-gray-200'}`}>
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -127,7 +127,7 @@ export function Dashboard({ onLogout, onNavigateHome }: DashboardProps) {
       </div>
 
       {/* Bottom Navigation */}
-      <nav className={`border-t shadow-lg ${
+      <nav className={`border-t shadow-lg sticky bottom-0 ${
         isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-gray-200'
       }`}>
         <div className="flex items-center justify-around px-4 py-2.5">
