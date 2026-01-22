@@ -369,7 +369,7 @@ export function MapView({
           onClick={() => setFilterSeverity("critical")}
           className={`absolute top-4 left-4 z-10`}
         >
-          {(urgentCount == 0 || (isMobileTablet && showFilters)) && (
+          {(urgentCount == 0 || (isMobileTablet && !showFilters)) && (
             <div className={`hidden`}>
               <span className={`hidden`}></span>
               <span className={`hidden`}></span>
