@@ -32,13 +32,11 @@ export function MapView({
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const [issues, setIssues] = useState<Issue[]>([]);
-  const [selectedIssue, setSelectedIssue] =
-    useState<Issue | null>(null);
+  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
 
   // State for filters
   const [filterType, setFilterType] = useState<string>("all");
-  const [filterSeverity, setFilterSeverity] =
-    useState<string>("all");
+  const [filterSeverity, setFilterSeverity] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(true);
   const isMobileTablet = isMobileOrTablet();
@@ -369,13 +367,8 @@ export function MapView({
           onClick={() => setFilterSeverity("critical")}
           className={`absolute top-4 left-4 z-10`}
         >
-          {(urgentCount == 0 || (isMobileTablet && showFilters)) && (
-            <div className={`hidden`}>
-              <span className={`hidden`}></span>
-              <span className={`hidden`}></span>
-            </div>
-          )}
-          {urgentCount > 0 && (
+          {/* LOGIC FIX: Only show if urgentCount > 0 AND we are NOT in (Mobile + Filters Open) state */}
+          {urgentCount && urgentCount > 0 && !(isMobileTablet && showFilters) && (
             <div
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border ml-1 ${
                 isDark
@@ -397,7 +390,7 @@ export function MapView({
         {!showFilters && urgentCount > 0 && (
           <button
             onClick={() => setShowFilters(true)}
-            className={`absolute top-4 left-28 z-10 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 transition-colors 
+            className={`absolute top-4 left-28 z-10 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 transition-colors
             ${isDark ? "bg-slate-800 hover:bg-slate-700 text-gray-200" : "bg-white hover:bg-gray-50 text-gray-700"}
           `}
           >
@@ -408,7 +401,7 @@ export function MapView({
         {!showFilters && urgentCount == 0 && (
           <button
             onClick={() => setShowFilters(true)}
-            className={`absolute top-4 left-4 z-10 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 transition-colors 
+            className={`absolute top-4 left-4 z-10 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 transition-colors
             ${isDark ? "bg-slate-800 hover:bg-slate-700 text-gray-200" : "bg-white hover:bg-gray-50 text-gray-700"}
           `}
           >
