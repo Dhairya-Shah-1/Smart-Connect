@@ -418,7 +418,7 @@ export function MapView({
         )}
 
         {/* Stats - Hide on mobile/tablet when filters panel is open */}
-        {((!isMobileTablet && showFilters) or (isMobileTablet && showFilters)) && (
+        {((!isMobileTablet && showFilters) || (isMobileTablet && showFilters)) && (
           <div
             className={`absolute top-4 right-4 rounded-lg shadow-lg p-3 z-10 ${
               isDark ? "bg-slate-800" : "bg-white"
