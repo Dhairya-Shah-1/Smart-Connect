@@ -111,7 +111,7 @@ export function Dashboard({ onLogout, onNavigateHome }: DashboardProps) {
       <nav className={`shrink-0 border-t shadow-[0_-4px_10px_rgba(0,0,0,0.05)] z-50 pb-safe ${
         isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-gray-200'
       }`}>
-        <div className={`flex items-center justify-around py-2 sm:mb-0 ${isMobile ? "px-1" : "mb-1 sm:mb-0 px-2"} `}>
+        <div className={`flex items-center justify-around py-2 mb-0 sm:mb-0 ${isMobile ? "px-1" : "px-2"} `}>
           <NavButton 
             active={currentView === 'map'} 
             onClick={() => setCurrentView('map')} 
