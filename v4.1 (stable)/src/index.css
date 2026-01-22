@@ -717,8 +717,8 @@
     width: calc(var(--spacing) * 0);
   }
 
-  .w-100-px {
-    width: 10px;
+  .w-0\.5 {
+    width: calc(var(--spacing) * 0.5);
   }
   
   .w-1\.5 {
