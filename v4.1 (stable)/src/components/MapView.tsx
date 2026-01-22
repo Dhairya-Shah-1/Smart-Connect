@@ -1,18 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  MapPin,
-  Droplets,
-  AlertTriangle,
-  Flame,
-  Car,
-  Mountain,
-  Navigation,
-  Filter,
-  Search,
-  X,
-  ShieldCheck,
-  Home,
-} from "lucide-react";
+import { MapPin, Droplets, AlertTriangle, Flame, Car, Mountain, Navigation, Filter, Search, X, ShieldCheck, Home } from "lucide-react";
 import { useTheme } from "../App";
 import { OpenLayersMap } from "./OpenLayersMap";
 import { isMobileOrTablet } from "../utils/deviceDetection";
