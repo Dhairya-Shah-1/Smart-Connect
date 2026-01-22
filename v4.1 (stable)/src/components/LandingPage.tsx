@@ -1,14 +1,4 @@
-import {
-  MapPin,
-  AlertTriangle,
-  Droplets,
-  Flame,
-  Car,
-  Mountain,
-  Sun,
-  Moon,
-  LogOut,
-} from "lucide-react";
+import { MapPin, AlertTriangle, Droplets, Flame, Car, Mountain, Sun, Moon, LogOut } from "lucide-react";
 import { isMobileOrTablet } from "../utils/deviceDetection";
 import shieldIcon from '../assets/Logos_and_icons/Shield(Gemini)(without-bg).png';
 import VerifiedIcon from '../assets/Logos_and_icons/Verified(Gemini)(without-bg).png';
