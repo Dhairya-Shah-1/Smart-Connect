@@ -1,4 +1,4 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 type GeminiResult = {
   verified: boolean;
@@ -7,8 +7,8 @@ type GeminiResult = {
 };
 
 export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse<GeminiResult | { error: string }>
+  req: VercelRequest,
+  res: VercelResponse
 ) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -36,66 +36,62 @@ export default async function handler(
     // 2. Gemini Prompt (TEXT + IMAGE)
     // -----------------------------
     const prompt = `
-You are an AI system that verifies civic incident reports.
+      You are an AI system that verifies civic incident reports.
 
-Incident Type:
-${incidentType}
+      Incident Type:
+      ${incidentType}
 
-Incident Description:
-${description}
+      Incident Description:
+      ${description}
 
-Incident Location:
-Latitude: ${lat}
-Longitude: ${lng}
+      Incident Location:
+      Latitude: ${lat}
+      Longitude: ${lng}
 
-Additional Instruction:
-Check the weather conditions for the given location and assess
-whether the reported incident is realistic.
+      Additional Instruction:
+      Check the weather conditions for the given location and assess
+      whether the reported incident is realistic.
 
-Incident Proof:
-An image is provided as evidence.
+      Incident Proof:
+      An image is provided as evidence.
 
-Your task:
-1. Decide if the incident is REAL or FAKE.
-2. Provide a confidence score between 0 and 1.
-3. Give a short justification.
+      Your task:
+      1. Decide if the incident is REAL or FAKE.
+      2. Provide a confidence score between 0 and 1.
+      3. Give a short justification.
 
-Respond ONLY in JSON format:
-{
-  "verified": true | false,
-  "confidence": number,
-  "reason": "string"
-}
-`;
-
-    // -----------------------------
-    // 3. Call Gemini API
-    // -----------------------------
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      Respond ONLY in JSON format:
       {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                { text: prompt },
-                {
-                  inline_data: {
-                    mime_type: 'image/jpeg',
-                    data: photoUrl, // Gemini supports URL-based image analysis
-                  },
-                },
-              ],
-            },
-          ],
-        }),
+        "verified": true | false,
+        "confidence": number,
+        "reason": "string"
       }
-    );
+      `;
+  const geminiRes = await fetch(
+    `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: prompt },
+              {
+                inline_data: {
+                  mime_type: 'image/jpeg',
+                  data: photoUrl, // Gemini supports URL-based image analysis
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    }
+  );
 
     const geminiData = await geminiRes.json();
 
