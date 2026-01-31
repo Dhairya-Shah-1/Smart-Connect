@@ -177,6 +177,23 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         photoUrl: photo, // Supabase public URL
       }),
     });
+
+    const verifyRes = await fetch('/api/verify-incident', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        issueType,
+        description,
+      }),
+    });
+    
+    const aiResult = await verifyRes.json();
+
+    if (!aiResult.verified) {
+      toast.error('Report rejected: ' + aiResult.reason);
+      setIsSubmitting(false);
+      return;
+    }
       
     const { error } = await supabase.from('incident_reports').insert({
       user_id: user.id,
@@ -188,23 +205,6 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       location: `POINT(${lng} ${lat})`,
       photo_url: photo,
     });
-
-    const verifyRes = await fetch('/api/verify-incident', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        issueType,
-        description,
-      }),
-    });
-
-    const aiResult = await verifyRes.json();
-
-    if (!aiResult.verified) {
-      toast.error('Report rejected: ' + aiResult.reason);
-      setIsSubmitting(false);
-      return;
-    }
 
     setIsSubmitting(true);
 
