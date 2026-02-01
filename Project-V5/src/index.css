@@ -2313,19 +2313,19 @@ html {
 @property --tw-gradient-from {
   syntax: "<color>";
   inherits: false;
-  initial-value: #0000;
+  initial-value: black;
 }
 
 @property --tw-gradient-via {
   syntax: "<color>";
   inherits: false;
-  initial-value: #0000;
+  initial-value: black;
 }
 
 @property --tw-gradient-to {
   syntax: "<color>";
   inherits: false;
-  initial-value: #0000;
+  initial-value: black;
 }
 
 @property --tw-gradient-stops {
@@ -2369,7 +2369,7 @@ html {
 @property --tw-shadow {
   syntax: "*";
   inherits: false;
-  initial-value: 0 0 #0000;
+  initial-value: 0 0 black;
 }
 
 @property --tw-shadow-color {
@@ -2386,7 +2386,7 @@ html {
 @property --tw-inset-shadow {
   syntax: "*";
   inherits: false;
-  initial-value: 0 0 #0000;
+  initial-value: 0 0 black;
 }
 
 @property --tw-inset-shadow-color {
@@ -2408,7 +2408,7 @@ html {
 @property --tw-ring-shadow {
   syntax: "*";
   inherits: false;
-  initial-value: 0 0 #0000;
+  initial-value: 0 0 black;
 }
 
 @property --tw-inset-ring-color {
@@ -2419,7 +2419,7 @@ html {
 @property --tw-inset-ring-shadow {
   syntax: "*";
   inherits: false;
-  initial-value: 0 0 #0000;
+  initial-value: 0 0 black;
 }
 
 @property --tw-ring-inset {
@@ -2436,13 +2436,13 @@ html {
 @property --tw-ring-offset-color {
   syntax: "*";
   inherits: false;
-  initial-value: #fff;
+  initial-value: white;
 }
 
 @property --tw-ring-offset-shadow {
   syntax: "*";
   inherits: false;
-  initial-value: 0 0 #0000;
+  initial-value: 0 0 black;
 }
 
 @property --tw-blur {
@@ -2865,8 +2865,8 @@ html {
 
   /* Glass effect for dark mode headers/navs */
   .glass-effect {
-    backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
   }
 }
 @keyframes spin {
