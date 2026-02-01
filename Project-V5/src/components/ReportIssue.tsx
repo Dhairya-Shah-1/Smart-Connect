@@ -406,7 +406,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {issueTypes.map((type) => (
-                <button
+                <button required
                   key={type}
                   type="button"
                   onClick={() => handleTypeChange(type)}
@@ -581,7 +581,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
             >
               {photo ? (
                 <div className="relative h-48 w-full group">
-                  <img
+                  <img required
                     src={photo}
                     alt="Preview"
                     className="w-full h-full object-contain rounded-lg"
