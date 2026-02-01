@@ -614,6 +614,8 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
                   <input
                     type="file"
                     accept="image/*"
+                    capture="environment"
+                    className="hidden"
                     onChange={handleImageUpload}
                   />
                 </label>
