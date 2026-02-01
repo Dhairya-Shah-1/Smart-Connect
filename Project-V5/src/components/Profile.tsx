@@ -20,11 +20,11 @@ export function Profile({ onLogout }: ProfileProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    setUser(currentUser);
+
     const fetchProfile = async () => {
       try {
-        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        setUser(currentUser);
-
         const { data, error } = await supabase
           .from('incident_reports')
           .select('status')
@@ -42,12 +42,32 @@ export function Profile({ onLogout }: ProfileProps) {
         console.error(err);
         toast.error('Failed to load profile data');
       } finally {
-        // 🔹 ADDED
         setLoading(false);
       }
     };
 
     fetchProfile();
+
+    // Real-time subscription for report count updates
+    const subscription = supabase
+      .channel('profile_reports_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'incident_reports',
+          filter: `user_id=eq.${currentUser.id}`,
+        },
+        () => {
+          fetchProfile();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleLogout = async () => {

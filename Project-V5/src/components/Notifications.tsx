@@ -16,11 +16,11 @@ export function Notifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
-  const fetchNotifications = async () => {
     const userStr = localStorage.getItem('currentUser');
     if (!userStr) return;
-
     const user = JSON.parse(userStr);
+
+  const fetchNotifications = async () => {
 
     // 1. Fetch all reports (for nearby critical alerts)
     const { data: allReports, error } = await supabase
@@ -40,14 +40,26 @@ export function Notifications() {
       let message = '';
       let type: 'success' | 'info' | 'warning' | 'urgent' = 'info';
 
-      if (report.status === 'resolved') {
-        title = 'Incident Resolved ✓';
+      // Check if report is flagged/rejected (AI determined it's fake)
+      const isFlagged = report.is_flagged || report.status === 'rejected';
+      
+      if (isFlagged) {
+        title = 'Report Flagged as Suspicious';
+        message = `Your ${report.incident_type} report was flagged by AI verification. Reason: ${report.ai_reason || 'Possible inaccuracy detected.'}`;
+        type = 'urgent';
+      } else if (report.status === 'resolved') {
+        title = 'Incident Resolved';
         message = `Your ${report.severity} severity ${report.incident_type} report at ${report.location} has been resolved.`;
         type = 'success';
       } else if (report.status === 'in-progress') {
         title = 'Incident Under Review';
         message = `Authorities are working on your ${report.incident_type} report at ${report.location}.`;
         type = 'info';
+      } else if (report.ai_verified) {
+        // Verified by AI - show as alert/success
+        title = 'Report Verified & Submitted';
+        message = `Your ${report.incident_type} report has been verified by AI and submitted to ${report.department || 'Municipal Authority'}.`;
+        type = 'success';
       } else {
         if (report.severity === 'critical' || report.severity === 'high') {
           title = 'Urgent Report Received';
@@ -61,13 +73,14 @@ export function Notifications() {
       }
 
       return {
-        id: report.report_id,
+        id: report.report_id || report.id,
         title,
         message,
         type,
         severity: report.severity,
         timestamp: report.timestamp,
         read: false,
+        isFlagged,
       };
     });
 
@@ -102,8 +115,28 @@ export function Notifications() {
     );
   };
 
-  fetchNotifications();
-}, []);
+    fetchNotifications();
+
+    // Real-time subscription for notifications updates
+    const subscription = supabase
+      .channel('notifications_reports_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'incident_reports',
+        },
+        () => {
+          fetchNotifications();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const markAsRead = (id: string) => {
     setNotifications((prev) =>

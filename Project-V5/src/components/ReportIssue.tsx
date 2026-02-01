@@ -156,22 +156,42 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
     })();
   }, [canReport, getPermissionState, requestLocation]);
 
+  // ─── AI Verification Result State ───────────────────────────
+  const [aiVerificationResult, setAiVerificationResult] = useState<{
+    verified: boolean;
+    confidence: number;
+    reason: string;
+  } | null>(null);
+
   // ─── Submit ────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!(await ensureLocation())) return;
-    if (!issueType || !description || !photo) {
-      toast.error('All required fields must be filled.');
+    // Validate all required fields
+    if (!issueType) {
+      toast.error('Please select an incident type.');
+      return;
+    }
+    if (!lat || !lng) {
+      toast.error('Location is required. Please enable GPS.');
+      if (!(await ensureLocation())) return;
+    }
+    if (!description.trim()) {
+      toast.error('Please provide a description.');
+      return;
+    }
+    if (!photo) {
+      toast.error('Please capture an evidence photo using your camera.');
       return;
     }
 
     setIsSubmitting(true);
+    setAiVerificationResult(null);
 
     try {
       const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
 
-      // Verify incident with AI
+      // Send all data to Gemini API for verification
       const verifyRes = await fetch('/api/verify-incident', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -185,12 +205,29 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       });
 
       const aiResult = await verifyRes.json();
+      setAiVerificationResult(aiResult);
 
-      if (!aiResult.verified) {
-        toast.error('Report rejected: ' + aiResult.reason);
-        setIsSubmitting(false);
-        return;
-      }
+      // Determine status based on AI verification
+      const reportStatus = aiResult.verified ? 'pending' : 'rejected';
+      const isFlagged = !aiResult.verified;
+
+      // Insert to Supabase with AI verification result
+      const { error } = await supabase.from('incident_reports').insert({
+        user_id: user.id,
+        incident_type: issueType,
+        incident_description: description,
+        severity,
+        status: reportStatus,
+        location: `POINT(${lng} ${lat})`,
+        photo_url: photo,
+        timestamp: new Date().toISOString(),
+        ai_verified: aiResult.verified,
+        ai_confidence: aiResult.confidence,
+        ai_reason: aiResult.reason,
+        is_flagged: isFlagged
+      });
+
+      if (error) throw error;
 
       // Local fallback (preserved)
       const localReport = {
@@ -202,28 +239,16 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         description,
         photo,
         user: user.email,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        aiVerified: aiResult.verified,
+        isFlagged
       };
 
       const existing = JSON.parse(localStorage.getItem('reports') || '[]');
       localStorage.setItem('reports', JSON.stringify([localReport, ...existing]));
 
-      // Supabase insert
-      const { error } = await supabase.from('incident_reports').insert({
-        user_id: user.id,
-        incident_type: issueType,
-        incident_description: description,
-        severity,
-        status: 'pending',
-        location: `POINT(${lng} ${lat})`,
-        photo_url: photo,
-        timestamp: new Date().toISOString()
-      });
-
-      if (error) throw error;
-
       setSuccess(true);
-      setTimeout(onSuccess, 2000);
+      setTimeout(onSuccess, 3000);
     } catch (err: any) {
       toast.error(err.message || 'Submission failed');
     } finally {
@@ -303,17 +328,60 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
   };
 
   if (success) {
+    const isVerified = aiVerificationResult?.verified;
+    const isFlagged = !isVerified;
+
     return (
       <div className="h-full flex items-center justify-center p-6 text-center animate-in fade-in">
-        <div className="bg-green-50 p-8 rounded-2xl max-w-sm border border-green-100 shadow-sm">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <ShieldCheck className="text-green-600" size={32} />
+        <div className={`p-8 rounded-2xl max-w-md border shadow-lg ${
+          isFlagged 
+            ? 'bg-red-50 border-red-200' 
+            : 'bg-green-50 border-green-100'
+        }`}>
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+            isFlagged ? 'bg-red-100' : 'bg-green-100'
+          }`}>
+            {isFlagged ? (
+              <AlertCircle className="text-red-600" size={32} />
+            ) : (
+              <ShieldCheck className="text-green-600" size={32} />
+            )}
           </div>
-          <h3 className="text-xl font-bold text-green-900 mb-2">
-            Report Submitted
+          
+          <h3 className={`text-xl font-bold mb-2 ${
+            isFlagged ? 'text-red-900' : 'text-green-900'
+          }`}>
+            {isFlagged ? 'Report Flagged' : 'Report Submitted'}
           </h3>
-          <p className="text-green-700">
-            Thank you! Your report has been verified and logged.
+          
+          <p className={`mb-4 ${isFlagged ? 'text-red-700' : 'text-green-700'}`}>
+            {isFlagged 
+              ? 'Your report has been flagged for review.' 
+              : 'Thank you! Your report has been verified and logged.'}
+          </p>
+
+          {aiVerificationResult && (
+            <div className={`mt-4 p-4 rounded-xl text-left ${
+              isFlagged ? 'bg-red-100/50' : 'bg-green-100/50'
+            }`}>
+              <p className={`text-sm font-medium mb-2 ${
+                isFlagged ? 'text-red-800' : 'text-green-800'
+              }`}>
+                AI Analysis Result:
+              </p>
+              <p className={`text-sm ${isFlagged ? 'text-red-700' : 'text-green-700'}`}>
+                {aiVerificationResult.reason}
+              </p>
+              <p className={`text-xs mt-2 ${isFlagged ? 'text-red-600' : 'text-green-600'}`}>
+                Confidence: {Math.round(aiVerificationResult.confidence * 100)}%
+              </p>
+            </div>
+          )}
+
+          <p className={`text-sm mt-4 ${isFlagged ? 'text-red-600' : 'text-green-600'}`}>
+            {isFlagged 
+              ? 'Check your History tab for details.' 
+              : 'View status in the History tab.'}
           </p>
         </div>
       </div>
