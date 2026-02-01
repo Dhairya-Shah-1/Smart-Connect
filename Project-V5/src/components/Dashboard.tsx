@@ -153,7 +153,7 @@ export function Dashboard({ onLogout, onNavigateHome }: DashboardProps) {
       </div>
 
       {/* Bottom Navigation */}
-      <nav className={`border-t shadow-lg ${
+      <nav className={`border-t sticky shadow-lg ${
         isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-gray-200'
       }`}>
         <div className="flex items-center justify-around px-4 py-2.5">
