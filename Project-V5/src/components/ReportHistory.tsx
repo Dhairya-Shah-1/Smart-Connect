@@ -26,13 +26,13 @@ export function ReportHistory() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const userStr = localStorage.getItem('currentUser');
+    if (!userStr) return;
+    const user = JSON.parse(userStr);
+
     const fetchReports = async () => {
       try {
         setLoading(true);
-        const userStr = localStorage.getItem('currentUser');
-        if (!userStr) return;
-
-        const user = JSON.parse(userStr);
 
         const { data, error } = await supabase
           .from('incident_reports')
@@ -44,14 +44,14 @@ export function ReportHistory() {
 
         if (data) {
           const mapped: Report[] = data.map((r: any) => ({
-            id: r.report_id,
+            id: r.report_id || r.id,
             type: r.incident_type,
             severity: r.severity,
             location: r.location,
             description: r.incident_description,
             photo: r.photo_url,
             status: r.status,
-            timestamp: r.timestamp,
+            timestamp: r.timestamp || r.created_at,
             userName: user.name,
             aiVerified: true,
             departmentNotified: r.department || 'Municipal Authority',
@@ -64,6 +64,27 @@ export function ReportHistory() {
     };
 
     fetchReports();
+
+    // Real-time subscription for new reports
+    const subscription = supabase
+      .channel('incident_reports_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'incident_reports',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchReports();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const getIssueIcon = (type: string) => {

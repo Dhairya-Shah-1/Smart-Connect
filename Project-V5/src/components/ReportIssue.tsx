@@ -166,50 +166,31 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       return;
     }
 
-    await fetch('/api/verify-incident', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        incidentType: issueType,
-        description,
-        lat,
-        lng,
-        photoUrl: photo, // Supabase public URL
-      }),
-    });
-
-    const verifyRes = await fetch('/api/verify-incident', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        issueType,
-        description,
-      }),
-    });
-    
-    const aiResult = await verifyRes.json();
-
-    if (!aiResult.verified) {
-      toast.error('Report rejected: ' + aiResult.reason);
-      setIsSubmitting(false);
-      return;
-    }
-      
-    const { error } = await supabase.from('incident_reports').insert({
-      user_id: user.id,
-      incident_type: issueType,
-      incident_description: description,
-      severity,
-      status: aiResult.verified ? 'verified' : 'rejected',
-      ai_reason: aiResult.reason,
-      location: `POINT(${lng} ${lat})`,
-      photo_url: photo,
-    });
-
     setIsSubmitting(true);
 
     try {
       const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
+
+      // Verify incident with AI
+      const verifyRes = await fetch('/api/verify-incident', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          incidentType: issueType,
+          description,
+          lat,
+          lng,
+          photoUrl: photo,
+        }),
+      });
+
+      const aiResult = await verifyRes.json();
+
+      if (!aiResult.verified) {
+        toast.error('Report rejected: ' + aiResult.reason);
+        setIsSubmitting(false);
+        return;
+      }
 
       // Local fallback (preserved)
       const localReport = {
@@ -235,7 +216,8 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         severity,
         status: 'pending',
         location: `POINT(${lng} ${lat})`,
-        photo_url: photo
+        photo_url: photo,
+        timestamp: new Date().toISOString()
       });
 
       if (error) throw error;
