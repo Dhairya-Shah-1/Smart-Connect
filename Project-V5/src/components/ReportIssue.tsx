@@ -186,7 +186,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
     }
 
     setIsSubmitting(true);
-    setAiVerificationResult(null);
+    setAiVerificationResult(true);
 
     try {
       const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
