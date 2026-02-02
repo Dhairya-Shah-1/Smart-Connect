@@ -186,7 +186,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
     }
 
     setIsSubmitting(true);
-    setAiVerificationResult(true);
+    setAiVerificationResult(null);
 
     try {
       const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
@@ -674,7 +674,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setPhoto(null);
+                      setPhoto('');
                     }}
                     className="absolute top-2 right-2 bg-red-600 text-white p-2 rounded-full shadow-lg hover:bg-red-700"
                   >
