@@ -667,7 +667,9 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
                 : "bg-blue-600 hover:bg-blue-700 text-white hover:shadow-blue-500/25 active:scale-[0.98]"
             }`}
           >
-            {isSubmitting && <Loader2 size={20} className="animate-spin" />}
+            {isSubmitting && <Loader2 size={20} style={{
+                    animation: 'spin 1s linear infinite',
+                  }} />}
             {isLoadingLocation
               ? "Detecting Location..."
               : isSubmitting
