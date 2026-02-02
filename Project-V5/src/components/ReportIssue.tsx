@@ -241,30 +241,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       const reportStatus = aiResult.verified ? 'pending' : 'rejected';
       const isFlagged = !aiResult.verified;
 
-      // Insert to Supabase
-      const { data, error } = await supabase.from('incident_reports').insert({
-        user_id: user.id,
-        incident_type: issueType,
-        incident_description: description,
-        severity,
-        status: reportStatus,
-        location: `POINT(${lng} ${lat})`,
-        photo_url: photo,
-        timestamp: new Date().toISOString(),
-        ai_verified: aiResult.verified,
-        ai_confidence: aiResult.confidence,
-        ai_reason: aiResult.reason,
-        is_flagged: isFlagged
-      }).select();
-
-      if (error) {
-        console.log('[v0] Supabase insert error:', error);
-        throw new Error(error.message || 'Failed to save report to database');
-      }
-
-      console.log('[v0] Report saved to Supabase:', data);
-
-      // Local fallback (preserved)
+      // 1. SAVE TO LOCALSTORAGE FIRST (immediate display in history)
       const localReport = {
         id: Date.now().toString(),
         issueType,
@@ -283,12 +260,38 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       const updatedReports = [localReport, ...existing];
       localStorage.setItem('reports', JSON.stringify(updatedReports));
       
-      // Trigger storage event to notify ReportHistory
+      // Trigger storage event to notify ReportHistory immediately
       window.dispatchEvent(new StorageEvent('storage', {
         key: 'reports',
         newValue: JSON.stringify(updatedReports),
         url: window.location.href
       }));
+
+      console.log('[v0] Report saved to localStorage:', localReport);
+
+      // 2. THEN attempt to save to Supabase (async, non-blocking)
+      supabase.from('incident_reports').insert({
+        user_id: user.id,
+        incident_type: issueType,
+        incident_description: description,
+        severity,
+        status: reportStatus,
+        location: `POINT(${lng} ${lat})`,
+        photo_url: photo,
+        timestamp: new Date().toISOString(),
+        ai_verified: aiResult.verified,
+        ai_confidence: aiResult.confidence,
+        ai_reason: aiResult.reason,
+        is_flagged: isFlagged
+      }).then(({ data, error }) => {
+        if (error) {
+          console.log('[v0] Supabase insert error:', error);
+        } else {
+          console.log('[v0] Report saved to Supabase:', data);
+        }
+      }).catch(err => {
+        console.log('[v0] Supabase insert failed:', err);
+      });
 
       setSuccess(true);
       toast.success('Report submitted successfully!');
@@ -306,6 +309,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
     } catch (err: any) {
       console.log('[v0] Submit error:', err);
       toast.error(err.message || 'Submission failed');
+      setIsSubmitting(false);
     } finally {
       setIsSubmitting(false);
     }
