@@ -64,28 +64,35 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
       setUploading(true);
 
-      // 1. Create unique file path
+      // 1. Create local preview immediately using FileReader
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        setPhoto(result); // Show preview immediately
+      };
+      reader.readAsDataURL(file);
+
+      // 2. Create unique file path
       const filePath = `reports/${Date.now()}-${file.name}`;
 
-      // 2. Upload to Supabase Storage
+      // 3. Upload to Supabase Storage
       const { error } = await supabase.storage
         .from('incident-images')
         .upload(filePath, file);
 
       if (error) {
         console.error('Upload failed:', error.message);
+        toast.error('Upload failed. Preview saved locally.');
         setUploading(false);
         return;
       }
 
-      // 3. Get PUBLIC URL (THIS IS WHAT YOU ASKED ABOUT)
+      // 4. Get PUBLIC URL and update if upload succeeds
       const { data } = supabase.storage
         .from('incident-images')
         .getPublicUrl(filePath);
 
-      // 4. Save public URL in state
-      setPhoto(data.publicUrl);
-
+      setPhoto(data.publicUrl); // Replace with Supabase URL
       setUploading(false);
     };
 
@@ -277,7 +284,17 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
       setSuccess(true);
       toast.success('Report submitted successfully!');
-      setTimeout(onSuccess, 3000);
+      // Reset form and keep success visible
+      setTimeout(() => {
+        setIssueType('');
+        setSeverity('');
+        setDescription('');
+        setPhoto('');
+        setLocationText('');
+        setLat(null);
+        setLng(null);
+        onSuccess();
+      }, 3000);
     } catch (err: any) {
       console.log('[v0] Submit error:', err);
       toast.error(err.message || 'Submission failed');
@@ -679,27 +696,30 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
                   </button>
                 </div>
               ) : (
-                <label className="cursor-pointer block">
-                  <Camera
-                    className="mx-auto mb-3 text-gray-400"
-                    size={40}
-                  />
-                  <p
-                    className={`font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}
-                  >
-                    Upload Evidence
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Capture a photo of the incident
-                  </p>
+                <>
+                  <label htmlFor="photo-upload" className="cursor-pointer block">
+                    <Camera
+                      className="mx-auto mb-3 text-gray-400"
+                      size={40}
+                    />
+                    <p
+                      className={`font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                    >
+                      Upload Evidence
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Capture a photo of the incident
+                    </p>
+                  </label>
                   <input
+                    id="photo-upload"
                     type="file"
                     accept="image/*"
                     capture="environment"
                     className="hidden"
                     onChange={handleImageUpload}
                   />
-                </label>
+                </>
               )}
             </div>
           </div>
