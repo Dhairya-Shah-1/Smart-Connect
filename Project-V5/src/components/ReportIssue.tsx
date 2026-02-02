@@ -197,6 +197,9 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         return;
       }
 
+      setSuccess(true);
+      toast.success('Report submitted successfully!');
+
       // Set default status as pending
       const reportStatus = 'pending';
 
@@ -209,14 +212,16 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
           incident_description: description,
           severity,
           status: reportStatus,
-          lcation: `${lat},${lng}`,
+          location: `${lat},${lng}`,
           photo_url: photo,
-          timestamp: new Date().toISOString(),
-        });
+          //timestamp: new Date().toISOString(),
+        })
+        .select()
+        .single();
 
-      if (error) {
-        console.error('Supabase insert error:', error);
-        toast.error('Failed to save report to database. Please try again.');
+      if (!data) {
+        //console.error('Supabase insert error:', error);
+        toast.error('Report could not be saved. Please try again.');
         setIsSubmitting(false);
         return;
       }
@@ -225,7 +230,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
       // 2. SAVE TO LOCALSTORAGE (immediate display in history)
       const localReport = {
-        id: Date.now().toString(),
+        id: data.id, //Date.now().toString(),
         issueType,
         severity,
         lat,
@@ -233,7 +238,8 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         description,
         photo,
         user: user.email,
-        timestamp: new Date().toISOString(),
+        status: data.status,
+        timestamp: data.created_at ?? new Date().toISOString(), //timestamp: new Date().toISOString(),
       };
 
       const existing = JSON.parse(localStorage.getItem('reports') || '[]');
@@ -254,8 +260,6 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
       console.log('Report saved to localStorage and database:', localReport);
 
-      setSuccess(true);
-      toast.success('Report submitted successfully!');
       // Reset form and keep success visible
       setTimeout(() => {
         setIssueType('');
@@ -335,7 +339,13 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       .upload(filePath, file);
 
     if (error) {
-      toast.error("Image upload failed");
+      toast.error('Failed to save report to database.');
+      console.error('Supabase insert error:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+      setIsSubmitting(false);
       return;
     }
 
