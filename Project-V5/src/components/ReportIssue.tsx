@@ -264,7 +264,10 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
       console.log('[v0] Report saved to Supabase:', data);
 
-      // Local fallback (preserved)
+      // Wait briefly to ensure Supabase replication before showing success
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      setAiVerificationResult(aiResult);
       const localReport = {
         id: Date.now().toString(),
         issueType,
