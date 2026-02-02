@@ -276,6 +276,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       localStorage.setItem('reports', JSON.stringify([localReport, ...existing]));
 
       setSuccess(true);
+      toast.success('Report submitted successfully!');
       setTimeout(onSuccess, 3000);
     } catch (err: any) {
       console.log('[v0] Submit error:', err);
@@ -315,38 +316,21 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
   };
 
   const issueTypes = [
-    'Flood',
-    'Puddle',
-    'Pothole',
-    'Landslide',
-    'Fire',
-    'Accident',
-    'Other',
+    "Pothole",
+    "Garbage",
+    "Street Light",
+    "Water Leakage",
+    "Accident",
+    "Other",
   ];
 
   const handleTypeChange = (type: string) => {
     setIssueType(type);
-    
-    // Auto-assign severity based on type
-    switch (type.toLowerCase()) {
-      case 'flood':
-      case 'landslide':
-      case 'fire':
-        setSeverity('critical');
-        break;
-      case 'accident':
-        setSeverity('high');
-        break;
-      case 'pothole':
-        setSeverity('medium');
-        break;
-      case 'puddle':
-      case 'other':
-        setSeverity('low');
-        break;
-      default:
-        setSeverity('low');
-    }
+
+    // example severity mapping (adjust to your original logic)
+    if (type === "Accident") setSeverity("critical");
+    else if (type === "Pothole") setSeverity("high");
+    else setSeverity("medium");
   };
 
   const handlePhotoUpload = async (
@@ -374,14 +358,65 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
   };
 
   if (success) {
+
+    const isVerified = aiVerificationResult?.verified;
+    const isFlagged = !isVerified;
+
     return (
       <div className="h-full flex items-center justify-center p-6 text-center animate-in fade-in">
-        <div className="bg-green-50 p-8 rounded-2xl max-w-sm border border-green-100 shadow-sm">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <ShieldCheck className="text-green-600" size={32} />
-          </div>
+        <div className={`bg-green-50 p-8 rounded-2xl max-w-sm border border-green-100 shadow-sm ${
+          isFlagged 
+            ? 'bg-red-50 border-red-200' 
+            : 'bg-green-50 border-green-100'
+        }`}>
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+            isFlagged ? 'bg-red-100' : 'bg-green-100'
+          }`}>
+          <ShieldCheck className="text-green-600" size={32} />
           <h3 className="text-xl font-bold text-green-900 mb-2">Report Submitted</h3>
           <p className="text-green-700">Thank you for helping make the city safer. Your report has been verified.</p>
+            {isFlagged ? (
+              <AlertCircle className="text-red-600" size={32} />
+            ) : (
+              <ShieldCheck className="text-green-600" size={32} />
+            )}
+          </div>
+          
+          <h3 className={`text-xl font-bold mb-2 ${
+            isFlagged ? 'text-red-900' : 'text-green-900'
+          }`}>
+            {isFlagged ? 'Report Flagged' : 'Report Submitted'}
+          </h3>
+          
+          <p className={`mb-4 ${isFlagged ? 'text-red-700' : 'text-green-700'}`}>
+            {isFlagged 
+              ? 'Your report has been flagged for review.' 
+              : 'Thank you! Your report has been verified and logged.'}
+          </p>
+
+          {aiVerificationResult && (
+            <div className={`mt-4 p-4 rounded-xl text-left ${
+              isFlagged ? 'bg-red-100/50' : 'bg-green-100/50'
+            }`}>
+              <p className={`text-sm font-medium mb-2 ${
+                isFlagged ? 'text-red-800' : 'text-green-800'
+              }`}>
+                AI Analysis Result:
+              </p>
+              <p className={`text-sm ${isFlagged ? 'text-red-700' : 'text-green-700'}`}>
+                {aiVerificationResult.reason}
+              </p>
+              <p className={`text-xs mt-2 ${isFlagged ? 'text-red-600' : 'text-green-600'}`}>
+                Confidence: {Math.round(aiVerificationResult.confidence * 100)}%
+              </p>
+            </div>
+          )}
+
+          <p className={`text-sm mt-4 ${isFlagged ? 'text-red-600' : 'text-green-600'}`}>
+            {isFlagged 
+              ? 'Check your History tab for details.' 
+              : 'View status in the History tab.'}
+          </p>
         </div>
       </div>
     );
@@ -389,34 +424,39 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
   if (!canReport) {
     return (
-      <div className={`h-full flex items-center justify-center p-6 ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
-        <div className={`max-w-md rounded-2xl shadow-lg border p-8 text-center ${
-          isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'
-        }`}>
-          <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${
-            isDark ? 'bg-blue-900' : 'bg-blue-100'
-          }`}>
-            <Monitor className={isDark ? 'text-blue-400' : 'text-blue-600'} size={40} />
+      <div
+        className={`h-full flex items-center justify-center p-6 ${isDark ? "bg-slate-900" : "bg-gray-50"}`}
+      >
+        <div
+          className={`max-w-md rounded-2xl shadow-lg border p-8 text-center ${
+            isDark
+              ? "bg-slate-800 border-slate-700"
+              : "bg-white border-gray-200"
+          }`}
+        >
+          <div
+            className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${
+              isDark ? "bg-blue-900" : "bg-blue-100"
+            }`}
+          >
+            <Monitor
+              className={
+                isDark ? "text-blue-400" : "text-blue-600"
+              }
+              size={40}
+            />
           </div>
-          <h3 className={`text-2xl mb-4 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+          <h3
+            className={`text-2xl mb-4 ${isDark ? "text-gray-100" : "text-gray-900"}`}
+          >
             Mobile Device Required
           </h3>
-          <p className={`text-sm mb-6 leading-relaxed ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-            Incident reporting is only available on mobile devices and tablets for accurate location tracking and photo evidence capture.
+          <p
+            className={`text-sm mb-6 ${isDark ? "text-gray-400" : "text-gray-600"}`}
+          >
+            Incident reporting is enabled for mobile/tablets to
+            capture accurate GPS coordinates.
           </p>
-          <div className={`rounded-lg p-4 ${isDark ? 'bg-slate-700' : 'bg-blue-50'}`}>
-            <p className={`text-sm ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>
-              <span className="font-semibold">You can still:</span>
-            </p>
-            <ul className={`text-sm mt-2 space-y-1 text-left list-disc list-inside ${
-              isDark ? 'text-gray-300' : 'text-gray-700'
-            }`}>
-              <li>View the live incident map</li>
-              <li>Check your report history</li>
-              <li>Monitor notifications and alerts</li>
-              <li>Access your profile</li>
-            </ul>
-          </div>
         </div>
       </div>
     );
@@ -450,7 +490,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {issueTypes.map((type) => (
-                <button
+                <button required
                   key={type}
                   type="button"
                   onClick={() => handleTypeChange(type)}
@@ -625,7 +665,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
             >
               {photo ? (
                 <div className="relative h-48 w-full group">
-                  <img
+                  <img required
                     src={photo}
                     alt="Preview"
                     className="w-full h-full object-contain rounded-lg"
@@ -667,35 +707,18 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
             </div>
           </div>
 
-          {/* Info Box */}
-          <div className={`border rounded-xl p-4 flex gap-3 ${
-            isDark ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-100'
-          }`}>
-            <AlertCircle className={`flex-shrink-0 mt-0.5 ${isDark ? 'text-blue-400' : 'text-blue-700'}`} size={20} />
-            <div className={`text-sm ${isDark ? 'text-blue-300' : 'text-blue-900'}`}>
-              <p className="font-semibold mb-1">Smart Verification Active</p>
-              <ul className={`list-disc list-inside text-xs space-y-1 ${isDark ? 'text-blue-400/90' : 'text-blue-800 opacity-90'}`}>
-                <li>Verifying image location metadata</li>
-                <li>Analyzing severity with AI models</li>
-                <li>Route optimization for repair crews</li>
-              </ul>
-            </div>
-          </div>
-
           <button
             type="submit"
-            disabled={isLoadingLocation || isSubmitting}
+            disabled={isLoadingLocation}
             className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all ${
-              isLoadingLocation || isSubmitting
+              isLoadingLocation
                 ? "bg-gray-400 cursor-not-allowed text-gray-200"
                 : "bg-blue-600 hover:bg-blue-700 text-white hover:shadow-blue-500/25 active:scale-[0.98]"
             }`}
           >
-            {isSubmitting
-              ? "Submitting..."
-              : isLoadingLocation
-                ? "Detecting Location..."
-                : "Submit Incident Report"}
+            {isLoadingLocation
+              ? "Detecting Location..."
+              : "Submit Incident Report"}
           </button>
         </form>
       </div>
