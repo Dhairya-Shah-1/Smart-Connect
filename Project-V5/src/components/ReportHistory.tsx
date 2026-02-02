@@ -31,100 +31,94 @@ export function ReportHistory() {
 
   useEffect(() => {
     const userStr = localStorage.getItem('currentUser');
-    if (!userStr) return;
+    if (!userStr) {
+      console.log('No user found');
+      return;
+    }
     const user = JSON.parse(userStr);
 
     const fetchReports = async () => {
       try {
         setLoading(true);
-
-        // 1. Fetch from Supabase
-        const { data: supabaseData, error } = await supabase
-          .from('incident_reports')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('timestamp', { ascending: false });
-
-        if (error) {
-          console.error('Error fetching reports:', error);
-        }
-
-        // 2. Get from localStorage
-        const localStorageReports = JSON.parse(localStorage.getItem('reports') || '[]');
-
-        // 3. Combine and deduplicate (Supabase takes precedence for newer data)
-        const allReports: Report[] = [];
+        let allReports: Report[] = [];
         const seenIds = new Set<string>();
 
-        // First add Supabase reports
-        if (supabaseData && supabaseData.length > 0) {
-          supabaseData.forEach((r: any) => {
-            const id = r.id || r.report_id;
-            seenIds.add(id);
-            allReports.push({
-              id,
-              type: r.incident_type || 'Unknown',
-              severity: r.severity || 'low',
-              location: r.location || 'Unknown Location',
-              description: r.incident_description || '',
-              photo: r.photo_url || null,
-              status: r.status || 'pending',
-              timestamp: r.timestamp || new Date().toISOString(),
-              userName: user.name || user.email,
-              aiVerified: r.ai_verified ?? true,
-              aiConfidence: r.ai_confidence,
-              aiReason: r.ai_reason,
-              isFlagged: r.is_flagged || r.status === 'rejected',
-              departmentNotified: r.department || 'Municipal Authority',
-            });
-          });
-        }
-
-        // Then add localStorage reports that aren't in Supabase yet
-        localStorageReports.forEach((r: any) => {
-          if (!seenIds.has(r.id)) {
-            allReports.push({
-              id: r.id,
-              type: r.issueType || 'Unknown',
-              severity: r.severity || 'low',
-              location: `${r.lat?.toFixed(6) || '0'}, ${r.lng?.toFixed(6) || '0'}`,
-              description: r.description || '',
-              photo: r.photo || null,
-              status: 'pending',
-              timestamp: r.timestamp || new Date().toISOString(),
-              userName: r.user || user.email,
-              aiVerified: r.aiVerified ?? true,
-              aiConfidence: undefined,
-              aiReason: undefined,
-              isFlagged: r.isFlagged || false,
-              departmentNotified: 'Municipal Authority',
+        // 1. First, get localStorage reports (most current)
+        try {
+          const localStorageReports = JSON.parse(localStorage.getItem('reports') || '[]');
+          console.log('Local storage reports:', localStorageReports);
+          
+          if (localStorageReports && localStorageReports.length > 0) {
+            localStorageReports.forEach((r: any) => {
+              const id = r.id;
+              seenIds.add(id);
+              allReports.push({
+                id,
+                type: r.issueType || 'Unknown',
+                severity: r.severity || 'low',
+                location: r.location || `${r.lat?.toFixed(6) || '0'}, ${r.lng?.toFixed(6) || '0'}`,
+                description: r.description || '',
+                photo: r.photo || null,
+                status: 'pending',
+                timestamp: r.timestamp || new Date().toISOString(),
+                userName: r.user || user.email,
+                aiVerified: r.aiVerified ?? true,
+                aiConfidence: undefined,
+                aiReason: undefined,
+                isFlagged: r.isFlagged || false,
+                departmentNotified: 'Municipal Authority',
+              });
             });
           }
-        });
+        } catch (localErr) {
+          console.error('Error reading localStorage:', localErr);
+        }
 
-        // Sort by timestamp descending
+        // 2. Then fetch from Supabase
+        try {
+          const { data: supabaseData, error } = await supabase
+            .from('incident_reports')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('timestamp', { ascending: false });
+
+          if (error) {
+            console.error('Error fetching from Supabase:', error);
+          } else if (supabaseData && supabaseData.length > 0) {
+            console.log('Supabase reports:', supabaseData);
+            supabaseData.forEach((r: any) => {
+              const id = r.id || r.report_id;
+              // Only add if not already in localStorage
+              if (!seenIds.has(id)) {
+                seenIds.add(id);
+                allReports.push({
+                  id,
+                  type: r.incident_type || 'Unknown',
+                  severity: r.severity || 'low',
+                  location: r.location || 'Unknown Location',
+                  description: r.incident_description || '',
+                  photo: r.photo_url || null,
+                  status: r.status || 'pending',
+                  timestamp: r.timestamp || new Date().toISOString(),
+                  userName: user.name || user.email,
+                  aiVerified: r.ai_verified ?? true,
+                  aiConfidence: r.ai_confidence,
+                  aiReason: r.ai_reason,
+                  isFlagged: r.is_flagged || r.status === 'rejected',
+                  departmentNotified: r.department || 'Municipal Authority',
+                });
+              }
+            });
+          }
+        } catch (supabaseErr) {
+          console.error('Supabase fetch error:', supabaseErr);
+        }
+
+        // 3. Sort all reports by timestamp descending
         allReports.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
+        console.log('Final merged reports:', allReports);
         setReports(allReports);
-      } catch (err) {
-        console.error('Failed to fetch reports:', err);
-        // Fallback to localStorage only
-        const localStorageReports = JSON.parse(localStorage.getItem('reports') || '[]');
-        const mapped: Report[] = localStorageReports.map((r: any) => ({
-          id: r.id,
-          type: r.issueType || 'Unknown',
-          severity: r.severity || 'low',
-          location: `${r.lat?.toFixed(6) || '0'}, ${r.lng?.toFixed(6) || '0'}`,
-          description: r.description || '',
-          photo: r.photo || null,
-          status: 'pending',
-          timestamp: r.timestamp || new Date().toISOString(),
-          userName: r.user || user.email,
-          aiVerified: r.aiVerified ?? true,
-          isFlagged: r.isFlagged || false,
-          departmentNotified: 'Municipal Authority',
-        }));
-        setReports(mapped);
       } finally {
         setLoading(false);
       }
@@ -132,7 +126,7 @@ export function ReportHistory() {
 
     fetchReports();
 
-    // Real-time subscription for new reports
+    // Real-time subscription for new reports from Supabase
     const subscription = supabase
       .channel(`incident_reports_${user.id}`)
       .on(
@@ -145,7 +139,7 @@ export function ReportHistory() {
         },
         (payload) => {
           console.log('Real-time update received:', payload);
-          fetchReports(); // Refetch all reports when any change occurs
+          fetchReports();
         }
       )
       .subscribe((status) => {
@@ -163,8 +157,20 @@ export function ReportHistory() {
       setLastRefresh(Date.now());
     };
 
+    // Listen for storage changes (when reports are added from another tab/component)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'reports') {
+        console.log('Storage changed, refreshing reports');
+        setLastRefresh(Date.now());
+      }
+    };
+
     window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   const getIssueIcon = (type: string) => {
