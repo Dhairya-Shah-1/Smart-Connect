@@ -38,7 +38,8 @@ export function ReportHistory() {
       try {
         setLoading(true);
 
-        const { data, error } = await supabase
+        // 1. Fetch from Supabase
+        const { data: supabaseData, error } = await supabase
           .from('incident_reports')
           .select('*')
           .eq('user_id', user.id)
@@ -46,33 +47,84 @@ export function ReportHistory() {
 
         if (error) {
           console.error('Error fetching reports:', error);
-          throw error;
         }
 
-        if (data && data.length > 0) {
-          const mapped: Report[] = data.map((r: any) => ({
-            id: r.id || r.report_id,
-            type: r.incident_type || 'Unknown',
-            severity: r.severity || 'low',
-            location: r.location || 'Unknown Location',
-            description: r.incident_description || '',
-            photo: r.photo_url || null,
-            status: r.status || 'pending',
-            timestamp: r.timestamp || new Date().toISOString(),
-            userName: user.name || user.email,
-            aiVerified: r.ai_verified ?? true,
-            aiConfidence: r.ai_confidence,
-            aiReason: r.ai_reason,
-            isFlagged: r.is_flagged || r.status === 'rejected',
-            departmentNotified: r.department || 'Municipal Authority',
-          }));
-          setReports(mapped);
-        } else {
-          setReports([]);
+        // 2. Get from localStorage
+        const localStorageReports = JSON.parse(localStorage.getItem('reports') || '[]');
+
+        // 3. Combine and deduplicate (Supabase takes precedence for newer data)
+        const allReports: Report[] = [];
+        const seenIds = new Set<string>();
+
+        // First add Supabase reports
+        if (supabaseData && supabaseData.length > 0) {
+          supabaseData.forEach((r: any) => {
+            const id = r.id || r.report_id;
+            seenIds.add(id);
+            allReports.push({
+              id,
+              type: r.incident_type || 'Unknown',
+              severity: r.severity || 'low',
+              location: r.location || 'Unknown Location',
+              description: r.incident_description || '',
+              photo: r.photo_url || null,
+              status: r.status || 'pending',
+              timestamp: r.timestamp || new Date().toISOString(),
+              userName: user.name || user.email,
+              aiVerified: r.ai_verified ?? true,
+              aiConfidence: r.ai_confidence,
+              aiReason: r.ai_reason,
+              isFlagged: r.is_flagged || r.status === 'rejected',
+              departmentNotified: r.department || 'Municipal Authority',
+            });
+          });
         }
+
+        // Then add localStorage reports that aren't in Supabase yet
+        localStorageReports.forEach((r: any) => {
+          if (!seenIds.has(r.id)) {
+            allReports.push({
+              id: r.id,
+              type: r.issueType || 'Unknown',
+              severity: r.severity || 'low',
+              location: `${r.lat?.toFixed(6) || '0'}, ${r.lng?.toFixed(6) || '0'}`,
+              description: r.description || '',
+              photo: r.photo || null,
+              status: 'pending',
+              timestamp: r.timestamp || new Date().toISOString(),
+              userName: r.user || user.email,
+              aiVerified: r.aiVerified ?? true,
+              aiConfidence: undefined,
+              aiReason: undefined,
+              isFlagged: r.isFlagged || false,
+              departmentNotified: 'Municipal Authority',
+            });
+          }
+        });
+
+        // Sort by timestamp descending
+        allReports.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+        setReports(allReports);
       } catch (err) {
         console.error('Failed to fetch reports:', err);
-        setReports([]);
+        // Fallback to localStorage only
+        const localStorageReports = JSON.parse(localStorage.getItem('reports') || '[]');
+        const mapped: Report[] = localStorageReports.map((r: any) => ({
+          id: r.id,
+          type: r.issueType || 'Unknown',
+          severity: r.severity || 'low',
+          location: `${r.lat?.toFixed(6) || '0'}, ${r.lng?.toFixed(6) || '0'}`,
+          description: r.description || '',
+          photo: r.photo || null,
+          status: 'pending',
+          timestamp: r.timestamp || new Date().toISOString(),
+          userName: r.user || user.email,
+          aiVerified: r.aiVerified ?? true,
+          isFlagged: r.isFlagged || false,
+          departmentNotified: 'Municipal Authority',
+        }));
+        setReports(mapped);
       } finally {
         setLoading(false);
       }
@@ -108,41 +160,24 @@ export function ReportHistory() {
   // Refetch reports whenever the page comes into focus
   useEffect(() => {
     const handleFocus = () => {
-      console.log('Page focused, refreshing reports...');
       setLastRefresh(Date.now());
     };
 
-    // Listen for visibility change (switching tabs)
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        handleFocus();
-      }
-    });
-
     window.addEventListener('focus', handleFocus);
-    
-    return () => {
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleFocus);
-    };
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   const getIssueIcon = (type: string) => {
-    switch (type.toLowerCase()) {
-      case 'flood':
-      case 'puddle':
-        return Droplets;
-      case 'pothole':
-        return AlertTriangle;
-      case 'fire':
-        return Flame;
-      case 'accident':
-        return Car;
-      case 'landslide':
-        return Mountain;
-      default:
-        return MapPin;
-    }
+    const lowerType = type.toLowerCase();
+    if (lowerType.includes('flood') || lowerType.includes('puddle') || lowerType.includes('water')) return Droplets;
+    if (lowerType.includes('pothole')) return AlertTriangle;
+    if (lowerType.includes('fire')) return Flame;
+    if (lowerType.includes('accident') || lowerType.includes('crash')) return Car;
+    if (lowerType.includes('landslide')) return Mountain;
+    if (lowerType.includes('garbage') || lowerType.includes('waste')) return AlertTriangle;
+    if (lowerType.includes('light') || lowerType.includes('street')) return AlertTriangle;
+    if (lowerType.includes('leak') || lowerType.includes('leakage')) return Droplets;
+    return MapPin;
   };
 
   const getSeverityColor = (severity: string) => {
