@@ -372,9 +372,6 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
           <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
             isFlagged ? 'bg-red-100' : 'bg-green-100'
           }`}>
-          <ShieldCheck className="text-green-600" size={32} />
-          <h3 className="text-xl font-bold text-green-900 mb-2">Report Submitted</h3>
-          <p className="text-green-700">Thank you for helping make the city safer. Your report has been verified.</p>
             {isFlagged ? (
               <AlertCircle className="text-red-600" size={32} />
             ) : (
@@ -490,7 +487,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {issueTypes.map((type) => (
-                <button required
+                <button
                   key={type}
                   type="button"
                   onClick={() => handleTypeChange(type)}
@@ -665,7 +662,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
             >
               {photo ? (
                 <div className="relative h-48 w-full group">
-                  <img required
+                  <img
                     src={photo}
                     alt="Preview"
                     className="w-full h-full object-contain rounded-lg"
