@@ -27,6 +27,7 @@ export function ReportHistory() {
   const [reports, setReports] = useState<Report[]>([]);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState(Date.now());
 
   useEffect(() => {
     const userStr = localStorage.getItem('currentUser');
@@ -43,19 +44,22 @@ export function ReportHistory() {
           .eq('user_id', user.id)
           .order('timestamp', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching reports:', error);
+          throw error;
+        }
 
-        if (data) {
+        if (data && data.length > 0) {
           const mapped: Report[] = data.map((r: any) => ({
-            id: r.report_id || r.id,
-            type: r.incident_type,
-            severity: r.severity,
-            location: r.location,
-            description: r.incident_description,
-            photo: r.photo_url,
-            status: r.status,
-            timestamp: r.timestamp || r.created_at,
-            userName: user.name,
+            id: r.id || r.report_id,
+            type: r.incident_type || 'Unknown',
+            severity: r.severity || 'low',
+            location: r.location || 'Unknown Location',
+            description: r.incident_description || '',
+            photo: r.photo_url || null,
+            status: r.status || 'pending',
+            timestamp: r.timestamp || new Date().toISOString(),
+            userName: user.name || user.email,
             aiVerified: r.ai_verified ?? true,
             aiConfidence: r.ai_confidence,
             aiReason: r.ai_reason,
@@ -63,7 +67,12 @@ export function ReportHistory() {
             departmentNotified: r.department || 'Municipal Authority',
           }));
           setReports(mapped);
+        } else {
+          setReports([]);
         }
+      } catch (err) {
+        console.error('Failed to fetch reports:', err);
+        setReports([]);
       } finally {
         setLoading(false);
       }
@@ -73,7 +82,7 @@ export function ReportHistory() {
 
     // Real-time subscription for new reports
     const subscription = supabase
-      .channel('incident_reports_changes')
+      .channel(`incident_reports_${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -82,15 +91,28 @@ export function ReportHistory() {
           table: 'incident_reports',
           filter: `user_id=eq.${user.id}`,
         },
-        () => {
-          fetchReports();
+        (payload) => {
+          console.log('Real-time update received:', payload);
+          fetchReports(); // Refetch all reports when any change occurs
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Subscription status:', status);
+      });
 
     return () => {
       subscription.unsubscribe();
     };
+  }, [lastRefresh]);
+
+  // Refetch reports whenever the page comes into focus
+  useEffect(() => {
+    const handleFocus = () => {
+      setLastRefresh(Date.now());
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   const getIssueIcon = (type: string) => {
