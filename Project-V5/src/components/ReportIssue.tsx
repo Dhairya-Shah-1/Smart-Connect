@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Camera, MapPin, AlertCircle, ShieldCheck, X, Monitor, Navigation, RefreshCw, HelpCircle } from 'lucide-react';
+import { Camera, MapPin, AlertCircle, ShieldCheck, X, Monitor, Navigation, RefreshCw, HelpCircle, Loader2 } from 'lucide-react';
 import { canReportIncident } from '../utils/deviceDetection';
 import { useTheme } from '../App';
 import { toast } from 'sonner';
@@ -163,12 +163,6 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
     })();
   }, [canReport, getPermissionState, requestLocation]);
 
-  // ─── AI Verification Result State ───────────────────────────
-  const [aiVerificationResult, setAiVerificationResult] = useState<{
-    verified: boolean;
-    confidence: number;
-    reason: string;
-  } | null>(null);
 
   // ─── Submit ────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
@@ -193,7 +187,6 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
     }
 
     setIsSubmitting(true);
-    setAiVerificationResult(null);
 
     try {
       const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
@@ -204,44 +197,33 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         return;
       }
 
-      // Default AI result if API fails
-      let aiResult = {
-        verified: true,
-        confidence: 1,
-        reason: 'Report submitted for manual review'
-      };
+      // Set default status as pending
+      const reportStatus = 'pending';
 
-      // Try to verify with Gemini API (but don't block submission if it fails)
-      try {
-        const verifyRes = await fetch('/api/verify-incident', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            incidentType: issueType,
-            description,
-            lat,
-            lng,
-            photoUrl: photo,
-          }),
+      // 1. SAVE TO SUPABASE (with loader showing)
+      const { data, error } = await supabase
+        .from('incident_reports')
+        .insert({
+          user_id: user.id,
+          incident_type: issueType,
+          incident_description: description,
+          severity,
+          status: reportStatus,
+          lcation: `${lat},${lng}`,
+          photo_url: photo,
+          timestamp: new Date().toISOString(),
         });
 
-        if (verifyRes.ok) {
-          const result = await verifyRes.json();
-          if (result && typeof result.verified === 'boolean') {
-            aiResult = result;
-          }
-        }
-      } catch (apiErr) {
-        console.log('[v0] AI verification API failed, proceeding with submission:', apiErr);
+      if (error) {
+        console.error('Supabase insert error:', error);
+        toast.error('Failed to save report to database. Please try again.');
+        setIsSubmitting(false);
+        return;
       }
 
-      setAiVerificationResult(aiResult);
+      console.log('Report saved to Supabase:', data);
 
-      // Determine status based on AI verification
-      const reportStatus = aiResult.verified ? 'pending' : 'rejected';
-      const isFlagged = !aiResult.verified;
-
-      // 1. SAVE TO LOCALSTORAGE FIRST (immediate display in history)
+      // 2. SAVE TO LOCALSTORAGE (immediate display in history)
       const localReport = {
         id: Date.now().toString(),
         issueType,
@@ -252,54 +234,25 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         photo,
         user: user.email,
         timestamp: new Date().toISOString(),
-        aiVerified: aiResult.verified,
-        isFlagged
       };
 
       const existing = JSON.parse(localStorage.getItem('reports') || '[]');
       const updatedReports = [localReport, ...existing];
       localStorage.setItem('reports', JSON.stringify(updatedReports));
-      
-      console.log('[v0] Reports in localStorage after save:', updatedReports);
-      
-      // Trigger BOTH storage event AND custom event to notify ReportHistory
+
+      // Dispatch events to update ReportHistory
       window.dispatchEvent(new StorageEvent('storage', {
         key: 'reports',
         newValue: JSON.stringify(updatedReports),
         oldValue: JSON.stringify(existing),
         url: window.location.href
       }));
-      
-      // Also dispatch custom event for same-window updates
+
       window.dispatchEvent(new CustomEvent('reports-updated', {
         detail: { reports: updatedReports }
       }));
 
-      console.log('[v0] Report saved to localStorage and events dispatched:', localReport);
-
-      // 2. THEN attempt to save to Supabase (async, non-blocking)
-      supabase.from('incident_reports').insert({
-        user_id: user.id,
-        incident_type: issueType,
-        incident_description: description,
-        severity,
-        status: reportStatus,
-        location: `POINT(${lng} ${lat})`,
-        photo_url: photo,
-        timestamp: new Date().toISOString(),
-        ai_verified: aiResult.verified,
-        ai_confidence: aiResult.confidence,
-        ai_reason: aiResult.reason,
-        is_flagged: isFlagged
-      }).then(({ data, error }) => {
-        if (error) {
-          console.log('[v0] Supabase insert error:', error);
-        } else {
-          console.log('[v0] Report saved to Supabase:', data);
-        }
-      }).catch(err => {
-        console.log('[v0] Supabase insert failed:', err);
-      });
+      console.log('Report saved to localStorage and database:', localReport);
 
       setSuccess(true);
       toast.success('Report submitted successfully!');
@@ -315,9 +268,8 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         onSuccess();
       }, 3000);
     } catch (err: any) {
-      console.log('[v0] Submit error:', err);
+      console.error('Submit error:', err);
       toast.error(err.message || 'Submission failed');
-      setIsSubmitting(false);
     } finally {
       setIsSubmitting(false);
     }
@@ -395,61 +347,23 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
   };
 
   if (success) {
-
-    const isVerified = aiVerificationResult?.verified;
-    const isFlagged = !isVerified;
-
     return (
       <div className="h-full flex items-center justify-center p-6 text-center animate-in fade-in">
-        <div className={`bg-green-50 p-8 rounded-2xl max-w-sm border border-green-100 shadow-sm ${
-          isFlagged 
-            ? 'bg-red-50 border-red-200' 
-            : 'bg-green-50 border-green-100'
-        }`}>
-          <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
-            isFlagged ? 'bg-red-100' : 'bg-green-100'
-          }`}>
-            {isFlagged ? (
-              <AlertCircle className="text-red-600" size={32} />
-            ) : (
-              <ShieldCheck className="text-green-600" size={32} />
-            )}
+        <div className="bg-green-50 p-8 rounded-2xl max-w-sm border border-green-100 shadow-sm">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 bg-green-100">
+            <ShieldCheck className="text-green-600" size={32} />
           </div>
           
-          <h3 className={`text-xl font-bold mb-2 ${
-            isFlagged ? 'text-red-900' : 'text-green-900'
-          }`}>
-            {isFlagged ? 'Report Flagged' : 'Report Submitted'}
+          <h3 className="text-xl font-bold mb-2 text-green-900">
+            Report Submitted
           </h3>
           
-          <p className={`mb-4 ${isFlagged ? 'text-red-700' : 'text-green-700'}`}>
-            {isFlagged 
-              ? 'Your report has been flagged for review.' 
-              : 'Thank you! Your report has been verified and logged.'}
+          <p className="text-green-700 mb-4">
+            Thank you! Your report has been successfully logged and submitted to our system for review.
           </p>
 
-          {aiVerificationResult && (
-            <div className={`mt-4 p-4 rounded-xl text-left ${
-              isFlagged ? 'bg-red-100/50' : 'bg-green-100/50'
-            }`}>
-              <p className={`text-sm font-medium mb-2 ${
-                isFlagged ? 'text-red-800' : 'text-green-800'
-              }`}>
-                AI Analysis Result:
-              </p>
-              <p className={`text-sm ${isFlagged ? 'text-red-700' : 'text-green-700'}`}>
-                {aiVerificationResult.reason}
-              </p>
-              <p className={`text-xs mt-2 ${isFlagged ? 'text-red-600' : 'text-green-600'}`}>
-                Confidence: {Math.round(aiVerificationResult.confidence * 100)}%
-              </p>
-            </div>
-          )}
-
-          <p className={`text-sm mt-4 ${isFlagged ? 'text-red-600' : 'text-green-600'}`}>
-            {isFlagged 
-              ? 'Check your History tab for details.' 
-              : 'View status in the History tab.'}
+          <p className="text-sm text-green-600">
+            View status in the History tab.
           </p>
         </div>
       </div>
@@ -746,15 +660,18 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
           <button
             type="submit"
-            disabled={isLoadingLocation || !issueType || !photo}
-            className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all ${
-              isLoadingLocation || !issueType || !photo
+            disabled={isLoadingLocation || !issueType || !photo || isSubmitting}
+            className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all flex items-center justify-center gap-2 ${
+              isLoadingLocation || !issueType || !photo || isSubmitting
                 ? "bg-gray-400 cursor-not-allowed text-gray-200"
                 : "bg-blue-600 hover:bg-blue-700 text-white hover:shadow-blue-500/25 active:scale-[0.98]"
             }`}
           >
+            {isSubmitting && <Loader2 size={20} className="animate-spin" />}
             {isLoadingLocation
               ? "Detecting Location..."
+              : isSubmitting
+              ? "Submitting Report..."
               : !issueType || !photo
               ? "Select Type & Photo"
               : "Submit Incident Report"}
