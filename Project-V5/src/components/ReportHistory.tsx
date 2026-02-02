@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Clock, MapPin, Droplets, AlertTriangle, Flame, Car, Mountain, ShieldCheck, Building2, Loader2 } from 'lucide-react';
+import { Clock, MapPin, Droplets, AlertTriangle, Flame, Car, Mountain, ShieldCheck, Building2, Loader2, Flag, XCircle } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { useTheme } from '../App';
 
@@ -14,6 +14,9 @@ interface Report {
   timestamp: string;
   userName: string;
   aiVerified: boolean;
+  aiConfidence?: number;
+  aiReason?: string;
+  isFlagged: boolean;
   departmentNotified: string;
 }
 
@@ -26,13 +29,13 @@ export function ReportHistory() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const userStr = localStorage.getItem('currentUser');
+    if (!userStr) return;
+    const user = JSON.parse(userStr);
+
     const fetchReports = async () => {
       try {
         setLoading(true);
-        const userStr = localStorage.getItem('currentUser');
-        if (!userStr) return;
-
-        const user = JSON.parse(userStr);
 
         const { data, error } = await supabase
           .from('incident_reports')
@@ -44,16 +47,19 @@ export function ReportHistory() {
 
         if (data) {
           const mapped: Report[] = data.map((r: any) => ({
-            id: r.report_id,
+            id: r.report_id || r.id,
             type: r.incident_type,
             severity: r.severity,
             location: r.location,
             description: r.incident_description,
             photo: r.photo_url,
             status: r.status,
-            timestamp: r.timestamp,
+            timestamp: r.timestamp || r.created_at,
             userName: user.name,
-            aiVerified: true,
+            aiVerified: r.ai_verified ?? true,
+            aiConfidence: r.ai_confidence,
+            aiReason: r.ai_reason,
+            isFlagged: r.is_flagged || r.status === 'rejected',
             departmentNotified: r.department || 'Municipal Authority',
           }));
           setReports(mapped);
@@ -64,6 +70,27 @@ export function ReportHistory() {
     };
 
     fetchReports();
+
+    // Real-time subscription for new reports
+    const subscription = supabase
+      .channel('incident_reports_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'incident_reports',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchReports();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const getIssueIcon = (type: string) => {
@@ -160,75 +187,162 @@ export function ReportHistory() {
         {/* List */}
         <div className="space-y-4">
           {filteredReports.length === 0 ? (
-            <div className="bg-white p-8 rounded-xl border text-center">
-              <p className="text-gray-500">No reports found</p>
+            <div className={`p-8 rounded-xl border text-center ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
+              <p className={isDark ? 'text-gray-400' : 'text-gray-500'}>No reports found</p>
+              {filter !== 'all' && (
+                <button
+                  onClick={() => setFilter('all')}
+                  className="mt-2 text-blue-600 hover:underline"
+                >
+                  View all reports
+                </button>
+              )}
             </div>
           ) : (
             filteredReports.map(report => {
               const Icon = getIssueIcon(report.type);
 
               return (
-                <div key={report.id} className="bg-white rounded-xl border shadow-sm hover:shadow-md transition">
-                  <div className="p-5 flex gap-4">
-                    {report.photo && (
-                      <img
-                        src={report.photo}
-                        className="w-32 h-32 object-cover rounded-lg"
-                        alt="incident"
-                      />
-                    )}
+                <div key={report.id} className={`rounded-xl border shadow-sm hover:shadow-md transition overflow-hidden ${
+                  report.isFlagged 
+                    ? 'bg-red-50 border-red-300 border-l-4 border-l-red-500' 
+                    : isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'
+                }`}>
+                  <div className="p-5">
+                    <div className="flex items-start gap-4">
+                      {report.photo && (
+                        <img
+                          src={report.photo}
+                          className="w-32 h-32 object-cover rounded-lg flex-shrink-0"
+                          alt="incident"
+                        />
+                      )}
 
-                    <div className="flex-1">
-                      <div className="flex justify-between mb-3">
-                        <div className="flex gap-2 items-center">
-                          <Icon size={20} />
-                          <div>
-                            <h3 className="text-lg">{report.type}</h3>
-                            <p className="text-xs text-gray-500 flex items-center gap-1">
-                              <MapPin size={12} />
-                              {report.location}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                report.isFlagged 
+                                  ? 'bg-red-100' 
+                                  : isDark ? 'bg-slate-700' : 'bg-gray-100'
+                              }`}>
+                                <Icon className={report.isFlagged ? 'text-red-600' : isDark ? 'text-gray-300' : 'text-gray-700'} size={20} />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h3 className={`text-lg ${
+                                    report.isFlagged 
+                                      ? 'text-red-900' 
+                                      : isDark ? 'text-white' : 'text-gray-900'
+                                  }`}>{report.type}</h3>
+                                  {report.isFlagged && (
+                                    <span className="inline-flex items-center gap-1 bg-red-600 text-white px-2 py-0.5 rounded text-xs">
+                                      <Flag size={10} />
+                                      Flagged
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500 flex items-center gap-1">
+                                  <MapPin size={12} />
+                                  {report.location}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <span className={`px-3 py-1 rounded-full text-xs border-2 flex-shrink-0 ml-2 ${getSeverityColor(report.severity)}`}>
+                            {report.severity?.toUpperCase() || 'UNKNOWN'}
+                          </span>
+                        </div>
+
+                        <p className={`text-sm mb-4 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{report.description}</p>
+
+                        {/* AI Reason for flagged reports */}
+                        {report.isFlagged && report.aiReason && (
+                          <div className="mb-3 p-3 bg-red-100 border border-red-200 rounded-lg">
+                            <div className="flex items-start gap-2">
+                              <XCircle size={16} className="text-red-600 mt-0.5 flex-shrink-0" />
+                              <div>
+                                <p className="text-xs font-medium text-red-800 mb-1">AI Analysis:</p>
+                                <p className="text-xs text-red-700">{report.aiReason}</p>
+                                {report.aiConfidence !== undefined && (
+                                  <p className="text-xs text-red-600 mt-1">
+                                    Confidence: {Math.round(report.aiConfidence * 100)}%
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                          <div className={`p-3 rounded-lg border ${
+                            report.isFlagged 
+                              ? 'bg-red-100/50 border-red-200' 
+                              : isDark ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-200'
+                          }`}>
+                            <p className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Current Status</p>
+                            <span className={`inline-block px-3 py-1 text-xs rounded border ${
+                              report.isFlagged 
+                                ? 'bg-red-100 text-red-800 border-red-300' 
+                                : getStatusBadgeColor(report.status)
+                            }`}>
+                              {report.isFlagged ? 'Rejected' : report.status === 'in-progress' ? 'In Progress' : report.status.charAt(0).toUpperCase() + report.status.slice(1)}
+                            </span>
+                          </div>
+                          <div className={`p-3 rounded-lg border ${
+                            report.isFlagged 
+                              ? 'bg-red-100/50 border-red-200' 
+                              : isDark ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-200'
+                          }`}>
+                            <p className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Department</p>
+                            <p className={`text-xs flex gap-1 ${isDark ? 'text-gray-300' : 'text-gray-900'}`}>
+                              <Building2 size={12} />
+                              {report.departmentNotified}
                             </p>
                           </div>
                         </div>
 
-                        <span className={`px-3 py-1 rounded-full text-xs border ${getSeverityColor(report.severity)}`}>
-                          {report.severity.toUpperCase()}
-                        </span>
+                        {report.aiVerified && !report.isFlagged && (
+                          <div className="inline-flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 mb-3">
+                            <ShieldCheck size={14} className="text-green-700" />
+                            <span className="text-xs text-green-800">
+                              Verified by SmartConnect AI
+                            </span>
+                          </div>
+                        )}
+
+                        <p className="text-xs text-gray-500 flex gap-1 items-center">
+                          <Clock size={12} />
+                          Reported on {new Date(report.timestamp).toLocaleDateString()} at {new Date(report.timestamp).toLocaleTimeString()}
+                        </p>
                       </div>
-
-                      <p className="text-sm mb-3">{report.description}</p>
-
-                      <div className="grid grid-cols-2 gap-3 mb-3">
-                        <div className="p-3 bg-gray-50 rounded-lg border">
-                          <p className="text-xs mb-1">Status</p>
-                          <span className={`px-3 py-1 text-xs rounded border ${getStatusBadgeColor(report.status)}`}>
-                            {report.status}
-                          </span>
-                        </div>
-                        <div className="p-3 bg-gray-50 rounded-lg border">
-                          <p className="text-xs mb-1">Department</p>
-                          <p className="text-xs flex gap-1">
-                            <Building2 size={12} />
-                            {report.departmentNotified}
-                          </p>
-                        </div>
-                      </div>
-
-                      {report.aiVerified && (
-                        <div className="inline-flex items-center gap-2 bg-green-50 border border-green-200 rounded px-3 py-2 mb-3">
-                          <ShieldCheck size={14} className="text-green-700" />
-                          <span className="text-xs text-green-800">
-                            Verified by SmartConnect AI
-                          </span>
-                        </div>
-                      )}
-
-                      <p className="text-xs text-gray-500 flex gap-1 items-center">
-                        <Clock size={12} />
-                        {new Date(report.timestamp).toLocaleString()}
-                      </p>
                     </div>
                   </div>
+
+                  {/* Progress Bar for In-Progress Items */}
+                  {report.status === 'in-progress' && !report.isFlagged && (
+                    <div className="bg-yellow-50 px-5 py-3 border-t border-yellow-200">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-yellow-800">Resolution Progress</span>
+                        <span className="text-xs text-yellow-800">65%</span>
+                      </div>
+                      <div className="w-full bg-yellow-200 rounded-full h-2">
+                        <div className="bg-yellow-600 h-2 rounded-full" style={{ width: '65%' }}></div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Resolved Badge */}
+                  {report.status === 'resolved' && !report.isFlagged && (
+                    <div className="bg-green-50 px-5 py-3 border-t border-green-200 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-green-600" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
+                        <path d="M5 13l4 4L19 7"></path>
+                      </svg>
+                      <span className="text-xs text-green-800">Issue resolved and verified</span>
+                    </div>
+                  )}
                 </div>
               );
             })
