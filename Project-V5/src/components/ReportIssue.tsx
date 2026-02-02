@@ -260,14 +260,22 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       const updatedReports = [localReport, ...existing];
       localStorage.setItem('reports', JSON.stringify(updatedReports));
       
-      // Trigger storage event to notify ReportHistory immediately
+      console.log('[v0] Reports in localStorage after save:', updatedReports);
+      
+      // Trigger BOTH storage event AND custom event to notify ReportHistory
       window.dispatchEvent(new StorageEvent('storage', {
         key: 'reports',
         newValue: JSON.stringify(updatedReports),
+        oldValue: JSON.stringify(existing),
         url: window.location.href
       }));
+      
+      // Also dispatch custom event for same-window updates
+      window.dispatchEvent(new CustomEvent('reports-updated', {
+        detail: { reports: updatedReports }
+      }));
 
-      console.log('[v0] Report saved to localStorage:', localReport);
+      console.log('[v0] Report saved to localStorage and events dispatched:', localReport);
 
       // 2. THEN attempt to save to Supabase (async, non-blocking)
       supabase.from('incident_reports').insert({
