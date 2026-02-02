@@ -108,11 +108,23 @@ export function ReportHistory() {
   // Refetch reports whenever the page comes into focus
   useEffect(() => {
     const handleFocus = () => {
+      console.log('Page focused, refreshing reports...');
       setLastRefresh(Date.now());
     };
 
+    // Listen for visibility change (switching tabs)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        handleFocus();
+      }
+    });
+
     window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
   }, []);
 
   const getIssueIcon = (type: string) => {
