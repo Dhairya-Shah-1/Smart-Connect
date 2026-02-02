@@ -264,10 +264,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
       console.log('[v0] Report saved to Supabase:', data);
 
-      // Wait briefly to ensure Supabase replication before showing success
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      setAiVerificationResult(aiResult);
+      // Local fallback (preserved)
       const localReport = {
         id: Date.now().toString(),
         issueType,
@@ -283,7 +280,15 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       };
 
       const existing = JSON.parse(localStorage.getItem('reports') || '[]');
-      localStorage.setItem('reports', JSON.stringify([localReport, ...existing]));
+      const updatedReports = [localReport, ...existing];
+      localStorage.setItem('reports', JSON.stringify(updatedReports));
+      
+      // Trigger storage event to notify ReportHistory
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'reports',
+        newValue: JSON.stringify(updatedReports),
+        url: window.location.href
+      }));
 
       setSuccess(true);
       toast.success('Report submitted successfully!');
