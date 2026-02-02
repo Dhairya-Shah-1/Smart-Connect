@@ -726,15 +726,17 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
           <button
             type="submit"
-            disabled={isLoadingLocation}
+            disabled={isLoadingLocation || !issueType || !photo}
             className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all ${
-              isLoadingLocation
+              isLoadingLocation || !issueType || !photo
                 ? "bg-gray-400 cursor-not-allowed text-gray-200"
                 : "bg-blue-600 hover:bg-blue-700 text-white hover:shadow-blue-500/25 active:scale-[0.98]"
             }`}
           >
             {isLoadingLocation
               ? "Detecting Location..."
+              : !issueType || !photo
+              ? "Select Type & Photo"
               : "Submit Incident Report"}
           </button>
         </form>
