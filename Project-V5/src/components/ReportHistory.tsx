@@ -154,22 +154,32 @@ export function ReportHistory() {
   // Refetch reports whenever the page comes into focus
   useEffect(() => {
     const handleFocus = () => {
+      console.log('Window focused, refreshing reports');
       setLastRefresh(Date.now());
     };
 
     // Listen for storage changes (when reports are added from another tab/component)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'reports') {
-        console.log('Storage changed, refreshing reports');
+        console.log('Storage changed, refreshing reports:', e.newValue);
         setLastRefresh(Date.now());
       }
     };
 
+    // Also listen for custom events
+    const handleCustomRefresh = () => {
+      console.log('Custom refresh event received');
+      setLastRefresh(Date.now());
+    };
+
     window.addEventListener('focus', handleFocus);
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('reports-updated', handleCustomRefresh);
+    
     return () => {
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('reports-updated', handleCustomRefresh);
     };
   }, []);
 
