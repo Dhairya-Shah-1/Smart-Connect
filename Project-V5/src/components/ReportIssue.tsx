@@ -228,7 +228,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
     localStorage.setItem('reports', JSON.stringify([newReport, ...existingReports]));
 
     setSuccess(true);
-    setTimeout(onSuccess, 2000);
+    // setTimeout(onSuccess, 2000);
 
   const getSeverityDotColor = (sev: string) => {
     switch (sev) {
