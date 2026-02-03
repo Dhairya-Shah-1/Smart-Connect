@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Camera, MapPin, AlertCircle, ShieldCheck, X, Monitor, Navigation, RefreshCw, HelpCircle } from 'lucide-react';
+// import { Camera, MapPin, AlertCircle, ShieldCheck, X, Monitor, Navigation, RefreshCw, HelpCircle } from 'lucide-react';
 import { canReportIncident } from '../utils/deviceDetection';
 import { useTheme } from '../App';
 import { toast } from 'sonner@2.0.3';
@@ -135,7 +135,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
     return data.publicUrl;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Prevent submission if location is not available
@@ -143,7 +143,29 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       toast.error('Location is required to submit a report. Please enable location access and try again.');
       return;
     }
-    
+
+    // v2 addition 1
+
+    const newReport = {
+      id: Date.now().toString(),
+      type: issueType,
+      severity,
+      location,
+      lat,
+      lng,
+      description,
+      photo: photoUrl, // Supabase public URL
+      status: 'pending',
+      timestamp: new Date().toISOString(),
+      userName: user.name || 'Anonymous',
+      userEmail: user.email,
+      aiVerified: true,
+      departmentNotified: 'Public Works Dept',
+      synced: true
+    };
+
+    // v2 addition 1 complete
+
     const user = JSON.parse(localStorage.getItem('currentUser') || '{}');  
       id: Date.now().toString(),
       type: issueType,
@@ -228,6 +250,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
     localStorage.setItem('reports', JSON.stringify([newReport, ...existingReports]));
 
     setSuccess(true);
+  };
     // setTimeout(onSuccess, 2000);
 
   const getSeverityDotColor = (sev: string) => {
@@ -413,7 +436,10 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
                      <button
                       type="button"
-                      onClick={() => setPhoto(null)}
+                      onClick={() => {
+                        setPhoto(null);
+                        setPhotoPreview(null);
+                      }}
                       className="bg-white text-red-600 px-4 py-2 rounded-lg font-medium shadow-lg hover:bg-red-50 flex items-center gap-2"
                     >
                       <X size={16} /> Remove Photo
