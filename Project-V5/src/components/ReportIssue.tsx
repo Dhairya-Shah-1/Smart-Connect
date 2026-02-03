@@ -209,22 +209,39 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       toast.success('Report submitted successfully!');
 
       // 2. SAVE TO LOCALSTORAGE (immediate display in history)
-      const localReport = {
-        id: "user", //Date.now().toString(),
-        issueType,
-        severity,
-        lat,
-        lng,
+      const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const newReport = {
+        id: Date.now().toString(),
+        type: issueType,
+        severity: severity,
+        location,
+        lat: lat,
+        lng: lng,
         description,
         photo,
-        //user: user.email,
-        // status: data.status,
-        // timestamp: data.created_at ?? new Date().toISOString(), //timestamp: new Date().toISOString(),
+        status: 'pending',
+        timestamp: new Date().toISOString(),
+        userName: user.name || 'Anonymous',
+        userEmail: user.email,
+        aiVerified: true,
+        departmentNotified: 'Public Works Dept'
       };
+      // const localReport = {
+      //   id: data.id, //Date.now().toString(),
+      //   issueType,
+      //   severity,
+      //   lat,
+      //   lng,
+      //   description,
+      //   photo,
+      //   user: user.email,
+      //   status: data.status,
+      //   timestamp: data.created_at ?? new Date().toISOString(), //timestamp: new Date().toISOString(),
+      // };
 
-      const existing = JSON.parse(localStorage.getItem('reports') || '[]');
-      const updatedReports = [localReport, ...existing];
-      localStorage.setItem('reports', JSON.stringify(updatedReports));
+      // const existing = JSON.parse(localStorage.getItem('reports') || '[]');
+      // const updatedReports = [localReport, ...existing];
+      // localStorage.setItem('reports', JSON.stringify(updatedReports));
 
       // Set default status as pending
       const reportStatus = 'pending';
