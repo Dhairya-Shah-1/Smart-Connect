@@ -45,6 +45,12 @@ export function ReportHistory() {
 
         // 1. First, get localStorage reports (most current)
         try {
+
+          const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
+          const allReports = JSON.parse(localStorage.getItem('reports') || '[]');
+          const userReports = allReports.filter((r: Report) => r.userName === user.name);
+          setReports(userReports);
+          
           const localStorageReports = JSON.parse(localStorage.getItem('reports') || '[]');
           console.log('Local storage reports count:', localStorageReports.length, localStorageReports);
           
