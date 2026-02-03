@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { canReportIncident } from '../utils/deviceDetection';
 import { useTheme } from '../App';
 import { toast } from 'sonner@2.0.3';
-import { supabase } from '../lib/supabase';
+import { supabase } from './supabaseClient';
 
 interface ReportIssueProps {
   onSuccess: () => void;
