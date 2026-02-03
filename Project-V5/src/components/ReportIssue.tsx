@@ -189,9 +189,17 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
     setIsSubmitting(true);
 
     try {
-      const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !authData?.user) {
+        toast.error('Please log in to submit a report.');a
+        setIsSubmitting(false);
+        return;
+      }
+
+      const userId = authData.user.id;
       
-      if (!user.id) {
+      if (!userId) {
         toast.error('Please log in to submit a report.');
         setIsSubmitting(false);
         return;
@@ -207,7 +215,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       const { data, error } = await supabase
         .from('incident_reports')
         .insert({
-          user_id: user.id,
+          user_id: userId,
           incident_type: issueType,
           incident_description: description,
           severity,
