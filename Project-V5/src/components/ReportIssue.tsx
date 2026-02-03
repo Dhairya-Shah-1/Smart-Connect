@@ -174,7 +174,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       lat,
       lng,
       description,
-      photo: photoUrl, // 👈 Supabase URL now
+      photo,    //: photoUrl, // 👈 Supabase URL now
       //status: 'pending',
       timestamp: new Date().toISOString(),
       userName: user.name || 'Anonymous',
