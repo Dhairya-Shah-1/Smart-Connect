@@ -210,16 +210,16 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
       // 2. SAVE TO LOCALSTORAGE (immediate display in history)
       const localReport = {
-        id: data.id, //Date.now().toString(),
+        id: "user", //Date.now().toString(),
         issueType,
         severity,
         lat,
         lng,
         description,
         photo,
-        user: user.email,
-        status: data.status,
-        timestamp: data.created_at ?? new Date().toISOString(), //timestamp: new Date().toISOString(),
+        //user: user.email,
+        // status: data.status,
+        // timestamp: data.created_at ?? new Date().toISOString(), //timestamp: new Date().toISOString(),
       };
 
       const existing = JSON.parse(localStorage.getItem('reports') || '[]');
