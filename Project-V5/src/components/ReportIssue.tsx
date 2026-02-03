@@ -166,23 +166,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
     // v2 addition 1 complete
 
-    const user = JSON.parse(localStorage.getItem('currentUser') || '{}');  
-      id: Date.now().toString(),
-      issueType,
-      severity,
-      location,
-      lat,
-      lng,
-      description,
-      photo,    //: photoUrl, // 👈 Supabase URL now
-      //status: 'pending',
-      // timestamp: new Date().toISOString(),
-      // userName: user.name || 'Anonymous',
-      // userEmail: user.email,
-      // aiVerified: true,
-      // departmentNotified: 'Public Works Dept',
-      // synced: true
-    };
+    const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
 
     // old report structure before supabase integration
 
