@@ -179,7 +179,6 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
     //   userEmail: user.email,
     //   aiVerified: true,
     //   departmentNotified: 'Public Works Dept'
-    };
 
     // addition
 
@@ -230,7 +229,6 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
     setSuccess(true);
     setTimeout(onSuccess, 2000);
-  };
 
   const getSeverityDotColor = (sev: string) => {
     switch (sev) {
