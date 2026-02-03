@@ -192,7 +192,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       const { data: authData, error: authError } = await supabase.auth.getUser();
 
       if (authError || !authData?.user) {
-        toast.error('Please log in to submit a report.');
+        toast.error('Please log in to submit a report.');a
         setIsSubmitting(false);
         return;
       }
@@ -209,28 +209,23 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       toast.success('Report submitted successfully!');
 
       // 2. SAVE TO LOCALSTORAGE (immediate display in history)
-      // ===== LOCAL STORAGE SAVE (v4.1-style robustness) =====
       const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
-
-      const localReport = {
+      const newReport = {
         id: Date.now().toString(),
         type: issueType,
-        severity,
-        location: locationText,
+        severity: severity,
+        location,
+        lat: lat,
+        lng: lng,
         description,
         photo,
         status: 'pending',
         timestamp: new Date().toISOString(),
         userName: user.name || 'Anonymous',
+        userEmail: user.email,
         aiVerified: true,
-        departmentNotified: 'Public Works Dept',
+        departmentNotified: 'Public Works Dept'
       };
-
-      const existingReports = JSON.parse(localStorage.getItem('reports') || '[]');
-      const updatedReports = [localReport, ...existingReports];
-
-      localStorage.setItem('reports', JSON.stringify(updatedReports));
-
       // const localReport = {
       //   id: data.id, //Date.now().toString(),
       //   issueType,
@@ -267,66 +262,28 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         .select()
         .single();
 
-      if (error) {
-        console.error('Supabase insert error:', error);
-        toast.warning('Saved locally. Syncing to server failed.');
+      if (!data) {
+        //console.error('Supabase insert error:', error);
+        toast.error('Report could not be saved. Please try again.');
+        setIsSubmitting(false);
+        return;
       }
 
       console.log('Report saved to Supabase:', data);
 
-      // ─── LOCAL STORAGE SYNC (v4.1 compatible) ────────────────
-      const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
-
-      const localReport = {
-        id: data.id || Date.now().toString(),   // Supabase id fallback
-        type: issueType,
-        severity,
-        location: `${lat}, ${lng}`,
-        description,
-        photo,
-        status: 'pending',
-        timestamp: new Date().toISOString(),
-        userName: user.name || 'Anonymous',
-        aiVerified: true,
-        departmentNotified: 'Municipal Authority',
-      };
-
-      // Existing reports
-      const existingReports = JSON.parse(localStorage.getItem('reports') || '[]');
-
-      // Add newest on top (same behavior as v4.1)
-      const updatedReports = [localReport, ...existingReports];
-
-      // Persist
-      localStorage.setItem('reports', JSON.stringify(updatedReports));
-
-      // Notify ReportHistory instantly
-      window.dispatchEvent(
-        new CustomEvent('reports-updated', {
-          detail: { reports: updatedReports },
-        })
-      );
-
-
       // Dispatch events to update ReportHistory
-      // window.dispatchEvent(new StorageEvent('storage', {
-      //   key: 'reports',
-      //   newValue: JSON.stringify(updatedReports),
-      //   oldValue: JSON.stringify(existing),
-      //   url: window.location.href
-      // }));
-
-      window.dispatchEvent(
-      new CustomEvent('reports-updated', {
-        detail: { reports: updatedReports },
-        })
-      );
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'reports',
+        newValue: JSON.stringify(updatedReports),
+        oldValue: JSON.stringify(existing),
+        url: window.location.href
+      }));
 
       window.dispatchEvent(new CustomEvent('reports-updated', {
         detail: { reports: updatedReports }
       }));
 
-      console.log('Report saved to localStorage and database:');
+      console.log('Report saved to localStorage and database:', localReport);
 
       // Reset form and keep success visible
       setTimeout(() => {
