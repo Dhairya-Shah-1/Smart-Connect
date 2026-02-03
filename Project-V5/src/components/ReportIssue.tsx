@@ -168,14 +168,14 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
     const user = JSON.parse(localStorage.getItem('currentUser') || '{}');  
       id: Date.now().toString(),
-      type: issueType,
+      issueType,
       severity,
       location,
       lat,
       lng,
       description,
       photo: photoUrl, // 👈 Supabase URL now
-      status: 'pending',
+      //status: 'pending',
       timestamp: new Date().toISOString(),
       userName: user.name || 'Anonymous',
       userEmail: user.email,
