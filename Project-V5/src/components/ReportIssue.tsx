@@ -208,6 +208,24 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       setSuccess(true);
       toast.success('Report submitted successfully!');
 
+      // 2. SAVE TO LOCALSTORAGE (immediate display in history)
+      const localReport = {
+        id: data.id, //Date.now().toString(),
+        issueType,
+        severity,
+        lat,
+        lng,
+        description,
+        photo,
+        user: user.email,
+        status: data.status,
+        timestamp: data.created_at ?? new Date().toISOString(), //timestamp: new Date().toISOString(),
+      };
+
+      const existing = JSON.parse(localStorage.getItem('reports') || '[]');
+      const updatedReports = [localReport, ...existing];
+      localStorage.setItem('reports', JSON.stringify(updatedReports));
+
       // Set default status as pending
       const reportStatus = 'pending';
 
@@ -235,24 +253,6 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       }
 
       console.log('Report saved to Supabase:', data);
-
-      // 2. SAVE TO LOCALSTORAGE (immediate display in history)
-      const localReport = {
-        id: data.id, //Date.now().toString(),
-        issueType,
-        severity,
-        lat,
-        lng,
-        description,
-        photo,
-        user: user.email,
-        status: data.status,
-        timestamp: data.created_at ?? new Date().toISOString(), //timestamp: new Date().toISOString(),
-      };
-
-      const existing = JSON.parse(localStorage.getItem('reports') || '[]');
-      const updatedReports = [localReport, ...existing];
-      localStorage.setItem('reports', JSON.stringify(updatedReports));
 
       // Dispatch events to update ReportHistory
       window.dispatchEvent(new StorageEvent('storage', {
