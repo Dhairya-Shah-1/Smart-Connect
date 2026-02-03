@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-// import { Camera, MapPin, AlertCircle, ShieldCheck, X, Monitor, Navigation, RefreshCw, HelpCircle } from 'lucide-react';
+import { Camera, MapPin, AlertCircle, ShieldCheck, X, Monitor, Navigation, RefreshCw, HelpCircle } from 'lucide-react';
 import { canReportIncident } from '../utils/deviceDetection';
 import { useTheme } from '../App';
 import { toast } from 'sonner@2.0.3';
