@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Camera, MapPin, AlertCircle, ShieldCheck, X, Monitor, Navigation, RefreshCw, HelpCircle, Loader2 } from 'lucide-react';
 import { canReportIncident } from '../utils/deviceDetection';
 import { useTheme } from '../App';
-import { toast } from 'sonner';
+// import { toast } from 'sonner';
 import { supabase } from './supabaseClient';
 
 interface ReportIssueProps {
@@ -14,6 +14,17 @@ type GeoPermState = PermissionState | 'unsupported';
 export function ReportIssue({ onSuccess }: ReportIssueProps) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+
+  const issueTypes = [
+    "Pothole",
+    "Garbage",
+    "Flood",
+    "Water Leakage",
+    "Accident",
+    "Landslide",
+    "Fire",
+  ];
+
 
   // ─── Form State ─────────────────────────────────────────────
   const [issueType, setIssueType] = useState('');
@@ -82,7 +93,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
       if (error) {
         console.error('Upload failed:', error.message);
-        toast.error('Upload failed. Preview saved locally.');
+        // toast.error('Upload failed. Preview saved locally.');
         setUploading(false);
         return;
       }
@@ -119,7 +130,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         setCoords(pos.coords.latitude, pos.coords.longitude);
         setGeoPermission('granted');
         setIsLoadingLocation(false);
-        toast.success('Location acquired!');
+        // toast.success('Location acquired!');
       },
       err => {
         setIsLoadingLocation(false);
@@ -128,7 +139,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
           setLocationError(
             'Location permission denied. Use browser lock icon to allow it.'
           );
-          toast.error('Location permission denied.');
+          // toast.error('Location permission denied.');
         } else {
           setLocationError('Unable to fetch location.');
         }
@@ -144,7 +155,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
     setGeoPermission(state);
 
     if (state === 'denied') {
-      toast.error('Please enable location permission.');
+      // toast.error('Please enable location permission.');
       return false;
     }
 
@@ -163,6 +174,21 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
     })();
   }, [canReport, getPermissionState, requestLocation]);
 
+  const handleTypeChange = (type: string) => {
+        setIssueType(type);
+
+        if (type === "Accident") { setSeverity("critical"); return 'Accident'; }
+        else if (type === "flood") { setSeverity("critical"); return 'Flood'; }
+        else if (type === "Pothole") { setSeverity("high"); return 'Pothole'; }                       
+        else if (type === "fire") { setSeverity("critical"); return 'Fire'; }
+        else if (type === "landslide") { setSeverity("critical"); return 'Disaster Management'; }
+        else if (type === "Garbage") { setSeverity("low"); return 'Sanitation Department'; }
+        else if (type === "Water Leakage") { setSeverity("medium"); return 'Water Management'; }
+
+          setSeverity("medium");
+          return "Municipal Authority";
+        // else { setSeverity("medium"); return 'Municipal Authority'; }
+        }
 
   // ─── Submit ────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
@@ -170,19 +196,19 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
     // Validate all required fields
     if (!issueType) {
-      toast.error('Please select an incident type.');
+      // toast.error('Please select an incident type.');
       return;
     }
     if (!lat || !lng) {
-      toast.error('Location is required. Please enable GPS.');
+      // toast.error('Location is required. Please enable GPS.');
       if (!(await ensureLocation())) return;
     }
     if (!description.trim()) {
-      toast.error('Please provide a description.');
+      // toast.error('Please provide a description.');
       return;
     }
     if (!photo) {
-      toast.error('Please capture an evidence photo using your camera.');
+      // toast.error('Please capture an evidence photo using your camera.');
       return;
     }
 
@@ -192,7 +218,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       const { data: authData, error: authError } = await supabase.auth.getUser();
 
       if (authError || !authData?.user) {
-        toast.error('Please log in to submit a report.');a
+        // toast.error('Please log in to submit a report.');
         setIsSubmitting(false);
         return;
       }
@@ -200,16 +226,26 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       const userId = authData.user.id;
       
       if (!userId) {
-        toast.error('Please log in to submit a report.');
+        // toast.error('Please log in to submit a report.');
         setIsSubmitting(false);
         return;
       }
 
       setSuccess(true);
-      toast.success('Report submitted successfully!');
+      setTimeout(() => {
+        onSuccess();
+      }, 2000);
+      // toast.success('Report submitted successfully!');
 
       // 2. SAVE TO LOCALSTORAGE (immediate display in history)
       const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const reports = JSON.parse(localStorage.getItem('reports') || '[]');
+
+        // example severity mapping (adjust to your original logic)
+        // if (type === "Accident") setSeverity("critical");
+        // else if (type === "Pothole") setSeverity("high");
+        // else setSeverity("medium");
+
       const newReport = {
         id: Date.now().toString(),
         type: issueType,
@@ -224,8 +260,12 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         userName: user.name || 'Anonymous',
         userEmail: user.email,
         aiVerified: true,
-        departmentNotified: 'Public Works Dept'
+        departmentNotified: handleTypeChange(issueType)
       };
+
+      reports.push(newReport);
+      localStorage.setItem('reports', JSON.stringify(reports));
+
       // const localReport = {
       //   id: data.id, //Date.now().toString(),
       //   issueType,
@@ -264,7 +304,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
       if (!data) {
         //console.error('Supabase insert error:', error);
-        toast.error('Report could not be saved. Please try again.');
+        // toast.error('Report could not be saved. Please try again.');
         setIsSubmitting(false);
         return;
       }
@@ -272,18 +312,18 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       console.log('Report saved to Supabase:', data);
 
       // Dispatch events to update ReportHistory
-      window.dispatchEvent(new StorageEvent('storage', {
-        key: 'reports',
-        newValue: JSON.stringify(updatedReports),
-        oldValue: JSON.stringify(existing),
-        url: window.location.href
-      }));
+      // window.dispatchEvent(new StorageEvent('storage', {
+      //   key: 'reports',
+      //   newValue: JSON.stringify(updatedReports),
+      //   oldValue: JSON.stringify(existing),
+      //   url: window.location.href
+      // }));
 
-      window.dispatchEvent(new CustomEvent('reports-updated', {
-        detail: { reports: updatedReports }
-      }));
+      // window.dispatchEvent(new CustomEvent('reports-updated', {
+      //   detail: { reports: updatedReports }
+      // }));
 
-      console.log('Report saved to localStorage and database:', localReport);
+      // console.log('Report saved to localStorage and database:', localReport);
 
       // Reset form and keep success visible
       setTimeout(() => {
@@ -298,7 +338,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       }, 3000);
     } catch (err: any) {
       console.error('Submit error:', err);
-      toast.error(err.message || 'Submission failed');
+      // toast.error(err.message || 'Submission failed');
     } finally {
       setIsSubmitting(false);
     }
@@ -333,24 +373,6 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
     }
   };
 
-  const issueTypes = [
-    "Pothole",
-    "Garbage",
-    "Street Light",
-    "Water Leakage",
-    "Accident",
-    "Other",
-  ];
-
-  const handleTypeChange = (type: string) => {
-    setIssueType(type);
-
-    // example severity mapping (adjust to your original logic)
-    if (type === "Accident") setSeverity("critical");
-    else if (type === "Pothole") setSeverity("high");
-    else setSeverity("medium");
-  };
-
   const handlePhotoUpload = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -364,11 +386,11 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       .upload(filePath, file);
 
     if (error) {
-      toast.error('Failed to save report to database.');
+      // toast.error('Failed to save report to database.');
       console.error('Supabase insert error:', {
         message: error.message,
-        details: error.details,
-        hint: error.hint,
+        // details: error.details,
+        // hint: error.hint,
       });
       setIsSubmitting(false);
       return;
@@ -383,9 +405,9 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
     if (success) {
     return (
-      <div className="h-full flex items-center justify-center bg-white">
-        <div className="text-center max-w-md px-6">
-          <div className="w-20 h-20 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+      <div className={`h-full flex items-center justify-center rounded-2xl ${isDark ? "bg-blue-200" : "bg-gray-50" }`}>
+        <div className="text-center w-full max-w-sm bg-white rounded-2xl px-6 py-8 shadow-2xl">
+          <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
             <svg
               className="w-10 h-10 text-white"
               fill="none"
@@ -398,12 +420,12 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
               <path d="M5 13l4 4L19 7"></path>
             </svg>
           </div>
-          <h2 className="text-2xl mb-3 text-gray-900">Incident Report Submitted</h2>
+          <h2 className={`text-2xl mb-3 text-blue-800`}>Incident Report Submitted</h2>
           <div className="flex items-center justify-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-3 mb-4">
             <ShieldCheck className="text-green-700" size={20} />
             <span className="text-sm text-green-800">AI verification in progress</span>
           </div>
-          <p className="text-gray-600">
+          <p className={`${isDark ? "text-gray-600" : "text-gray-50" }`}>
             Local authorities have been notified. You'll receive real-time updates on the resolution progress.
           </p>
         </div>
