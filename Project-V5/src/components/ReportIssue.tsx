@@ -381,24 +381,30 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
     setPhoto(data.publicUrl); // 🔥 NOW it's hosted
   };
 
-  if (success) {
+    if (success) {
     return (
-      <div className="h-full flex items-center justify-center p-6 text-center animate-in fade-in">
-        <div className="bg-green-50 p-8 rounded-2xl max-w-sm border border-green-100 shadow-sm">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 bg-green-100">
-            <ShieldCheck className="text-green-600" size={32} />
+      <div className="h-full flex items-center justify-center bg-white">
+        <div className="text-center max-w-md px-6">
+          <div className="w-20 h-20 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+            <svg
+              className="w-10 h-10 text-white"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="3"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path d="M5 13l4 4L19 7"></path>
+            </svg>
           </div>
-          
-          <h3 className="text-xl font-bold mb-2 text-green-900">
-            Report Submitted
-          </h3>
-          
-          <p className="text-green-700 mb-4">
-            Thank you! Your report has been successfully logged and submitted to our system for review.
-          </p>
-
-          <p className="text-sm text-green-600">
-            View status in the History tab.
+          <h2 className="text-2xl mb-3 text-gray-900">Incident Report Submitted</h2>
+          <div className="flex items-center justify-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-3 mb-4">
+            <ShieldCheck className="text-green-700" size={20} />
+            <span className="text-sm text-green-800">AI verification in progress</span>
+          </div>
+          <p className="text-gray-600">
+            Local authorities have been notified. You'll receive real-time updates on the resolution progress.
           </p>
         </div>
       </div>
