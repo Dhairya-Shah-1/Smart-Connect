@@ -700,6 +700,10 @@
     height: calc(var(--spacing) * 48);
   }
 
+  .h-110 {
+    height: calc(var(--spacing) * 110);
+  }
+
   .h-auto {
     height: auto;
   }
@@ -790,6 +794,10 @@
 
   .w-80 {
     width: calc(var(--spacing) * 80);
+  }
+
+  .w-100 {
+    width: calc(var(--spacing) * 100);
   }
 
   .w-full {
@@ -1193,6 +1201,14 @@
 
   .bg-blue-100 {
     background-color: var(--color-blue-100);
+  }
+
+  .bg-blue-200 {
+    background-color: var(--color-blue-200);
+  }
+
+  .bg-blue-400 {
+    background-color: var(--color-blue-400);
   }
 
   .bg-blue-500 {
