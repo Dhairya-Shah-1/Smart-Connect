@@ -295,7 +295,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
           incident_description: description,
           severity,
           status: reportStatus,
-          location: `${lat},${lng}`,
+          location: `POINT(${lng} ${lat})`,
           photo_url: photo,
           //timestamp: new Date().toISOString(),
         })
