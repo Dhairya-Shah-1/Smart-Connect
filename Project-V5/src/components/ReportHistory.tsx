@@ -45,12 +45,6 @@ export function ReportHistory() {
 
         // 1. First, get localStorage reports (most current)
         try {
-
-          const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
-          const allReports = JSON.parse(localStorage.getItem('reports') || '[]');
-          const userReports = allReports.filter((r: Report) => r.userName === user.name);
-          setReports(userReports);
-          
           const localStorageReports = JSON.parse(localStorage.getItem('reports') || '[]');
           console.log('Local storage reports count:', localStorageReports.length, localStorageReports);
           
@@ -62,7 +56,9 @@ export function ReportHistory() {
                 id,
                 type: r.issueType || r.type || 'Unknown',
                 severity: r.severity || 'low',
-                location: r.location || (r.lat && r.lng ? `${r.lat.toFixed(6)}, ${r.lng.toFixed(6)}` : 'Unknown Location'),
+                location: typeof r.location === 'string'
+                  ? r.location
+                  : JSON.stringify(r.location),
                 description: r.description || '',
                 photo: r.photo || null,
                 status: r.status || 'pending', // Default to pending
@@ -336,7 +332,9 @@ export function ReportHistory() {
                         </div>
                         <p className="text-xs text-gray-500 flex items-center gap-1">
                           <MapPin size={11} />
-                          {report.location}
+                          {typeof report.location === 'string'
+                            ? report.location
+                            : JSON.stringify(report.location)}
                         </p>
                       </div>
 
