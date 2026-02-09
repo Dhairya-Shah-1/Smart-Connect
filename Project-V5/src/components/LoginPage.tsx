@@ -4,7 +4,7 @@ import { MapPin, ArrowLeft } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
-type Page = 'landing' | 'login' | 'signup' | 'dashboard';
+type Page = 'landing' | 'login' | 'signup' | 'dashboard' | 'super_admin' | 'admin';
 
 interface LoginPageProps {
   onNavigate: (page: Page) => void;
@@ -73,24 +73,35 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
         }
       }
 
+      const resolvedName =
+        profileData?.sa_name ??
+        profileData?.a_name ??
+        profileData?.u_name ??
+        user.user_metadata?.full_name ??
+        user.email?.split('@')[0];
+        
       // 3. Preserve your app flow using localStorage
       const currentUser = {
         id: user.id,
         email: user.email,
         role,
-        name:
-          profileData?.sa_name ||
-          profileData?.a_name ||
-          profileData?.u_name ||
-          user.email,
-        ...profileData,
+        name: resolvedName,
+        profile: profileData, // keep raw data nested, not merged
       };
 
       localStorage.setItem('currentUser', JSON.stringify(currentUser));
 
       // 4. Continue existing navigation logic
       onLogin();
-      onNavigate('dashboard');
+      
+      // Route based on role
+      if (role === 'super_admin') {
+        onNavigate('super_admin' as Page);
+      } else if (role === 'admin') {
+        onNavigate('admin' as Page);
+      } else {
+        onNavigate('dashboard');
+      }
 
     } catch (err: any) {
       console.error('Login Error:', err);
