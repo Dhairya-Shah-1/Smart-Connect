@@ -126,7 +126,7 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
           <div className="flex items-center justify-center gap-3 mb-8">
             <img src={ASSETS.Shield} alt="Shield Icon" className="inline-flex w-12" />
             <div className="text-center">
-              <span className="text-2xl text-gray-900">CivicAlert</span>
+              <span className="text-2xl text-gray-900">Smart Connect</span>
               <p className="text-xs text-gray-600">Secure Login</p>
             </div>
           </div>
