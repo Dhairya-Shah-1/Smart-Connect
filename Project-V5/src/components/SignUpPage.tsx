@@ -36,7 +36,7 @@ export function SignUpPage({ onNavigate, onLogin }: SignUpPageProps) {
     setLoading(true);
 
     try {
-      const { error: signUpError } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -48,6 +48,24 @@ export function SignUpPage({ onNavigate, onLogin }: SignUpPageProps) {
       });
 
       if (signUpError) throw signUpError;
+
+      // Create user profile in users table
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('users')
+          .insert([
+            {
+              u_id: data.user.id,
+              u_name: name,
+              u_email: email,
+            },
+          ]);
+
+        if (profileError) {
+          console.error('Error creating user profile:', profileError);
+          // Don't throw here, as the auth user was created successfully
+        }
+      }
 
       // Show "Check your email" screen
       setEmailSent(true);
@@ -105,7 +123,7 @@ export function SignUpPage({ onNavigate, onLogin }: SignUpPageProps) {
      VIEW 1: SIGN UP FORM (Original UI preserved)
   ---------------------------------------------------- */
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center px-4 py-8">
+    <div className="hide-scrollbar min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center px-4 py-8">
       <div className="max-w-md w-full">
         <button
           onClick={() => onNavigate('landing')}
