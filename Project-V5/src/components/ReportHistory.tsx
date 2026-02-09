@@ -41,86 +41,72 @@ export function ReportHistory() {
       try {
         setLoading(true);
         let allReports: Report[] = [];
-        const seenIds = new Set<string>();
 
-        // 1. First, get localStorage reports (most current)
+        // 1. Check localStorage cache first (with user validation)
         try {
-          const localStorageReports = JSON.parse(localStorage.getItem('reports') || '[]');
-          console.log('Local storage reports count:', localStorageReports.length, localStorageReports);
-          
-          if (localStorageReports && localStorageReports.length > 0) {
-            localStorageReports.forEach((r: any) => {
-              const id = r.id || Date.now().toString();
-              seenIds.add(id);
-              allReports.push({
-                id,
-                type: r.issueType || r.type || 'Unknown',
-                severity: r.severity || 'low',
-                location: typeof r.location === 'string'
-                  ? r.location
-                  : JSON.stringify(r.location),
-                description: r.description || '',
-                photo: r.photo || null,
-                status: r.status || 'pending', // Default to pending
-                timestamp: r.timestamp || new Date().toISOString(),
-                userName: r.user || r.userName || 'Anonymous',
-                aiVerified: r.aiVerified ?? true,
-                aiConfidence: r.aiConfidence,
-                aiReason: r.aiReason,
-                isFlagged: r.isFlagged || false,
-                departmentNotified: 'Municipal Authority',
-              });
-            });
+          const cachedDataStr = localStorage.getItem('reportHistory_cache');
+          if (cachedDataStr) {
+            const cachedData = JSON.parse(cachedDataStr);
+            
+            // Validate that the cached data belongs to the current user
+            if (cachedData.userId === user.id) {
+              console.log('Using cached reports for user:', user.id);
+              allReports = cachedData.reports || [];
+              setReports(allReports);
+              setLoading(false);
+            } else {
+              console.log('Cached data belongs to different user, clearing cache');
+              localStorage.removeItem('reportHistory_cache');
+            }
           }
-        } catch (localErr) {
-          console.error('Error reading localStorage:', localErr);
+        } catch (cacheErr) {
+          console.error('Error reading cache:', cacheErr);
         }
 
-        // 2. Then fetch from Supabase
+        // 2. Fetch from Supabase (always fetch to ensure data is up-to-date)
         try {
           const { data: supabaseData, error } = await supabase
             .from('incident_reports')
             .select('*')
             .eq('user_id', user.id)
-            .order('timestamp', { ascending: false });
+            .order('created_at', { ascending: false });
 
           if (error) {
             console.error('Error fetching from Supabase:', error);
-          } else if (supabaseData && supabaseData.length > 0) {
-            console.log('Supabase reports:', supabaseData);
-            supabaseData.forEach((r: any) => {
-              const id = r.id || r.report_id;
-              // Only add if not already in localStorage
-              if (!seenIds.has(id)) {
-                seenIds.add(id);
-                allReports.push({
-                  id,
-                  type: r.incident_type || 'Unknown',
-                  severity: r.severity || 'low',
-                  location: r.location || 'Unknown Location',
-                  description: r.incident_description || '',
-                  photo: r.photo_url || null,
-                  status: r.status || 'pending',
-                  timestamp: r.timestamp || new Date().toISOString(),
-                  userName: user.name || user.email,
-                  aiVerified: r.ai_verified ?? true,
-                  aiConfidence: r.ai_confidence,
-                  aiReason: r.ai_reason,
-                  isFlagged: r.is_flagged || r.status === 'rejected',
-                  departmentNotified: r.department || 'Municipal Authority',
-                });
-              }
-            });
+          } else if (supabaseData) {
+            console.log('Fetched reports from Supabase:', supabaseData.length);
+            
+            allReports = supabaseData.map((r: any) => ({
+              id: r.id || r.report_id,
+              type: r.incident_type || 'Unknown',
+              severity: r.severity || 'low',
+              location: r.location || 'Unknown Location',
+              description: r.incident_description || '',
+              photo: r.photo_url || null,
+              status: r.status || 'pending',
+              timestamp: r.created_at || r.timestamp || new Date().toISOString(),
+              userName: user.name || user.email,
+              aiVerified: r.ai_verified ?? true,
+              aiConfidence: r.ai_confidence,
+              aiReason: r.ai_reason,
+              isFlagged: r.is_flagged || r.status === 'rejected',
+              departmentNotified: r.department || 'Municipal Authority',
+            }));
+
+            // 3. Cache the fetched data with user ID
+            const cacheData = {
+              userId: user.id,
+              reports: allReports,
+              timestamp: Date.now(),
+            };
+            localStorage.setItem('reportHistory_cache', JSON.stringify(cacheData));
+            console.log('Cached reports for user:', user.id);
+
+            setReports(allReports);
           }
         } catch (supabaseErr) {
           console.error('Supabase fetch error:', supabaseErr);
         }
-
-        // 3. Sort all reports by timestamp descending
-        allReports.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-        console.log('Final merged reports:', allReports);
-        setReports(allReports);
       } finally {
         setLoading(false);
       }
@@ -236,15 +222,15 @@ export function ReportHistory() {
       <div className={`h-full flex items-center justify-center ${
         isDark ? 'bg-slate-900' : 'bg-slate-500'
       }`}>
-        <Loader2 className="animate-spin text-blue-600" size={40} />
+        <Loader2 className="spin text-blue-600" style={{ animation: 'spin 1s linear infinite' }} size={40} />
       </div>
     );
   }
 
   return (
-    <div className={`h-full overflow-y-auto ${isDark ? 'bg-slate-900' : 'bg-gray-100'}`}>
-      <div className="w-full mx-auto p-4">
-
+  <div className={`hide-scrollbar h-full max-w-md mx-auto items-center justify-center overflow-y-auto ${isDark ? 'bg-slate-900' : 'bg-gray-100'}`}>
+    <div className="w-full mx-auto p-4">
+      <div className="mx-auto items-center justify-center">
         {/* Header - Mobile Optimized */}
         <h2 className={`text-xl font-bold mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
           My Reports
@@ -272,7 +258,7 @@ export function ReportHistory() {
             </button>
           ))}
         </div>
-
+      </div>
         {/* List - Mobile Optimized */}
         <div className="space-y-3">
           {filteredReports.length === 0 ? (
@@ -292,7 +278,7 @@ export function ReportHistory() {
               const Icon = getIssueIcon(report.type);
 
               return (
-                <div key={report.id} className={`rounded-lg border shadow-sm transition overflow-hidden ${
+                <div key={report.id} className={`rounded-lg max-w-md mx-auto items-center justify-center border shadow-sm transition overflow-hidden ${
                   report.isFlagged 
                     ? 'bg-red-50 border-red-300' 
                     : isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'
@@ -302,7 +288,7 @@ export function ReportHistory() {
                     {report.photo && (
                       <img
                         src={report.photo}
-                        className="w-full h-40 object-cover rounded-lg mb-3"
+                        className="w-full h-110 object-cover rounded-lg mb-3"
                         alt="incident"
                       />
                     )}
@@ -330,12 +316,12 @@ export function ReportHistory() {
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500 flex items-center gap-1">
+                        {/* <p className="text-xs text-gray-500 flex items-center gap-1">
                           <MapPin size={11} />
                           {typeof report.location === 'string'
                             ? report.location
                             : JSON.stringify(report.location)}
-                        </p>
+                        </p> */}
                       </div>
 
                       <span className={`px-2 py-1 rounded-full text-xs border-2 flex-shrink-0 ml-2 font-bold ${getSeverityColor(report.severity)}`}>
@@ -408,7 +394,7 @@ export function ReportHistory() {
                     <p className="text-xs text-gray-500 flex gap-1 items-center">
                       <Clock size={11} />
                       {new Date(report.timestamp).toLocaleDateString()} {new Date(report.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </p>
+                     </p>
                   </div>
                 </div>
               );
