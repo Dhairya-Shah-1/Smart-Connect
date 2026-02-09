@@ -20,11 +20,11 @@ export function Profile({ onLogout }: ProfileProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-    setUser(currentUser);
-
     const fetchProfile = async () => {
       try {
+        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        setUser(currentUser);
+
         const { data, error } = await supabase
           .from('incident_reports')
           .select('status')
@@ -42,32 +42,12 @@ export function Profile({ onLogout }: ProfileProps) {
         console.error(err);
         toast.error('Failed to load profile data');
       } finally {
+        // 🔹 ADDED
         setLoading(false);
       }
     };
 
     fetchProfile();
-
-    // Real-time subscription for report count updates
-    const subscription = supabase
-      .channel('profile_reports_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'incident_reports',
-          filter: `user_id=eq.${currentUser.id}`,
-        },
-        () => {
-          fetchProfile();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
   }, []);
 
   const handleLogout = async () => {
@@ -83,16 +63,18 @@ export function Profile({ onLogout }: ProfileProps) {
       <div className={`h-full flex items-center justify-center ${
         isDark ? 'bg-slate-900' : 'bg-slate-50'
       }`}>
-        <Loader2 className="animate-spin text-blue-600" size={40} />
+        <Loader2 className="spin text-blue-600" style={{ animation: 'spin 1s linear infinite' }} size={40} />
       </div>
     );
   }
 
   if (!user) return null;
+  
+  const displayName = user.name && user.name !== user.email ? user.name : 'User';
 
   // Original initials logic restored
   const initials =
-    user.name
+    displayName
       ?.split(' ')
       .map((n: string) => n[0])
       .join('')
@@ -100,7 +82,7 @@ export function Profile({ onLogout }: ProfileProps) {
       .slice(0, 2) || 'U';
 
   return (
-    <div className={`h-full overflow-y-auto ${isDark ? 'bg-slate-900' : 'bg-slate-50'} p-4 md:p-6`}>
+    <div className={`hide-scrollbar h-full overflow-y-auto ${isDark ? 'bg-slate-900' : 'bg-slate-50'} p-4 md:p-6`}>
       <div className="max-w-2xl mx-auto space-y-6">
 
         {/* PROFILE CARD — ORIGINAL STRUCTURE PRESERVED */}
@@ -128,7 +110,7 @@ export function Profile({ onLogout }: ProfileProps) {
 
                 <div className="mt-4 text-center">
                   <h2 className={`text-xl mb-1 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-                    {user.name || 'User'}
+                    {displayName} {/* {user.name || 'User'} */}
                   </h2>
                   <div className={`flex items-center justify-center gap-2 text-sm ${
                     isDark ? 'text-gray-400' : 'text-gray-600'
@@ -165,7 +147,7 @@ export function Profile({ onLogout }: ProfileProps) {
 
                 <div className="mt-20">
                   <h2 className={`text-2xl mb-1 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-                    {user.name || 'User'}
+                    {displayName} {/* {user.name || 'User'} */}
                   </h2>
                   <div className={`flex items-center gap-2 text-sm ${
                     isDark ? 'text-gray-400' : 'text-gray-600'
@@ -249,7 +231,7 @@ export function Profile({ onLogout }: ProfileProps) {
               <MapPinIcon className={isDark ? 'text-blue-400' : 'text-blue-600'} size={20} />
               <div>
                 <div className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Role</div>
-                <div className={`text-sm ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>Citizen Reporter</div>
+                <div className={`text-sm ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>Citizen</div>
               </div>
             </div>
           </div>
