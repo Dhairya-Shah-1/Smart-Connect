@@ -200,7 +200,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
         <div className={`max-w-7xl mx-auto ${isMobile ? "px-3 py-3" : "px-4 py-4"}`}>
           <div className="flex items-center justify-between">
             <div className={`flex items-center ${isMobile ? "gap-2" : "gap-3"}`}>
-              <img src={ASSETS.Shield} alt="Shield Icon" className={`inline-flex ${isMobile ? "w-8" : "w-14"}`} />
+              <img src={ASSETS.Shield} alt="Shield Icon" className={`inline-flex ${isMobile ? "w-9" : "w-14"}`} />
               <div>
                 <h1 className={` ${isMobile ? "text-base" : "text-xl"} font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
                   Super Admin Dashboard
@@ -296,11 +296,11 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
         {currentTab === 'overview' && (
           <>
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className={`p-6 rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-                <div className="flex items-center justify-between">
+            <div className={`gap-4 ${isMobile ? "grid grid-cols-3 mb-3 text-xs" : "grid grid-cols-1 mb-6 text-sm"}`}>
+              <div className={`${isMobile ? "w-45 p-4" : "p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+                <div className={`flex items-center justify-between ${isMobile ? "gap-2" : ""}`}>
                   <div>
-                    <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Total Incidents</p>
+                    <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Total Incidents</p>
                     <p className={`text-3xl font-bold mt-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
                       {stats.totalIncidents}
                     </p>
@@ -309,8 +309,8 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                 </div>
               </div>
 
-              <div className={`p-6 rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-                <div className="flex items-center justify-between">
+              <div className={`${isMobile ? "w-45 p-4" : "p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+                <div className={`flex items-center justify-between ${isMobile ? "gap-2" : ""}`}>
                   <div>
                     <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Total Admins</p>
                     <p className={`text-3xl font-bold mt-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
@@ -321,8 +321,8 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                 </div>
               </div>
 
-              <div className={`p-6 rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-                <div className="flex items-center justify-between">
+              <div className={`${isMobile ? "w-45 p-4" : "p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+                <div className={`flex items-center justify-between ${isMobile ? "gap-2" : ""}`}>
                   <div>
                     <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Total Users</p>
                     <p className={`text-3xl font-bold mt-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
@@ -336,8 +336,8 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
 
             {/* Status Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className={`p-6 rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-                <div className="flex items-center justify-between">
+              <div className={`${isMobile ? "w-45 p-4" : "p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+                <div className={`flex items-center justify-between ${isMobile ? "gap-2" : ""}`}>
                   <div>
                     <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Pending</p>
                     <p className={`text-3xl font-bold mt-1 ${isDark ? 'text-yellow-300' : 'text-yellow-600'}`}>
@@ -348,8 +348,8 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                 </div>
               </div>
 
-              <div className={`p-6 rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-                <div className="flex items-center justify-between">
+              <div className={`${isMobile ? "w-45 p-4" : "p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+                <div className={`flex items-center justify-between ${isMobile ? "gap-2" : ""}`}>
                   <div>
                     <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>In Progress</p>
                     <p className={`text-3xl font-bold mt-1 ${isDark ? 'text-blue-300' : 'text-blue-600'}`}>
@@ -360,8 +360,8 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                 </div>
               </div>
 
-              <div className={`p-6 rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-                <div className="flex items-center justify-between">
+              <div className={`${isMobile ? "w-45 p-4" : "p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+                <div className={`flex items-center justify-between ${isMobile ? "gap-2" : ""}`}>
                   <div>
                     <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Resolved</p>
                     <p className={`text-3xl font-bold mt-1 ${isDark ? 'text-green-300' : 'text-green-600'}`}>
