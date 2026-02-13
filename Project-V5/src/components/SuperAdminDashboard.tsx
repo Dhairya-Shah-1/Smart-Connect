@@ -1,27 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from '../App';
 import { supabase } from './supabaseClient';
-import { toast } from 'sonner@2.0.3';
-import {
-  Shield,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  MapPin,
-  Mail,
-  Building2,
-  LogOut,
-  Sun,
-  Moon,
-  TrendingUp,
-  Users,
-  AlertCircle,
-  UserPlus,
-  Trash2,
-  Activity,
-  BarChart3,
-} from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, MapPin, Mail, Building2, LogOut, Sun, Moon, TrendingUp, Users, AlertCircle, UserPlus, Trash2, Activity, BarChart3 } from 'lucide-react';
 import { AdminList } from './AdminList';
+import { toast } from 'sonner@2.0.3';
+import { ASSETS } from '../config/assets';
 
 interface SuperAdminDashboardProps {
   onLogout: () => void;
@@ -39,6 +22,7 @@ interface IncidentReport {
   department: string;
   created_at: string;
   user_id: string;
+  user_name: string;
 }
 
 export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
@@ -96,40 +80,54 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
 
       setSuperAdminData(user);
 
-      // Fetch all incidents
+      // Fetch all incidents from incident_reports table
       const { data: incidentData, error: incidentError } = await supabase
         .from('incident_reports')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*, users(u_name)')
+        .order('timestamp', { ascending: false });
 
       if (incidentError) throw incidentError;
 
-      setIncidents(incidentData || []);
-      setFilteredIncidents(incidentData || []);
+      // Map the data to match the interface
+      const mappedIncidents = incidentData?.map((inc: any) => ({
+        id: inc.report_id,
+        title: inc.incident_type,
+        description: inc.incident_description,
+        severity: inc.severity,
+        status: inc.status,
+        location: inc.location || 'Unknown Location',
+        department: inc.department_name || 'General',
+        created_at: inc.timestamp,
+        user_id: inc.user_id,
+        user_name: inc.users?.u_name || 'Anonymous'
+      })) || [];
+
+      setIncidents(mappedIncidents);
+      setFilteredIncidents(mappedIncidents);
 
       // Extract unique departments
-      const uniqueDepts = [...new Set(incidentData?.map((i: any) => i.department) || [])];
+      const uniqueDepts = [...new Set(mappedIncidents.map((i: any) => i.department))];
       setDepartments(uniqueDepts as string[]);
 
-      // Fetch admin count
+      // Fetch admin count from admins table
       const { data: adminData, error: adminError } = await supabase
         .from('admins')
         .select('a_id');
 
       if (adminError) throw adminError;
 
-      // Fetch user count
+      // Fetch user count from users table
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('u_id');
 
       if (userError) throw userError;
 
-      // Calculate stats
-      const totalIncidents = incidentData?.length || 0;
-      const pendingIncidents = incidentData?.filter((i: any) => i.status === 'pending').length || 0;
-      const inProgressIncidents = incidentData?.filter((i: any) => i.status === 'in_progress').length || 0;
-      const resolvedIncidents = incidentData?.filter((i: any) => i.status === 'resolved').length || 0;
+      // Calculate stats from incident_reports table
+      const totalIncidents = mappedIncidents.length;
+      const pendingIncidents = mappedIncidents.filter((i: any) => i.status === 'pending').length;
+      const inProgressIncidents = mappedIncidents.filter((i: any) => i.status === 'in-progress').length;
+      const resolvedIncidents = mappedIncidents.filter((i: any) => i.status === 'resolved').length;
       const totalAdmins = adminData?.length || 0;
       const totalUsers = userData?.length || 0;
 
@@ -195,7 +193,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Shield className={`${isDark ? 'text-purple-400' : 'text-purple-600'}`} size={32} />
+              <img src={ASSETS.Shield} alt="Shield Icon" className="inline-flex w-10" />
               <div>
                 <h1 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
                   Super Admin Dashboard
