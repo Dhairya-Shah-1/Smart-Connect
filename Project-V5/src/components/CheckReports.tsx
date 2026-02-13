@@ -172,7 +172,7 @@ export function CheckReports() {
                       <img 
                         src={report.photo_url} 
                         alt="Evidence" 
-                        className="w-full h-48 md:h-52 object-contain bg-gray-100 bg-slate-200 dark:bg-slate-700 transition-transform"
+                        className={`w-full h-48 md:h-52 object-contain bg-gray-100 bg-slate-200 dark:bg-slate-700 transition-transform ${isMobile ? "opacity-50" : ""} `}
                       />
 
                       {/* Overlay */}
