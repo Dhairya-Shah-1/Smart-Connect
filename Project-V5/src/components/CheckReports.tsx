@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { MapPin, CheckCircle, Clock, Loader2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { useTheme } from '../App';
 import { toast } from 'sonner@2.0.3';
+import { isMobileOrTablet } from "../utils/deviceDetection";
 import { supabase } from './supabaseClient';
 
 export function CheckReports() {
@@ -12,6 +13,7 @@ export function CheckReports() {
   const [loading, setLoading] = useState(true);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [imageZoom, setImageZoom] = useState(1);
+  const isMobile = isMobileOrTablet();
 
   const fetchReports = async () => {
     setLoading(true);
@@ -174,7 +176,7 @@ export function CheckReports() {
                       />
 
                       {/* Overlay */}
-                      <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-slate-500 duration-300">
+                      <div className={`absolute inset-0 flex flex-col items-center justify-center ${isMobile ? "" : "opacity-0 group-hover:opacity-100 transition-opacity bg-slate-500 duration-300"} `}>
                         <ZoomIn className="text-white mb-2" size={32} />
                         <p className="text-white text-sm font-medium">Click to view image</p>
                       </div>
