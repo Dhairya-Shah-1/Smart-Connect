@@ -42,11 +42,11 @@ export function Notifications() {
 
       if (report.status === 'resolved') {
         title = 'Incident Resolved ✓';
-        message = `Your ${report.severity} severity ${report.incident_type} report at ${report.location} has been resolved.`;
+        message = `Your ${report.severity} severity ${report.incident_type} report at your location has been resolved.`;  //${report.location}
         type = 'success';
       } else if (report.status === 'in-progress') {
         title = 'Incident Under Review';
-        message = `Authorities are working on your ${report.incident_type} report at ${report.location}.`;
+        message = `Authorities are working on your ${report.incident_type} report at your location.`; //${report.location}
         type = 'info';
       } else {
         if (report.severity === 'critical' || report.severity === 'high') {
