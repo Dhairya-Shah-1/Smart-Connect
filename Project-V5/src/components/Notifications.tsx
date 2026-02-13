@@ -51,11 +51,11 @@ export function Notifications() {
       } else {
         if (report.severity === 'critical' || report.severity === 'high') {
           title = 'Urgent Report Received';
-          message = `Your ${report.severity} severity ${report.incident_type} report at ${report.location} was flagged for immediate attention.`;
+          message = `Your ${report.severity} severity ${report.incident_type} report at your location was flagged for immediate attention.`;  //${report.location}
           type = 'urgent';
         } else {
           title = 'Report Received & Pending';
-          message = `Your ${report.incident_type} report at ${report.location} is pending review.`;
+          message = `Your ${report.incident_type} report at your location is pending review.`;  //${report.location}
           type = 'warning';
         }
       }
