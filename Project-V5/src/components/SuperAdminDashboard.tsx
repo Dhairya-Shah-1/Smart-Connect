@@ -83,7 +83,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
       // Fetch all incidents from incident_reports table
       const { data: incidentData, error: incidentError } = await supabase
         .from('incident_reports')
-        .select('*, users(u_name)')
+        .select('*')
         .order('timestamp', { ascending: false });
 
       if (incidentError) throw incidentError;
@@ -482,10 +482,10 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                         </div>
 
                         <div className={`flex items-center gap-4 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                          <span className="flex items-center gap-1">
+                          {/* <span className="flex items-center gap-1">
                             <MapPin size={14} />
                             {incident.location}
-                          </span>
+                          </span> */}
                           <span className="flex items-center gap-1">
                             <Building2 size={14} />
                             {incident.department}
