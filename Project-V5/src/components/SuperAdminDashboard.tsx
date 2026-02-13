@@ -200,7 +200,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
         <div className={`max-w-7xl mx-auto ${isMobile ? "px-3 py-3" : "px-4 py-4"}`}>
           <div className="flex items-center justify-between">
             <div className={`flex items-center ${isMobile ? "gap-2" : "gap-3"}`}>
-              <img src={ASSETS.Shield} alt="Shield Icon" className={`inline-flex ${isMobile ? "w-8" : "w-12"}`} />
+              <img src={ASSETS.Shield} alt="Shield Icon" className={`inline-flex ${isMobile ? "w-8" : "w-14"}`} />
               <div>
                 <h1 className={` ${isMobile ? "text-base" : "text-xl"} font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
                   Super Admin Dashboard
