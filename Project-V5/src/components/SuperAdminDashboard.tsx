@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle, Clock, MapPin, Mail, Building2, LogOut, Sun
 import { AdminList } from './AdminList';
 import { toast } from 'sonner@2.0.3';
 import { ASSETS } from '../config/assets';
+import { isMobileOrTablet } from '../utils/deviceDetection';
 
 interface SuperAdminDashboardProps {
   onLogout: () => void;
@@ -44,6 +45,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
     totalUsers: 0,
   });
   const [departments, setDepartments] = useState<string[]>([]);
+  const isMobile = isMobileOrTablet();
 
   useEffect(() => {
     loadSuperAdminData();
@@ -57,7 +59,12 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
     let filtered = incidents;
 
     if (filterStatus !== 'all') {
-      filtered = filtered.filter((inc) => inc.status === filterStatus);
+      // Normalize status comparison to handle both underscore and hyphen formats
+      const normalizedFilterStatus = filterStatus.replace('_', '-');
+      filtered = filtered.filter((inc) => {
+        const normalizedIncStatus = inc.status.replace('_', '-');
+        return normalizedIncStatus === normalizedFilterStatus;
+      });
     }
 
     if (filterDepartment !== 'all') {
@@ -190,34 +197,34 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
     <div className={`min-h-screen ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
       {/* Header */}
       <header className={`sticky top-0 z-50 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'} border-b`}>
-        <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className={`max-w-7xl mx-auto ${isMobile ? "px-3 py-3" : "px-4 py-4"}`}>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <img src={ASSETS.Shield} alt="Shield Icon" className="inline-flex w-10" />
+            <div className={`flex items-center ${isMobile ? "gap-2" : "gap-3"}`}>
+              <img src={ASSETS.Shield} alt="Shield Icon" className={`inline-flex ${isMobile ? "w-8" : "w-12"}`} />
               <div>
-                <h1 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                <h1 className={` ${isMobile ? "text-base" : "text-xl"} font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
                   Super Admin Dashboard
                 </h1>
-                <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                <p className={` ${isMobile ? "text-xs" : "block text-sm"} ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                   System-wide Management
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className={`flex items-center ${isMobile ? "gap-1" : "gap-2"} `}>
               <button
                 onClick={toggleTheme}
-                className={`p-2 rounded-lg ${isDark ? 'hover:bg-slate-700' : 'hover:bg-gray-100'}`}
+                className={`${isMobile ? "p-1.5" : "p-2"} rounded-lg ${isDark ? 'hover:bg-slate-700' : 'hover:bg-gray-100'}`}
               >
                 {isDark ? <Sun size={20} className="text-yellow-400" /> : <Moon size={20} className="text-gray-600" />}
               </button>
               <button
                 onClick={onLogout}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+                className={`flex items-center ${isMobile ? "gap-1 px-2 py-1.5" : "gap-2 px-4 py-2" } rounded-lg ${
                   isDark ? 'bg-red-900 text-red-200 hover:bg-red-800' : 'bg-red-100 text-red-700 hover:bg-red-200'
                 }`}
               >
-                <LogOut size={18} />
+                <LogOut size={18} className={`${isMobile ? "sm:w-[18px] sm:h-[18px]" : "" }`} />
                 Logout
               </button>
             </div>
@@ -225,20 +232,20 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className={`max-w-7xl mx-auto ${isMobile ? "px-3 py-4" : "px-4 py-6"}`}>
         {/* Super Admin Info Card */}
-        <div className={`mb-6 p-6 rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-          <div className="flex items-center gap-4">
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold ${
+        <div className={`${isMobile ? "mb-4 p-4" : "mb-6 p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+          <div className={`flex items-center ${isMobile ? "gap-3" : "gap-4"}`}>
+            <div className={`${isMobile ? "w-12 h-12 text-xl" : "w-16 h-16 text-2xl"} rounded-full flex items-center justify-center font-bold ${
               isDark ? 'bg-purple-900 text-purple-200' : 'bg-purple-100 text-purple-700'
             }`}>
               {superAdminData?.sa_name?.charAt(0).toUpperCase()}
             </div>
-            <div className="flex-1">
-              <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            <div className="flex-1 min-w-0">
+              <h2 className={`${isMobile ? "text-lg" : "text-xl"} font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
                 {superAdminData?.sa_name}
               </h2>
-              <div className={`flex items-center gap-4 mt-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              <div className={`flex ${isMobile ? "flex-col gap-1 mt-1 text-xs" : "items-center flex-row gap-4 mt-2 text-sm"} ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                 <span className="flex items-center gap-1">
                   <Mail size={14} />
                   {superAdminData?.sa_email}
@@ -257,8 +264,8 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
         </div>
 
         {/* Tabs */}
-        <div className={`mb-6 p-2 rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-          <div className="flex gap-2">
+        <div className={` ${isMobile ? "mb-4 p-1.5" : "mb-6 p-2"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+          <div className={`flex ${isMobile ? "gap-1 min-w-max" : "gap-2 min-w-0"}`}>
             {[
               { id: 'overview', label: 'Overview', icon: TrendingUp },
               { id: 'incidents', label: 'All Incidents', icon: AlertTriangle },
@@ -268,7 +275,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
               <button
                 key={tab.id}
                 onClick={() => setCurrentTab(tab.id as TabView)}
-                className={`flex items-center gap-2 px-4 py-3 rounded-lg font-medium transition-colors flex-1 justify-center ${
+                className={`flex items-center ${isMobile ? "gap-1.5 px-3 py-2 whitespace-nowrap text-sm" : "gap-2 px-4 py-3"} rounded-lg font-medium transition-colors flex-1 justify-center ${
                   currentTab === tab.id
                     ? isDark
                       ? 'bg-purple-600 text-white'
@@ -371,10 +378,10 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
         {currentTab === 'incidents' && (
           <>
             {/* Filters */}
-            <div className={`mb-6 p-4 rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+            <div className={`${isMobile ? "mb-4 p-3" : "mb-6 p-4"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
               <div className="space-y-3">
                 <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <label className={`block ${isMobile ? "text-xs" : "text-sm"} font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
                     Status Filter
                   </label>
                   <div className="flex gap-2 flex-wrap">
@@ -382,7 +389,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                       <button
                         key={status}
                         onClick={() => setFilterStatus(status)}
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        className={`${isMobile ? "px-3 py-1.5" : "px-4 py-2"} rounded-lg font-medium transition-colors ${
                           filterStatus === status
                             ? isDark
                               ? 'bg-purple-600 text-white'
@@ -399,13 +406,13 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <label className={`block ${isMobile ? "text-xs" : "text-sm"} font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
                     Department Filter
                   </label>
                   <div className="flex gap-2 flex-wrap">
                     <button
                       onClick={() => setFilterDepartment('all')}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      className={`${isMobile ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"} rounded-lg font-medium transition-colors ${
                         filterDepartment === 'all'
                           ? isDark
                             ? 'bg-purple-600 text-white'
@@ -421,7 +428,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                       <button
                         key={dept}
                         onClick={() => setFilterDepartment(dept)}
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        className={`${isMobile ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"} rounded-lg font-medium transition-colors ${
                           filterDepartment === dept
                             ? isDark
                               ? 'bg-purple-600 text-white'
@@ -442,7 +449,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
             {/* Incidents List */}
             <div className={`rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg overflow-hidden`}>
               <div className="p-6">
-                <h2 className={`text-xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                <h2 className={`${isMobile ? "text-lg" : "text-xl"} font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
                   All System Incidents ({filteredIncidents.length})
                 </h2>
 
@@ -454,34 +461,34 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-4 max-h-[600px] overflow-y-auto hide-scrollbar">
+                  <div className={`${isMobile ? "space-y-3" : "space-y-4"} max-h-[600px] overflow-y-auto hide-scrollbar`}>
                     {filteredIncidents.map((incident) => (
                       <div
                         key={incident.id}
-                        className={`p-4 rounded-lg border ${
+                        className={`${isMobile ? "p-3" : "p-4"} rounded-lg border ${
                           isDark ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-200'
                         }`}
                       >
-                        <div className="flex items-start justify-between mb-3">
+                        <div className={`flex ${isMobile ? "gap-2 flex-col" : "flex-row items-start justify-between"} mb-3`}>
                           <div className="flex-1">
-                            <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            <h3 className={`font-bold ${isMobile ? "text-base" : "text-lg"} ${isDark ? 'text-white' : 'text-gray-900'}`}>
                               {incident.title}
                             </h3>
-                            <p className={`text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            <p className={`${isMobile ? "text-xs" : "text-sm"} mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                               {incident.description}
                             </p>
                           </div>
                           <div className="flex gap-2">
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${getSeverityColor(incident.severity)}`}>
+                            <span className={`${isMobile ? "px-2" : "px-3"} py-1 rounded-full text-xs font-bold ${getSeverityColor(incident.severity)}`}>
                               {incident.severity}
                             </span>
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(incident.status)}`}>
+                            <span className={`${isMobile ? "px-2" : "px-3"} py-1 rounded-full text-xs font-bold ${getStatusColor(incident.status)}`}>
                               {incident.status.replace('_', ' ')}
                             </span>
                           </div>
                         </div>
 
-                        <div className={`flex items-center gap-4 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                        <div className={`flex ${isMobile ? "flex-col gap-2 text-xs" : "flex-row items-center gap-4 text-sm"} ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                           {/* <span className="flex items-center gap-1">
                             <MapPin size={14} />
                             {incident.location}
