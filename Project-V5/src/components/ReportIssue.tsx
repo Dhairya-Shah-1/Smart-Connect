@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Camera, MapPin, AlertCircle, ShieldCheck, X, Monitor, Navigation, RefreshCw, HelpCircle, Loader2 } from 'lucide-react';
 import { canReportIncident } from '../utils/deviceDetection';
 import { useTheme } from '../App';
-// import { toast } from 'sonner';
+import { toast } from 'sonner';
 import { supabase } from './supabaseClient';
 
 interface ReportIssueProps {
@@ -218,7 +218,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       const { data: authData, error: authError } = await supabase.auth.getUser();
 
       if (authError || !authData?.user) {
-        // toast.error('Please log in to submit a report.');
+        toast.error('Please log in to submit a report.');
         setIsSubmitting(false);
         return;
       }
@@ -226,9 +226,39 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       const userId = authData.user.id;
       
       if (!userId) {
-        // toast.error('Please log in to submit a report.');
+        toast.error('Please log in to submit a report.');
         setIsSubmitting(false);
         return;
+      }
+
+      if (success) {
+        return (
+          <div className={`h-full flex items-center justify-center rounded-2xl ${isDark ? "bg-blue-200" : "bg-gray-50" }`}>
+            <div className="text-center w-full max-w-sm bg-white rounded-2xl px-6 py-8 shadow-2xl">
+              <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <svg
+                  className="w-10 h-10 text-white"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="3"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path d="M5 13l4 4L19 7"></path>
+                </svg>
+              </div>
+              <h2 className={`text-2xl mb-3 text-blue-800`}>Incident Report Submitted</h2>
+              <div className="flex items-center justify-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-3 mb-4">
+                <ShieldCheck className="text-green-700" size={20} />
+                <span className="text-sm text-green-800">AI verification in progress</span>
+              </div>
+              <p className={`${isDark ? "text-gray-600" : "text-gray-50" }`}>
+                Local authorities have been notified. You'll receive real-time updates on the resolution progress.
+              </p>
+            </div>
+          </div>
+        );
       }
 
       setSuccess(true);
@@ -386,11 +416,11 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       .upload(filePath, file);
 
     if (error) {
-      // toast.error('Failed to save report to database.');
+      toast.error('Failed to save report to database.');
       console.error('Supabase insert error:', {
         message: error.message,
-        // details: error.details,
-        // hint: error.hint,
+        details: error.details,
+        hint: error.hint,
       });
       setIsSubmitting(false);
       return;
@@ -402,36 +432,6 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
     setPhoto(data.publicUrl); // 🔥 NOW it's hosted
   };
-
-    if (success) {
-    return (
-      <div className={`h-full flex items-center justify-center rounded-2xl ${isDark ? "bg-blue-200" : "bg-gray-50" }`}>
-        <div className="text-center w-full max-w-sm bg-white rounded-2xl px-6 py-8 shadow-2xl">
-          <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <svg
-              className="w-10 h-10 text-white"
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="3"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path d="M5 13l4 4L19 7"></path>
-            </svg>
-          </div>
-          <h2 className={`text-2xl mb-3 text-blue-800`}>Incident Report Submitted</h2>
-          <div className="flex items-center justify-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-3 mb-4">
-            <ShieldCheck className="text-green-700" size={20} />
-            <span className="text-sm text-green-800">AI verification in progress</span>
-          </div>
-          <p className={`${isDark ? "text-gray-600" : "text-gray-50" }`}>
-            Local authorities have been notified. You'll receive real-time updates on the resolution progress.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   if (!canReport) {
     return (
