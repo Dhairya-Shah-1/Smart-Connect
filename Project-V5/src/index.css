@@ -864,6 +864,10 @@
     width: calc(var(--spacing) * 32);
   }
 
+  .w-45 {
+    width: calc(var(--spacing) * 45);
+  }
+
   .w-80 {
     width: calc(var(--spacing) * 80);
   }
@@ -2101,16 +2105,8 @@
     opacity: 0;
   }
 
-  .opacity-20 {
-    opacity: 20;
-  }
-
   .opacity-50 {
     opacity: .5;
-  }
-
-  .opacity-80 {
-    opacity: 80;
   }
 
   .shadow-2xl {
@@ -2260,18 +2256,6 @@
   @media (hover: hover) {
     .hover\:bg-blue-700:hover {
       background-color: var(--color-blue-700);
-    }
-  }
-
-  @media (hover: hover) {
-    .hover\:bg-blue-100:hover {
-      background-color: var(--color-blue-100);
-    }
-  }
-
-  @media (hover: hover) {
-    .hover\:bg-blue-200:hover {
-      background-color: var(--color-blue-200);
     }
   }
 
@@ -3508,7 +3492,7 @@ html {
   display: none;
 }
 .ol-overviewmap:not(.ol-collapsed) {
-  background:var(--ol-subtle-background-color);
+  background: var(--ol-subtle-background-color);
 }
 .ol-overviewmap-box {
   border: 1.5px dotted var(--ol-subtle-foreground-color);
