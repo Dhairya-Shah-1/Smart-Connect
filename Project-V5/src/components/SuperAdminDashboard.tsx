@@ -85,7 +85,25 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
         return;
       }
 
-      setSuperAdminData(user);
+      // Fetch actual super admin data from the database
+      const { data: superAdminData, error: superAdminError } = await supabase
+        .from('super_admins')
+        .select('*')
+        .eq('sa_id', user.id)
+        .single();
+
+      if (superAdminError) {
+        console.error('Error fetching super admin data:', superAdminError);
+        toast.error('Failed to load super admin profile');
+        return;
+      }
+
+      if (!superAdminData) {
+        toast.error('Super admin profile not found');
+        return;
+      }
+
+      setSuperAdminData(superAdminData);
 
       // Fetch all incidents from incident_reports table
       const { data: incidentData, error: incidentError } = await supabase
@@ -106,7 +124,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
         department: inc.department_name || 'General',
         created_at: inc.timestamp,
         user_id: inc.user_id,
-        user_name: inc.users?.u_name || 'Anonymous'
+        user_name: 'Anonymous' // Will be populated separately
       })) || [];
 
       setIncidents(mappedIncidents);
