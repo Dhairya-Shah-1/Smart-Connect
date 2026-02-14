@@ -17,28 +17,61 @@ export function CheckReports() {
 
   const fetchReports = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    
+    // First, get all pending reports
+    const { data: reportsData, error: reportsError } = await supabase
         .from('incident_reports')
-        .select('*, users(u_name)')
+        .select('*')
         .eq('status', 'pending')
         .order('timestamp', { ascending: false });
 
-    if (error) {
-        console.error(error);
+    if (reportsError) {
+        console.error('Error fetching reports:', reportsError);
         toast.error("Error loading reports");
-    } else {
-        setReports(data || []);
-        const counts = {
-            critical: data?.filter(r => r.severity === 'critical').length || 0,
-            high: data?.filter(r => r.severity === 'high').length || 0,
-            medium: data?.filter(r => r.severity === 'medium').length || 0,
-            low: data?.filter(r => r.severity === 'low').length || 0,
-        };
-        if (counts.critical > 0) setFilter('critical');
-        else if (counts.high > 0) setFilter('high');
-        else if (counts.medium > 0) setFilter('medium');
-        else if (counts.low > 0) setFilter('low');
+        setLoading(false);
+        return;
     }
+
+    // Get unique user IDs from the reports
+    const userIds = [...new Set(reportsData?.map(r => r.user_id).filter(Boolean))];
+    
+    // Fetch user names for these IDs
+    const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('u_id, u_name')
+        .in('u_id', userIds);
+
+    if (usersError) {
+        console.error('Error fetching user names:', usersError);
+        // Continue without user names if this fails
+    }
+
+    // Create a map of user IDs to names
+    const userMap = new Map();
+    usersData?.forEach(user => {
+        userMap.set(user.u_id, user.u_name);
+    });
+
+    // Combine reports with user names
+    const reportsWithUsers = reportsData?.map(report => ({
+        ...report,
+        reporter_name: userMap.get(report.user_id) || 'Unknown User'
+    })) || [];
+
+    setReports(reportsWithUsers);
+    
+    const counts = {
+        critical: reportsWithUsers?.filter(r => r.severity === 'critical').length || 0,
+        high: reportsWithUsers?.filter(r => r.severity === 'high').length || 0,
+        medium: reportsWithUsers?.filter(r => r.severity === 'medium').length || 0,
+        low: reportsWithUsers?.filter(r => r.severity === 'low').length || 0,
+    };
+    
+    if (counts.critical > 0) setFilter('critical');
+    else if (counts.high > 0) setFilter('high');
+    else if (counts.medium > 0) setFilter('medium');
+    else if (counts.low > 0) setFilter('low');
+
     setLoading(false);
   };
 
@@ -176,7 +209,7 @@ export function CheckReports() {
                       />
 
                       {/* Overlay */}
-                      <div className={`absolute inset-0 flex flex-col items-center justify-center ${isMobile ? "" : "opacity-0 group-hover:opacity-100 transition-opacity bg-slate-500 duration-300"} `}>
+                      <div className={`absolute inset-0 flex flex-col items-center justify-center ${isMobile ? "bg-slate-700\/50" : "opacity-0 group-hover:opacity-100 transition-opacity bg-slate-500 duration-300"} `}>
                         <ZoomIn className="text-white mb-2" size={32} />
                         <p className="text-white text-sm font-medium">Click to view image</p>
                       </div>
