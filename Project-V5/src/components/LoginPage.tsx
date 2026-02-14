@@ -42,7 +42,7 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
         .from('super_admins')
         .select('*')
         .eq('sa_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (sa) {
         role = 'super_admin';
@@ -53,12 +53,12 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
           .from('admins')
           .select('*')
           .eq('a_id', user.id)
-          .single();
+          .maybeSingle();
 
         if (admin) {
           role = 'admin';
           profileData = admin;
-        } else {
+          } else {
           // User
           const { data: usr } = await supabase
             .from('users')
@@ -73,17 +73,20 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
         }
       }
 
+      const resolvedName =
+        profileData?.sa_name ??
+        profileData?.a_name ??
+        profileData?.u_name ??
+        user.user_metadata?.full_name ??
+        user.email?.split('@')[0];
+        
       // 3. Preserve your app flow using localStorage
       const currentUser = {
         id: user.id,
         email: user.email,
         role,
-        name:
-          profileData?.sa_name ||
-          profileData?.a_name ||
-          profileData?.u_name ||
-          user.email,
-        ...profileData,
+        name: resolvedName,
+        profile: profileData, // keep raw data nested, not merged
       };
 
       localStorage.setItem('currentUser', JSON.stringify(currentUser));
@@ -123,7 +126,7 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
           <div className="flex items-center justify-center gap-3 mb-8">
             <img src={ASSETS.Shield} alt="Shield Icon" className="inline-flex w-12" />
             <div className="text-center">
-              <span className="text-2xl text-gray-900">CivicAlert</span>
+              <span className="text-2xl text-gray-900">Smart Connect</span>
               <p className="text-xs text-gray-600">Secure Login</p>
             </div>
           </div>
