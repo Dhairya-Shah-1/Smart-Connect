@@ -83,17 +83,24 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       };
       reader.readAsDataURL(file);
 
-      // 2. Create unique file path
-      const filePath = `reports/${Date.now()}-${file.name}`;
+      // 2. Create unique file path with user ID if available
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData?.user?.id || 'anonymous';
+      const timestamp = Date.now();
+      const fileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_'); // Sanitize filename
+      const filePath = `reports/${userId}/${timestamp}-${fileName}`;
 
-      // 3. Upload to Supabase Storage
+      // 3. Upload to Supabase Storage with proper error handling
       const { error } = await supabase.storage
         .from('incident-images')
-        .upload(filePath, file);
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
       if (error) {
         console.error('Upload failed:', error.message);
-        // toast.error('Upload failed. Preview saved locally.');
+        toast.error('Upload failed. Preview saved locally.');
         setUploading(false);
         return;
       }
@@ -130,7 +137,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         setCoords(pos.coords.latitude, pos.coords.longitude);
         setGeoPermission('granted');
         setIsLoadingLocation(false);
-        // toast.success('Location acquired!');
+        toast.success('Location acquired!');
       },
       err => {
         setIsLoadingLocation(false);
@@ -139,7 +146,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
           setLocationError(
             'Location permission denied. Use browser lock icon to allow it.'
           );
-          // toast.error('Location permission denied.');
+          toast.error('Location permission denied.');
         } else {
           setLocationError('Unable to fetch location.');
         }
@@ -155,7 +162,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
     setGeoPermission(state);
 
     if (state === 'denied') {
-      // toast.error('Please enable location permission.');
+      toast.error('Please enable location permission.');
       return false;
     }
 
@@ -177,17 +184,14 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
   const handleTypeChange = (type: string) => {
         setIssueType(type);
 
-        if (type === "Accident") { setSeverity("critical"); return 'Accident'; }
-        else if (type === "flood") { setSeverity("critical"); return 'Flood'; }
-        else if (type === "Pothole") { setSeverity("high"); return 'Pothole'; }                       
-        else if (type === "fire") { setSeverity("critical"); return 'Fire'; }
-        else if (type === "landslide") { setSeverity("critical"); return 'Disaster Management'; }
-        else if (type === "Garbage") { setSeverity("low"); return 'Sanitation Department'; }
-        else if (type === "Water Leakage") { setSeverity("medium"); return 'Water Management'; }
-
-          setSeverity("medium");
-          return "Municipal Authority";
-        // else { setSeverity("medium"); return 'Municipal Authority'; }
+        if (type === "Accident") { setSeverity("critical"); }
+        else if (type === "Flood") { setSeverity("critical"); }
+        else if (type === "Pothole") { setSeverity("high"); }                       
+        else if (type === "Fire") { setSeverity("critical"); }
+        else if (type === "Landslide") { setSeverity("critical"); }
+        else if (type === "Garbage") { setSeverity("low"); }
+        else if (type === "Water Leakage") { setSeverity("medium"); }
+        else { setSeverity("medium"); }
         }
 
   // ─── Submit ────────────────────────────────────────────────
@@ -196,19 +200,19 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
     // Validate all required fields
     if (!issueType) {
-      // toast.error('Please select an incident type.');
+      toast.error('Please select an incident type.');
       return;
     }
     if (!lat || !lng) {
-      // toast.error('Location is required. Please enable GPS.');
+      toast.error('Location is required. Please enable GPS.');
       if (!(await ensureLocation())) return;
     }
     if (!description.trim()) {
-      // toast.error('Please provide a description.');
+      toast.error('Please provide a description.');
       return;
     }
     if (!photo) {
-      // toast.error('Please capture an evidence photo using your camera.');
+      toast.error('Please capture an evidence photo using your camera.');
       return;
     }
 
@@ -231,36 +235,6 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         return;
       }
 
-      if (success) {
-        return (
-          <div className={`h-full flex items-center justify-center rounded-2xl ${isDark ? "bg-blue-200" : "bg-gray-50" }`}>
-            <div className="text-center w-full max-w-sm bg-white rounded-2xl px-6 py-8 shadow-2xl">
-              <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <svg
-                  className="w-10 h-10 text-white"
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="3"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path d="M5 13l4 4L19 7"></path>
-                </svg>
-              </div>
-              <h2 className={`text-2xl mb-3 text-blue-800`}>Incident Report Submitted</h2>
-              <div className="flex items-center justify-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-3 mb-4">
-                <ShieldCheck className="text-green-700" size={20} />
-                <span className="text-sm text-green-800">AI verification in progress</span>
-              </div>
-              <p className={`${isDark ? "text-gray-600" : "text-gray-50" }`}>
-                Local authorities have been notified. You'll receive real-time updates on the resolution progress.
-              </p>
-            </div>
-          </div>
-        );
-      }
-
       setSuccess(true);
       setTimeout(() => {
         onSuccess();
@@ -280,17 +254,17 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         id: Date.now().toString(),
         type: issueType,
         severity: severity,
-        location,
+        // location,
         lat: lat,
         lng: lng,
         description,
         photo,
         status: 'pending',
-        timestamp: new Date().toISOString(),
+        // timestamp: new Date().toISOString(),
         userName: user.name || 'Anonymous',
         userEmail: user.email,
         aiVerified: true,
-        departmentNotified: handleTypeChange(issueType)
+        departmentNotified: issueType
       };
 
       reports.push(newReport);
@@ -327,14 +301,14 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
           status: reportStatus,
           location: `POINT(${lng} ${lat})`,
           photo_url: photo,
-          //timestamp: new Date().toISOString(),
+          // timestamp: new Date().toISOString(),
         })
         .select()
         .single();
 
       if (!data) {
-        //console.error('Supabase insert error:', error);
-        // toast.error('Report could not be saved. Please try again.');
+        console.error('Supabase insert error:', error);
+        toast.error('Report could not be saved. Please try again.');
         setIsSubmitting(false);
         return;
       }
@@ -403,35 +377,36 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
     }
   };
 
-  const handlePhotoUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
 
-    const filePath = `incidents/${Date.now()}-${file.name}`;
-
-    const { error } = await supabase.storage
-      .from('incident-images')
-      .upload(filePath, file);
-
-    if (error) {
-      toast.error('Failed to save report to database.');
-      console.error('Supabase insert error:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-      });
-      setIsSubmitting(false);
-      return;
-    }
-
-    const { data } = supabase.storage
-      .from('incident-images')
-      .getPublicUrl(filePath);
-
-    setPhoto(data.publicUrl); // 🔥 NOW it's hosted
-  };
+    if (success) {
+    return (
+      <div className={`h-full flex items-center justify-center rounded-2xl ${isDark ? "bg-blue-200" : "bg-gray-50" }`}>
+        <div className="text-center w-full max-w-sm bg-white rounded-2xl px-6 py-8 shadow-2xl">
+          <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+            <svg
+              className="w-10 h-10 text-white"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="3"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path d="M5 13l4 4L19 7"></path>
+            </svg>
+          </div>
+          <h2 className={`text-2xl mb-3 text-blue-800`}>Incident Report Submitted</h2>
+          <div className="flex items-center justify-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-3 mb-4">
+            <ShieldCheck className="text-green-700" size={20} />
+            <span className="text-sm text-green-800">AI verification in progress</span>
+          </div>
+          <p className={`${isDark ? "text-gray-600" : "text-gray-50" }`}>
+            Local authorities have been notified. You'll receive real-time updates on the resolution progress.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (!canReport) {
     return (
@@ -730,9 +705,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
                 : "bg-blue-600 hover:bg-blue-700 text-white hover:shadow-blue-500/25 active:scale-[0.98]"
             }`}
           >
-            {isSubmitting && <Loader2 size={20} style={{
-                    animation: 'spin 1s linear infinite',
-                  }} />}
+            {isSubmitting && <Loader2 size={20} className="animate-spin" />}
             {isLoadingLocation
               ? "Detecting Location..."
               : isSubmitting
