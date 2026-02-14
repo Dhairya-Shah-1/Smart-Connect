@@ -1764,6 +1764,10 @@
     padding-bottom: calc(var(--spacing) * 20);
   }
 
+  .pl-2 {
+    padding-left: calc(var(--spacing) * 2);
+  }
+
   .pl-10 {
     padding-left: calc(var(--spacing) * 10);
   }
