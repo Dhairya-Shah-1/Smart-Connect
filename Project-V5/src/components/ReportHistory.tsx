@@ -23,27 +23,35 @@ interface Report {
 export function ReportHistory() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-
+  const [userId, setUserId] = useState<string | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(Date.now());
 
   useEffect(() => {
-    const userStr = localStorage.getItem('currentUser');
-    if (!userStr) {
-      console.log('No user found');
-      setLoading(false);
-      return;
-    }
-    const user = JSON.parse(userStr);
-
     const fetchReports = async () => {
       try {
         setLoading(true);
         let allReports: Report[] = [];
 
-        // 1. Check localStorage cache first (with user validation)
+        // 1. Get user from Supabase Auth (more reliable than localStorage)
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+
+        if (authError || !authData?.user) {
+          console.log('No authenticated user found or session expired');
+
+          setUserId(null);
+          setReports([]);
+          setLoading(false);
+
+          return;
+        }
+
+        const user = authData.user;
+        setUserId(user.id);
+
+        // 2. Check localStorage cache first (with user validation)
         try {
           const cachedDataStr = localStorage.getItem('reportHistory_cache');
           if (cachedDataStr) {
@@ -64,13 +72,13 @@ export function ReportHistory() {
           console.error('Error reading cache:', cacheErr);
         }
 
-        // 2. Fetch from Supabase (always fetch to ensure data is up-to-date)
+        // 3. Fetch from Supabase (always fetch to ensure data is up-to-date)
         try {
           const { data: supabaseData, error } = await supabase
             .from('incident_reports')
             .select('*')
             .eq('user_id', user.id)
-            .order('created_at', { ascending: false });
+            .order('timestamp', { ascending: false });
 
           if (error) {
             console.error('Error fetching from Supabase:', error);
@@ -78,15 +86,15 @@ export function ReportHistory() {
             console.log('Fetched reports from Supabase:', supabaseData.length);
             
             allReports = supabaseData.map((r: any) => ({
-              id: r.id || r.report_id,
+              id: r.report_id,
               type: r.incident_type || 'Unknown',
               severity: r.severity || 'low',
               location: r.location || 'Unknown Location',
               description: r.incident_description || '',
               photo: r.photo_url || null,
               status: r.status || 'pending',
-              timestamp: r.created_at || r.timestamp || new Date().toISOString(),
-              userName: user.name || user.email,
+              timestamp: r.timestamp || new Date().toISOString(),
+              userName: user.user_metadata?.full_name || user.email,
               aiVerified: r.ai_verified ?? true,
               aiConfidence: r.ai_confidence,
               aiReason: r.ai_reason,
@@ -94,7 +102,7 @@ export function ReportHistory() {
               departmentNotified: r.department || 'Municipal Authority',
             }));
 
-            // 3. Cache the fetched data with user ID
+            // 4. Cache the fetched data with user ID
             const cacheData = {
               userId: user.id,
               reports: allReports,
@@ -116,21 +124,23 @@ export function ReportHistory() {
     fetchReports();
 
     // Real-time subscription for new reports from Supabase
-    const subscription = supabase
-      .channel(`incident_reports_${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'incident_reports',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          console.log('Real-time update received:', payload);
-          fetchReports();
-        }
-      )
+    if (!userId) return;
+
+      const subscription = supabase
+        .channel(`incident_reports_${userId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'incident_reports',
+            filter: `user_id=eq.${userId}`,
+          },
+          () => {
+            console.log('Real-time update received');
+            fetchReports();
+          }
+        )
       .subscribe((status) => {
         console.log('Subscription status:', status);
       });
@@ -138,7 +148,7 @@ export function ReportHistory() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [lastRefresh]);
+  }, [lastRefresh, userId]);
 
   // Refetch reports whenever the page comes into focus
   useEffect(() => {
@@ -322,7 +332,7 @@ export function ReportHistory() {
                           {typeof report.location === 'string'
                             ? report.location
                             : JSON.stringify(report.location)}
-                        </p> */}
+                        </p> */}x
                       </div>
 
                       <span className={`px-2 py-1 rounded-full text-xs border-2 flex-shrink-0 ml-2 font-bold ${getSeverityColor(report.severity)}`}>
