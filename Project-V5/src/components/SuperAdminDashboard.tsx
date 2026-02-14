@@ -215,7 +215,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
     <div className={`min-h-screen ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
       {/* Header */}
       <header className={`sticky top-0 z-50 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'} border-b`}>
-        <div className={`max-w-5xl mx-auto ${isMobile ? "px-3 py-3" : "px-4 py-4"}`}>
+        <div className={`w-full ${isMobile ? "px-3 py-3" : "px-4 py-4"}`}>
           <div className="flex items-center justify-between">
             <div className={`flex items-center ${isMobile ? "gap-2" : "gap-3"}`}>
               <img src={ASSETS.Shield} alt="Shield Icon" className={`inline-flex ${isMobile ? "w-9" : "w-14"}`} />
@@ -250,7 +250,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
         </div>
       </header>
 
-      <div className={`max-w-5xl mx-auto ${isMobile ? "px-3 py-4" : "px-4 py-6"}`}>
+      <div className={`w-full ${isMobile ? "px-3 py-4" : "px-4 py-6"}`}>
         {/* Super Admin Info Card */}
         <div className={`${isMobile ? "mb-4 p-4" : "mb-6 p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
           <div className={`flex items-center ${isMobile ? "gap-3" : "gap-4"}`}>
@@ -283,7 +283,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
 
         {/* Tabs */}
         <div className={` ${isMobile ? "mb-4 p-1.5" : "mb-6 p-2"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-          <div className={`flex ${isMobile ? "gap-1 min-w-max" : "gap-2 min-w-0"}`}>
+          <div className={`flex ${isMobile ? "gap-1 overflow-x-auto hide-scrollbar pb-1" : "gap-2"}`}>
             {[
               { id: 'overview', label: 'Overview', icon: TrendingUp },
               { id: 'incidents', label: 'All Incidents', icon: AlertTriangle },
@@ -293,7 +293,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
               <button
                 key={tab.id}
                 onClick={() => setCurrentTab(tab.id as TabView)}
-                className={`flex items-center ${isMobile ? "gap-1.5 px-3 py-2 whitespace-nowrap text-sm" : "gap-2 px-4 py-3"} rounded-lg font-medium transition-colors flex-1 justify-center ${
+                className={`flex items-center ${isMobile ? "gap-1 px-2 py-1.5 whitespace-nowrap text-xs flex-shrink-0 min-w-max" : "gap-2 px-4 py-3 flex-1 justify-center"} rounded-lg font-medium transition-colors ${
                   currentTab === tab.id
                     ? isDark
                       ? 'bg-purple-600 text-white'
@@ -303,7 +303,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
-                <tab.icon size={18} />
+                <tab.icon size={16} />
                 {tab.label}
               </button>
             ))}
@@ -316,7 +316,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
             {/* Stats Grid */}
             <div className={`gap-4 ${isMobile ? "grid grid-cols-2 mb-3 text-xs" : "grid grid-cols-1 mb-6 text-sm"}`}>
               <div className={`${isMobile ? "w-45 p-4" : "p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-                <div className={`flex items-center justify-between ${isMobile ? "gap-2" : ""}`}>
+                <div className={`flex items-center justify-between rounded-xl ${isMobile ? "gap-2" : ""}`}>
                   <div>
                     <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Total Incidents</p>
                     <p className={`text-3xl font-bold mt-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
