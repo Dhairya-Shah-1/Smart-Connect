@@ -41,11 +41,65 @@ export function MapView({
 
   // State for filters
   const [filterType, setFilterType] = useState<string>("all");
-  const [filterSeverity, setFilterSeverity] =
-    useState<string>("all");
+  const [filterSeverity, setFilterSeverity] =  useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(true);
   const isMobileTablet = isMobileOrTablet();
+
+  const getDistance = (
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+  ) => {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) *
+      Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+};
+
+const groupNearbyIssues = (issues: Issue[]) => {
+  const grouped: any[] = [];
+
+  issues.forEach((issue) => {
+    let found = false;
+
+    for (let group of grouped) {
+      const distance = getDistance(
+        issue.lat,
+        issue.lng,
+        group.lat,
+        group.lng
+      );
+
+      if (
+        distance <= 30 &&
+        issue.type.toLowerCase() === group.type.toLowerCase()
+      ) {
+        group.reportCount += 1;
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      grouped.push({
+        ...issue,
+        reportCount: 1,
+      });
+    }
+  });
+
+  return grouped;
+};
 
   /* ======================================================
      🔹 SUPABASE DATA FETCH (REPLACES localStorage ONLY)
@@ -53,42 +107,33 @@ export function MapView({
   const fetchIssues = async () => {
     try {
       const { data, error } = await supabase
-        .from("incident_reports")
-        .select("*, users(u_name)")
+        .from("incident_reports_view")
+        .select("*")
+        .neq("status", "rejected")
         .order("timestamp", { ascending: false });
 
       if (error) throw error;
 
       const mappedIssues: Issue[] = (data || []).map((report: any) => {
-        let lat = 0;
-        let lng = 0;
-
-        if (report.location) {
-          const match = report.location.match(/POINT\(([^ ]+) ([^ ]+)\)/);
-          if (match) {
-            lng = parseFloat(match[1]);
-            lat = parseFloat(match[2]);
-          }
-        }
-
         return {
           id: report.report_id,
           type: report.incident_type,
-          location: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-          lat,
-          lng,
+          location: `${report.lat.toFixed(4)}, ${report.lng.toFixed(4)}`,
+          lat: report.lat,
+          lng: report.lng,
           status: report.status,
           severity: report.severity,
           description: report.incident_description,
           timestamp: report.timestamp,
-          userName: report.users?.u_name || "Anonymous",
+          userName: "Anonymous",
           photo: report.photo_url,
           aiVerified: true,
           departmentNotified: "Central Control",
         };
       });
 
-      setIssues(mappedIssues);
+      const grouped = groupNearbyIssues(mappedIssues);
+      setIssues(grouped);
     } catch (err) {
       console.error(err);
       toast.error("Failed to load incident data");
@@ -98,6 +143,25 @@ export function MapView({
   /* 🔹 ONLY CHANGE INSIDE useEffect */
   useEffect(() => {
     fetchIssues();
+
+    const channel = supabase
+      .channel("incident-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "incident_reports",
+        },
+        () => {
+          fetchIssues();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   /* ================= ORIGINAL CODE CONTINUES UNTOUCHED ================= */
@@ -531,6 +595,12 @@ export function MapView({
               <p className="text-sm text-gray-700 mb-4">
                 {selectedIssue.description}
               </p>
+              {"reportCount" in selectedIssue && //added
+                selectedIssue.reportCount > 1 && (
+                  <div className="mb-3 text-sm text-red-600 font-semibold">
+                    Reported by {selectedIssue.reportCount} people
+                  </div>
+              )}
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <div className="bg-gray-50 rounded-lg p-3">
                   <p className="text-xs text-gray-600 mb-1">
