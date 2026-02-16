@@ -27,7 +27,7 @@ export function ReportHistory() {
   const [reports, setReports] = useState<Report[]>([]);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
-  // const [lastRefresh, setLastRefresh] = useState(Date.now());
+  const [lastRefresh, setLastRefresh] = useState(Date.now());
 
   // Fetch reports + realtime subscription
 useEffect(() => {
