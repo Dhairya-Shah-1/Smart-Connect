@@ -27,160 +27,116 @@ export function ReportHistory() {
   const [reports, setReports] = useState<Report[]>([]);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
-  const [lastRefresh, setLastRefresh] = useState(Date.now());
+  // const [lastRefresh, setLastRefresh] = useState(Date.now());
 
-  useEffect(() => {
-    const fetchReports = async () => {
+  // Fetch reports + realtime subscription
+useEffect(() => {
+  const fetchReports = async () => {
+    try {
+      setLoading(true);
+      let allReports: Report[] = [];
+
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !authData?.user) {
+        setUserId(null);
+        setReports([]);
+        return;
+      }
+
+      const user = authData.user;
+      setUserId(user.id);
+
+      // Load cache
       try {
-        setLoading(true);
-        let allReports: Report[] = [];
-
-        // 1. Get user from Supabase Auth (more reliable than localStorage)
-        const { data: authData, error: authError } = await supabase.auth.getUser();
-
-        if (authError || !authData?.user) {
-          console.log('No authenticated user found or session expired');
-
-          setUserId(null);
-          setReports([]);
-          setLoading(false);
-
-          return;
-        }
-
-        const user = authData.user;
-        setUserId(user.id);
-
-        // 2. Check localStorage cache first (with user validation)
-        try {
-          const cachedDataStr = localStorage.getItem('reportHistory_cache');
-          if (cachedDataStr) {
-            const cachedData = JSON.parse(cachedDataStr);
-            
-            // Validate that the cached data belongs to the current user
-            if (cachedData.userId === user.id) {
-              console.log('Using cached reports for user:', user.id);
-              allReports = cachedData.reports || [];
-              setReports(allReports);
-              setLoading(false);
-            } else {
-              console.log('Cached data belongs to different user, clearing cache');
-              localStorage.removeItem('reportHistory_cache');
-            }
+        const cached = localStorage.getItem('reportHistory_cache');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.userId === user.id) {
+            setReports(parsed.reports || []);
           }
-        } catch (cacheErr) {
-          console.error('Error reading cache:', cacheErr);
         }
+      } catch {}
 
-        // 3. Fetch from Supabase (always fetch to ensure data is up-to-date)
+      // Fetch fresh data
+      const { data, error } = await supabase
+        .from('incident_reports')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('timestamp', { ascending: false });
+
+      if (error) {
+        console.error('Supabase fetch error:', error);
+        return;
+      }
+
+      if (data) {
+        allReports = data.map((r: any) => ({
+          id: r.report_id,
+          type: r.incident_type || 'Unknown',
+          severity: r.severity || 'low',
+          location: r.location || 'Unknown Location',
+          description: r.incident_description || '',
+          photo: r.photo_url || null,
+          status: r.status || 'pending',
+          timestamp: r.timestamp || new Date().toISOString(),
+          userName: user.user_metadata?.full_name || user.email,
+          aiVerified: r.ai_verified ?? true,
+          aiConfidence: r.ai_confidence,
+          aiReason: r.ai_reason,
+          isFlagged: r.is_flagged || r.status === 'rejected',
+          departmentNotified: r.department || 'Municipal Authority',
+        }));
+
         try {
-          const { data: supabaseData, error } = await supabase
-            .from('incident_reports')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('timestamp', { ascending: false });
-
-          if (error) {
-            console.error('Error fetching from Supabase:', error);
-          } else if (supabaseData) {
-            console.log('Fetched reports from Supabase:', supabaseData.length);
-            
-            allReports = supabaseData.map((r: any) => ({
-              id: r.report_id,
-              type: r.incident_type || 'Unknown',
-              severity: r.severity || 'low',
-              location: r.location || 'Unknown Location',
-              description: r.incident_description || '',
-              photo: r.photo_url || null,
-              status: r.status || 'pending',
-              timestamp: r.timestamp || new Date().toISOString(),
-              userName: user.user_metadata?.full_name || user.email,
-              aiVerified: r.ai_verified ?? true,
-              aiConfidence: r.ai_confidence,
-              aiReason: r.ai_reason,
-              isFlagged: r.is_flagged || r.status === 'rejected',
-              departmentNotified: r.department || 'Municipal Authority',
-            }));
-
-            // 4. Cache the fetched data with user ID
-            const cacheData = {
+          localStorage.setItem(
+            'reportHistory_cache',
+            JSON.stringify({
               userId: user.id,
-              reports: allReports,
               timestamp: Date.now(),
-            };
-            localStorage.setItem('reportHistory_cache', JSON.stringify(cacheData));
-            console.log('Cached reports for user:', user.id);
-
-            setReports(allReports);
-          }
-        } catch (supabaseErr) {
-          console.error('Supabase fetch error:', supabaseErr);
+              reports: allReports.slice(0, 20),
+            })
+          );
+        } catch {
+          localStorage.removeItem('reportHistory_cache');
         }
-      } finally {
-        setLoading(false);
+
+        setReports(allReports);
       }
-    };
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchReports();
+  fetchReports();
 
-    // Real-time subscription for new reports from Supabase
-    if (!userId) return;
+  if (!userId) return;
 
-      const subscription = supabase
-        .channel(`incident_reports_${userId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'incident_reports',
-            filter: `user_id=eq.${userId}`,
-          },
-          () => {
-            console.log('Real-time update received');
-            fetchReports();
-          }
-        )
-      .subscribe((status) => {
-        console.log('Subscription status:', status);
-      });
+  const channel = supabase
+    .channel(`incident_reports_${userId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'incident_reports',
+        filter: `user_id=eq.${userId}`,
+      },
+      fetchReports
+    )
+    .subscribe();
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [lastRefresh, userId]);
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [userId]);
 
-  // Refetch reports whenever the page comes into focus
-  useEffect(() => {
-    const handleFocus = () => {
-      console.log('Window focused, refreshing reports');
-      setLastRefresh(Date.now());
-    };
+useEffect(() => {
+  const handleFocus = () => setLastRefresh(Date.now());
 
-    // Listen for storage changes (when reports are added from another tab/component)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'reports') {
-        console.log('Storage changed, refreshing reports:', e.newValue);
-        setLastRefresh(Date.now());
-      }
-    };
-
-    // Also listen for custom events
-    const handleCustomRefresh = () => {
-      console.log('Custom refresh event received');
-      setLastRefresh(Date.now());
-    };
-
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('reports-updated', handleCustomRefresh);
-    
-    return () => {
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('reports-updated', handleCustomRefresh);
-    };
-  }, []);
+  window.addEventListener('focus', handleFocus);
+  return () => window.removeEventListener('focus', handleFocus);
+}, []);
 
   const getIssueIcon = (type: string) => {
     const lowerType = type.toLowerCase();
