@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+ import { useState, useEffect } from 'react';
 import { Clock, MapPin, Droplets, AlertTriangle, Flame, Car, Mountain, ShieldCheck, Building2, Loader2, Flag, XCircle } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { useTheme } from '../App';
@@ -288,7 +288,7 @@ useEffect(() => {
                           {typeof report.location === 'string'
                             ? report.location
                             : JSON.stringify(report.location)}
-                        </p> */}x
+                        </p> */}
                       </div>
 
                       <span className={`px-2 py-1 rounded-full text-xs border-2 flex-shrink-0 ml-2 font-bold ${getSeverityColor(report.severity)}`}>
