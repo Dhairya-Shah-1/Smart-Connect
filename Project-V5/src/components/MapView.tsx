@@ -493,7 +493,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
           )}
         <div className="absolute inset-0 z-0">
           <OpenLayersMap
-            issues={filteredIssues} className={`${loading ? "opacity-0" : ""}`}
+            issues={filteredIssues}
             onMarkerClick={(id) => {
               const issue = issues.find((i) => i.id === id);
               setSelectedIssue(issue || null);
