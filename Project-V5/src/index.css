@@ -208,6 +208,7 @@
 
   html, :host {
     -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
     tab-size: 4;
     line-height: 1.5;
     font-family: var(--default-font-family, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji");
@@ -1470,6 +1471,11 @@
     background-color: var(--color-slate-500);
   }
 
+  .bg-slate-50-opacity-70 {
+    background-color: var(--color-slate-50);
+    opacity: 0.7;
+  }
+
   .bg-slate-700 {
     background-color: var(--color-slate-700);
   }
@@ -2113,6 +2119,10 @@
     opacity: .5;
   }
 
+  .opacity-70 {
+    opacity: .7;
+  }
+
   .shadow-2xl {
     --tw-shadow: 0 25px 50px -12px var(--tw-shadow-color, #00000040);
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
@@ -2511,6 +2521,15 @@
     }
   }
 
+  @media (width <= 40rem) {
+    .sm\:truncate {
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    display: none;
+  }
+  }
+
   @media (width >= 40rem) {
     .sm\:inline {
       display: inline;
@@ -2710,6 +2729,13 @@
   }
 
   @media (width >= 48rem) {
+    .md\:pl-pr-3 {
+      padding-left: calc(var(--spacing) * 6);
+      padding-right: calc(var(--spacing) * 6);
+    }
+  }
+
+  @media (width >= 48rem) {
     .md\:pb-6 {
       padding-bottom: calc(var(--spacing) * 6);
     }
@@ -2793,6 +2819,10 @@
 
   .dark\:bg-slate-700:is(.dark *) {
     background-color: var(--color-slate-700);
+  }
+
+  .bg-none {
+    background-color: none;
   }
 
   .h-d-screen {
