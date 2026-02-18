@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { MapPin, Filter, Search, X, ShieldCheck} from "lucide-react";
+import { MapPin, Filter, Search, X, ShieldCheck, Loader2} from "lucide-react";
 import { useTheme } from "../App";
 import { OpenLayersMap } from "./OpenLayersMap";
 import { isMobileOrTablet } from "../utils/deviceDetection";
@@ -36,8 +36,8 @@ export function MapView({
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const [issues, setIssues] = useState<Issue[]>([]);
-  const [selectedIssue, setSelectedIssue] =
-    useState<Issue | null>(null);
+  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
+  const [loading, setLoading] = useState(true);
 
   // State for filters
   const [filterType, setFilterType] = useState<string>("all");
@@ -106,6 +106,9 @@ const groupNearbyIssues = (issues: Issue[]) => {
      ====================================================== */
   const fetchIssues = async () => {
     try {
+      if (issues.length === 0) {
+        setLoading(true);   // START LOADING only for FIRST fetch when there are no issues yet
+      }
       const { data, error } = await supabase
         .from("incident_reports_view")
         .select("*")
@@ -137,6 +140,8 @@ const groupNearbyIssues = (issues: Issue[]) => {
     } catch (err) {
       console.error(err);
       toast.error("Failed to load incident data");
+    } finally {
+    setLoading(false);   // STOP LOADING
     }
   };
 
@@ -476,9 +481,19 @@ const groupNearbyIssues = (issues: Issue[]) => {
       <div
         className={`flex-1 relative ${isDark ? "bg-gradient-to-br from-slate-700 to-slate-900" : "bg-gradient-to-br from-slate-100 to-blue-50"}`}
       >
+        {loading && (
+            <div className="z-0 absolute inset-0 flex bg-slate-50-opacity-70 items-center justify-center backdrop-blur-sm z-40">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="z-10 w-10 h-10 animate-spin text-blue-800" />
+                <span className="z-50 text-sm text-blue-800 font-medium">
+                  Loading incidents...
+                </span>
+              </div>
+            </div>
+          )}
         <div className="absolute inset-0 z-0">
           <OpenLayersMap
-            issues={filteredIssues}
+            issues={filteredIssues} className={`${loading ? "opacity-0" : ""}`}
             onMarkerClick={(id) => {
               const issue = issues.find((i) => i.id === id);
               setSelectedIssue(issue || null);
