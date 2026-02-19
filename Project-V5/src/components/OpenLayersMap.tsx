@@ -1,4 +1,3 @@
-// src/components/OpenLayersMap.tsx
 import { useEffect, useRef } from "react";
 import "ol/ol.css";
 import Map from "ol/Map";
@@ -70,9 +69,10 @@ export function OpenLayersMap({
         (feature) => feature,
       );
       if (feature) {
-        const id = feature.get("id");
+        // Use getId() or get("issueId") to retrieve the ID
+        const id = feature.getId() || feature.get("issueId");
         if (id && onMarkerClick) {
-          onMarkerClick(id);
+          onMarkerClick(id.toString());
         }
       }
     });
@@ -89,9 +89,12 @@ export function OpenLayersMap({
     const features = issues.map((issue) => {
       const feature = new Feature({
         geometry: new Point(fromLonLat([issue.lng, issue.lat])),
-        id: issue.id,
-        type: issue.type,
       });
+
+      // Set ID and properties explicitly
+      feature.setId(issue.id);
+      feature.set("type", issue.type);
+      feature.set("issueId", issue.id);
 
       // Simple marker style (you can customize icons based on issue.type here)
       feature.setStyle(
