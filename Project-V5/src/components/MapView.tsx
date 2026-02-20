@@ -58,6 +58,9 @@ export function MapView({
   // Check if user is admin or super_admin
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
   
+  // Admin filter state
+  const [adminFilter, setAdminFilter] = useState<'pending' | 'in-progress'>('pending');
+  
   // Get user on mount
   useEffect(() => {
     const userStr = localStorage.getItem('currentUser');
@@ -171,15 +174,20 @@ const groupNearbyIssues = (issues: Issue[]) => {
   const fetchIssues = async () => {
     try {
       setLoading(true);
-      // console.log("Fetching issues from database...");
       
-      const { data, error } = await supabase
-        .from("incident_reports_view")
-        .select("*")
-        .eq("status", "in-progress")
-        .order("timestamp", { ascending: false });
-
-      console.log("error:", error); //"Supabase response - data:", data?.length || 0, 
+      // For admins, fetch both pending and in-progress
+      // For users, only show in-progress
+      let query = supabase.from("incident_reports_view").select("*");
+      
+      if (isAdmin) {
+        // Admin sees both pending and in-progress based on filter
+        query = query.in("status", [adminFilter, "in-progress"]).order("timestamp", { ascending: false });
+      } else {
+        // Regular users only see in-progress
+        query = query.eq("status", "in-progress").order("timestamp", { ascending: false });
+      }
+      
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -201,7 +209,13 @@ const groupNearbyIssues = (issues: Issue[]) => {
         };
       });
 
-      const grouped = groupNearbyIssues(mappedIssues);
+      // For admins, filter by adminFilter after fetching
+      let filteredIssues = mappedIssues;
+      if (isAdmin) {
+        filteredIssues = mappedIssues.filter(issue => issue.status === adminFilter);
+      }
+
+      const grouped = groupNearbyIssues(filteredIssues);
       setIssues(grouped);
     } catch (err) {
       console.error(err);
@@ -234,7 +248,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [adminFilter, isAdmin]);
 
   /* ================= ORIGINAL CODE CONTINUES UNTOUCHED ================= */
 
@@ -600,34 +614,70 @@ const groupNearbyIssues = (issues: Issue[]) => {
           />
         </div>
 
-        {/* Urgent Indicator */}
-        <button
-          onClick={() => setFilterSeverity("critical")}
-          className={`absolute top-4 left-4 z-10`}
-        >
-          {urgentCount == 0 && (
-            <div className={`hidden`}>
-              <span className={`hidden`}></span>
-              <span className={`hidden`}></span>
-            </div>
-          )}
-          {urgentCount > 0 && (
-            <div
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border ml-1 ${
-                isDark
-                  ? "bg-red-900 border-red-700"
-                  : "bg-red-50 border-red-200"
+        {/* Admin Filter Buttons - Only show for admins */}
+        {isAdmin ? (
+          <div className="absolute top-4 left-4 z-10 flex gap-2">
+            <button
+              onClick={() => setAdminFilter('pending')}
+              className={`px-3 py-2 rounded-lg border flex items-center gap-2 ${
+                adminFilter === 'pending'
+                  ? isDark
+                    ? "bg-yellow-900 border-yellow-700 text-yellow-200"
+                    : "bg-yellow-50 border-yellow-200 text-yellow-800"
+                  : isDark
+                    ? "bg-slate-800 border-slate-700 text-gray-300"
+                    : "bg-white border-gray-300 text-gray-700"
               }`}
             >
-              <span className="w-1.5 h-1.5 bg-red-600 rounded-lg animate-pulse"></span>
-              <span
-                className={`text-xs ${isDark ? "text-red-300" : "text-red-700"}`}
+              <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+              <span className="text-xs font-medium">Check Reports</span>
+            </button>
+            <button
+              onClick={() => setAdminFilter('in-progress')}
+              className={`px-3 py-2 rounded-lg border flex items-center gap-2 ${
+                adminFilter === 'in-progress'
+                  ? isDark
+                    ? "bg-blue-900 border-blue-700 text-blue-200"
+                    : "bg-blue-50 border-blue-200 text-blue-800"
+                  : isDark
+                    ? "bg-slate-800 border-slate-700 text-gray-300"
+                    : "bg-white border-gray-300 text-gray-700"
+              }`}
+            >
+              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+              <span className="text-xs font-medium">Verified Reports</span>
+            </button>
+          </div>
+        ) : (
+          /* Urgent Indicator - Only show for non-admins */
+          <button
+            onClick={() => setFilterSeverity("critical")}
+            className={`absolute top-4 left-4 z-10`}
+          >
+            {urgentCount == 0 && (
+              <div className={`hidden`}>
+                <span className={`hidden`}></span>
+                <span className={`hidden`}></span>
+              </div>
+            )}
+            {urgentCount > 0 && (
+              <div
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border ml-1 ${
+                  isDark
+                    ? "bg-red-900 border-red-700"
+                    : "bg-red-50 border-red-200"
+                }`}
               >
-                {urgentCount} Urgent
-              </span>
-            </div>
-          )}
-        </button>
+                <span className="w-1.5 h-1.5 bg-red-600 rounded-lg animate-pulse"></span>
+                <span
+                  className={`text-xs ${isDark ? "text-red-300" : "text-red-700"}`}
+                >
+                  {urgentCount} Urgent
+                </span>
+              </div>
+            )}
+          </button>
+        )}
 
         {/* Filter Toggle */}
         {!showFilters && urgentCount > 0 && (
@@ -701,7 +751,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
                   <h3 className="text-lg text-gray-900">
                     {selectedIssue.type}
                   </h3>
-                  <div className="flex items-center text-gray-600 text-sm mt-1">
+                  <div className="flex items-center text-gray-600 text-sm mt-1" onClick={() => window.open(`https://www.google.com/maps/place/${selectedIssue.location}`, "_blank")}>
                     <MapPin size={14} className="mr-1" />
                     {selectedIssue.location}
                   </div>
