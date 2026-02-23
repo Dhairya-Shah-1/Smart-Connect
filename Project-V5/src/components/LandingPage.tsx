@@ -1,25 +1,19 @@
+import { useNavigate } from "react-router-dom";
 import { MapPin, AlertTriangle, Droplets, Flame, Car, Mountain, Sun, Moon, LogOut } from "lucide-react";
 import { isMobileOrTablet } from "../utils/deviceDetection";
 import { ASSETS } from '../config/assets';
 
 import { useTheme } from "../App";
 
-type Page = "landing" | "login" | "signup" | "dashboard";
-
-interface LandingPageProps {
-  onNavigate: (page: Page) => void;
-  isLoggedIn: boolean;
-  onLogout: () => void;
-}
-
-export function LandingPage({
-  onNavigate,
-  isLoggedIn,
-  onLogout,
-}: LandingPageProps) {
+export function LandingPage() {
+  const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === "dark";
-  const isMobile = isMobileOrTablet(); // Execute function to get boolean
+  const isMobile = isMobileOrTablet();
+  
+  // Check if user is logged in
+  const user = localStorage.getItem('currentUser');
+  const isLoggedIn = !!user;
 
   const issues = [
     {
@@ -56,10 +50,16 @@ export function LandingPage({
 
   const handleStartReporting = () => {
     if (isLoggedIn) {
-      onNavigate("dashboard");
+      navigate("/dashboard");
     } else {
-      onNavigate("signup");
+      navigate("/signup");
     }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('reportHistory_cache');
+    navigate('/login');
   };
 
   return (
@@ -123,7 +123,7 @@ export function LandingPage({
               {!isLoggedIn ? (
                 <>
                   <button
-                    onClick={() => onNavigate("login")}
+                    onClick={() => navigate("/login")}
                     className={`px-4 py-2 transition-colors ${
                       isDark
                         ? "text-gray-300 hover:text-blue-400"
@@ -133,7 +133,7 @@ export function LandingPage({
                     Login
                   </button>
                   <button
-                    onClick={() => onNavigate("signup")}
+                    onClick={() => navigate("/signup")}
                     className={` ${isMobile ? "inline-flex mx-auto px-5 py-2" : "px-6 py-2"} rounded-lg transition-colors shadow-md ${
                       isDark
                         ? "bg-blue-600 text-white hover:bg-blue-700"
@@ -145,7 +145,7 @@ export function LandingPage({
                 </>
               ) : (
                     <button
-                      onClick={onLogout} className={`gap-2 flex items-center px-2 py-2 rounded-lg transition-colors border
+                      onClick={handleLogout} className={`gap-2 flex items-center px-2 py-2 rounded-lg transition-colors border
                       ${ !isMobile ? "small" : "" }
                       ${ isDark
                         ? "bg-transparent text-blue-300 border-red-500 hover:text-red-300"
