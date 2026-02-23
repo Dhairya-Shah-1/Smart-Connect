@@ -3,7 +3,7 @@ import { useTheme } from '../App';
 import { supabase } from './supabaseClient';
 import { AlertTriangle, CheckCircle, Clock, MapPin, Mail, Building2, LogOut, Sun, Moon, TrendingUp, Users, AlertCircle, UserPlus, Trash2, Activity, BarChart3 } from 'lucide-react';
 import { AdminList } from './AdminList';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { ASSETS } from '../config/assets';
 import { isMobileOrTablet } from '../utils/deviceDetection';
 
@@ -212,226 +212,203 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
   }
 
   return (
-    <div className={`min-h-screen ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
-      {/* Header */}
-      <header className={`sticky top-0 z-50 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'} border-b`}>
-        <div className={`${isMobile ? "px-3 py-3 w-full" : "max-w-7xl item-center justify-center mx-auto px-4 py-4"}`}>
-          <div className="flex items-center justify-between">
-            <div className={`flex items-center ${isMobile ? "gap-2" : "gap-3"}`}>
-              <img src={ASSETS.Shield} alt="Shield Icon" className={`inline-flex ${isMobile ? "w-9" : "w-14"}`} />
+  <div className={`min-h-screen ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
+    {/* Header */}
+    <header className={`sticky top-0 z-50 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'} border-b`}>
+      <div className={`${isMobile ? "px-3 py-3 w-full" : "max-w-7xl item-center justify-center mx-auto px-4 py-4"}`}>
+        <div className="flex items-center justify-between">
+          <div className={`flex items-center ${isMobile ? "gap-2" : "gap-3"}`}>
+            <img src={ASSETS.Shield} alt="Shield Icon" className={`inline-flex ${isMobile ? "w-9" : "w-14"}`} />
+            <div>
+              <h1 className={` ${isMobile ? "text-base" : "text-xl"} font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                Super Admin Dashboard
+              </h1>
+              <p className={` ${isMobile ? "text-xs" : "block text-sm"} ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                System-wide Management
+              </p>
+            </div>
+          </div>
+
+          <div className={`flex items-center ${isMobile ? "gap-1" : "gap-2"} `}>
+            <button
+              onClick={toggleTheme}
+              className={`${isMobile ? "p-1.5" : "p-2"} rounded-lg ${isDark ? 'hover:bg-slate-700' : 'hover:bg-gray-100'}`}
+            >
+              {isDark ? <Sun size={20} className="text-yellow-400" /> : <Moon size={20} className="text-gray-600" />}
+            </button>
+            <button
+              onClick={onLogout}
+              className={`flex items-center ${isMobile ? "gap-1 px-2 py-1.5" : "gap-2 px-4 py-2" } rounded-lg ${
+                isDark ? 'bg-red-900 text-red-200 hover:bg-red-800' : 'bg-red-100 text-red-700 hover:bg-red-200'
+              }`}
+            >
+              <LogOut size={18} className={`${isMobile ? "sm:w-[18px] sm:h-[18px]" : "" }`} />
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div className={`w-full ${isMobile ? "px-3 py-4" : "max-w-7xl item-center justify-center mx-auto px-4 py-6"}`}>
+      {/* Super Admin Info Card */}
+      <div className={`${isMobile ? "mb-4 p-4" : "mb-6 p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+        <div className={`flex items-center ${isMobile ? "gap-3" : "gap-4"}`}>
+          <div className={`${isMobile ? "w-12 h-12 text-xl" : "w-16 h-16 text-2xl"} rounded-full flex items-center justify-center font-bold ${
+            isDark ? 'bg-purple-900 text-purple-200' : 'bg-purple-100 text-purple-700'
+          }`}>
+            {superAdminData?.sa_name?.charAt(0).toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className={`${isMobile ? "text-lg" : "text-xl"} font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              {superAdminData?.sa_name}
+            </h2>
+            <div className={`flex flex-row ${isMobile ? "gap-3 mt-1 text-xs" : "items-center gap-4 mt-2 text-sm"} ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              <span className="flex items-center gap-1 sm:truncate">
+                <Mail size={14} />
+                {superAdminData?.sa_email}
+              </span>
+              <span className="flex items-center gap-1">
+                <Building2 size={14} />
+                {superAdminData?.station}
+              </span>
+              <span className="flex items-center gap-1">
+                <MapPin size={14} />
+                {superAdminData?.district}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className={` ${isMobile ? "md\:pl-pr-3 mb-4 p-1.5" : "mb-6 p-2"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+        <div className={`flex rounded-xl ${isMobile ? "gap-1 overflow-x-auto items-center justify-between hide-scrollbar pb-1 md\:text-2xl" : "gap-2"}`}>
+          {[
+            { id: 'overview', label: 'Overview', icon: TrendingUp },
+            { id: 'incidents', label: 'All Incidents', icon: AlertTriangle },
+            { id: 'admins', label: 'Admin Management', icon: Users },
+            { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setCurrentTab(tab.id as TabView)}
+              className={`flex items-center ${isMobile ? "gap-1 px-2 py-1.5 whitespace-nowrap text-xs flex-shrink-0 min-w-max" : "gap-2 px-4 py-3 flex-1 justify-center"} rounded-lg font-medium transition-colors ${
+                currentTab === tab.id
+                  ? isDark
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-purple-600 text-white'
+                  : isDark
+                  ? 'text-gray-300 hover:bg-slate-700'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <tab.icon size={16} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tab Content */}
+      {currentTab === 'overview' && (
+        <>
+          {/* Stats Grid */}
+          <div className={`gap-4 ${isMobile ? "grid grid-cols-1 mb-3 text-xs" : "grid sm:grid-cols-3 mb-6 text-sm"}`}>
+            <div className={`${isMobile ? "w-full p-4" : "p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+              <div className={`flex items-center justify-between rounded-xl ${isMobile ? "gap-2" : ""}`}>
+                <div>
+                  <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Total Incidents</p>
+                  <p className={`text-3xl font-bold mt-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    {stats.totalIncidents}
+                  </p>
+                </div>
+                <Activity className={`${isDark ? 'text-blue-400' : 'text-blue-600'}`} size={32} />
+              </div>
+            </div>
+
+            <div className={`${isMobile ? "w-full p-4" : "p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+              <div className={`flex items-center justify-between ${isMobile ? "gap-2" : ""}`}>
+                <div>
+                  <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Total Admins</p>
+                  <p className={`text-3xl font-bold mt-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    {stats.totalAdmins}
+                  </p>
+                </div>
+                <Users className={`${isDark ? 'text-purple-400' : 'text-purple-600'}`} size={32} />
+              </div>
+            </div>
+
+            <div className={`${isMobile ? "w-full p-4" : "p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+              <div className={`flex items-center justify-between ${isMobile ? "gap-2" : ""}`}>
+                <div>
+                  <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Total Users</p>
+                  <p className={`text-3xl font-bold mt-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    {stats.totalUsers}
+                  </p>
+                </div>
+                <UserPlus className={`${isDark ? 'text-green-400' : 'text-green-600'}`} size={32} />
+              </div>
+            </div>
+          </div>
+
+          {/* Status Stats */}
+          <div className={`grid ${isMobile ? "grid-cols-1" : "sm:grid-cols-3"} gap-4`}>
+            <div className={`${isMobile ? "w-full p-4" : "p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+              <div className={`flex items-center justify-between ${isMobile ? "gap-2" : ""}`}>
+                <div>
+                  <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Pending</p>
+                  <p className={`text-3xl font-bold mt-1 ${isDark ? 'text-yellow-300' : 'text-yellow-600'}`}>
+                    {stats.pendingIncidents}
+                  </p>
+                </div>
+                <Clock className={`${isDark ? 'text-yellow-400' : 'text-yellow-600'}`} size={32} />
+              </div>
+            </div>
+
+            <div className={`${isMobile ? "w-full p-4" : "p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+              <div className={`flex items-center justify-between ${isMobile ? "gap-2" : ""}`}>
+                <div>
+                  <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>In Progress</p>
+                  <p className={`text-3xl font-bold mt-1 ${isDark ? 'text-blue-300' : 'text-blue-600'}`}>
+                    {stats.inProgressIncidents}
+                  </p>
+                </div>
+                <AlertCircle className={`${isDark ? 'text-blue-400' : 'text-blue-600'}`} size={32} />
+              </div>
+            </div>
+
+            <div className={`${isMobile ? "w-full p-4" : "p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+              <div className={`flex items-center justify-between ${isMobile ? "gap-2" : ""}`}>
+                <div>
+                  <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Resolved</p>
+                  <p className={`text-3xl font-bold mt-1 ${isDark ? 'text-green-300' : 'text-green-600'}`}>
+                    {stats.resolvedIncidents}
+                  </p>
+                </div>
+                <CheckCircle className={`${isDark ? 'text-green-400' : 'text-green-600'}`} size={32} />
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {currentTab === 'incidents' && (
+        <>
+          {/* Filters */}
+          <div className={`${isMobile ? "mb-4 p-3" : "mb-6 p-4"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+            <div className="space-y-3">
               <div>
-                <h1 className={` ${isMobile ? "text-base" : "text-xl"} font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  Super Admin Dashboard
-                </h1>
-                <p className={` ${isMobile ? "text-xs" : "block text-sm"} ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                  System-wide Management
-                </p>
-              </div>
-            </div>
-
-            <div className={`flex items-center ${isMobile ? "gap-1" : "gap-2"} `}>
-              <button
-                onClick={toggleTheme}
-                className={`${isMobile ? "p-1.5" : "p-2"} rounded-lg ${isDark ? 'hover:bg-slate-700' : 'hover:bg-gray-100'}`}
-              >
-                {isDark ? <Sun size={20} className="text-yellow-400" /> : <Moon size={20} className="text-gray-600" />}
-              </button>
-              <button
-                onClick={onLogout}
-                className={`flex items-center ${isMobile ? "gap-1 px-2 py-1.5" : "gap-2 px-4 py-2" } rounded-lg ${
-                  isDark ? 'bg-red-900 text-red-200 hover:bg-red-800' : 'bg-red-100 text-red-700 hover:bg-red-200'
-                }`}
-              >
-                <LogOut size={18} className={`${isMobile ? "sm:w-[18px] sm:h-[18px]" : "" }`} />
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className={`w-full ${isMobile ? "px-3 py-4" : "max-w-7xl item-center justify-center mx-auto px-4 py-6"}`}>
-        {/* Super Admin Info Card */}
-        <div className={`${isMobile ? "mb-4 p-4" : "mb-6 p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-          <div className={`flex items-center ${isMobile ? "gap-3" : "gap-4"}`}>
-            <div className={`${isMobile ? "w-12 h-12 text-xl" : "w-16 h-16 text-2xl"} rounded-full flex items-center justify-center font-bold ${
-              isDark ? 'bg-purple-900 text-purple-200' : 'bg-purple-100 text-purple-700'
-            }`}>
-              {superAdminData?.sa_name?.charAt(0).toUpperCase()}
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className={`${isMobile ? "text-lg" : "text-xl"} font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                {superAdminData?.sa_name}
-              </h2>
-              <div className={`flex ${isMobile ? "flex-col gap-1 mt-1 text-xs" : "items-center flex-row gap-4 mt-2 text-sm"} ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                <span className="flex items-center gap-1">
-                  <Mail size={14} />
-                  {superAdminData?.sa_email}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Building2 size={14} />
-                  {superAdminData?.station}
-                </span>
-                <span className="flex items-center gap-1">
-                  <MapPin size={14} />
-                  {superAdminData?.district}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className={` ${isMobile ? "mb-4 p-1.5" : "mb-6 p-2"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-          <div className={`flex ${isMobile ? "gap-1 overflow-x-auto hide-scrollbar pb-1" : "gap-2"}`}>
-            {[
-              { id: 'overview', label: 'Overview', icon: TrendingUp },
-              { id: 'incidents', label: 'All Incidents', icon: AlertTriangle },
-              { id: 'admins', label: 'Admin Management', icon: Users },
-              { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setCurrentTab(tab.id as TabView)}
-                className={`flex items-center ${isMobile ? "gap-1 px-2 py-1.5 whitespace-nowrap text-xs flex-shrink-0 min-w-max" : "gap-2 px-4 py-3 flex-1 justify-center"} rounded-lg font-medium transition-colors ${
-                  currentTab === tab.id
-                    ? isDark
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-purple-600 text-white'
-                    : isDark
-                    ? 'text-gray-300 hover:bg-slate-700'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                <tab.icon size={16} />
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Tab Content */}
-        {currentTab === 'overview' && (
-          <>
-            {/* Stats Grid */}
-            <div className={`gap-4 ${isMobile ? "grid grid-cols-1 mb-3 text-xs" : "grid sm:grid-cols-3 mb-6 text-sm"}`}>
-              <div className={`${isMobile ? "w-full p-4" : "p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-                <div className={`flex items-center justify-between rounded-xl ${isMobile ? "gap-2" : ""}`}>
-                  <div>
-                    <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Total Incidents</p>
-                    <p className={`text-3xl font-bold mt-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                      {stats.totalIncidents}
-                    </p>
-                  </div>
-                  <Activity className={`${isDark ? 'text-blue-400' : 'text-blue-600'}`} size={32} />
-                </div>
-              </div>
-
-              <div className={`${isMobile ? "w-full p-4" : "p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-                <div className={`flex items-center justify-between ${isMobile ? "gap-2" : ""}`}>
-                  <div>
-                    <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Total Admins</p>
-                    <p className={`text-3xl font-bold mt-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                      {stats.totalAdmins}
-                    </p>
-                  </div>
-                  <Users className={`${isDark ? 'text-purple-400' : 'text-purple-600'}`} size={32} />
-                </div>
-              </div>
-
-              <div className={`${isMobile ? "w-full p-4" : "p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-                <div className={`flex items-center justify-between ${isMobile ? "gap-2" : ""}`}>
-                  <div>
-                    <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Total Users</p>
-                    <p className={`text-3xl font-bold mt-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                      {stats.totalUsers}
-                    </p>
-                  </div>
-                  <UserPlus className={`${isDark ? 'text-green-400' : 'text-green-600'}`} size={32} />
-                </div>
-              </div>
-            </div>
-
-            {/* Status Stats */}
-            <div className={`grid ${isMobile ? "grid-cols-1" : "sm:grid-cols-3"} gap-4`}>
-              <div className={`${isMobile ? "w-full p-4" : "p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-                <div className={`flex items-center justify-between ${isMobile ? "gap-2" : ""}`}>
-                  <div>
-                    <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Pending</p>
-                    <p className={`text-3xl font-bold mt-1 ${isDark ? 'text-yellow-300' : 'text-yellow-600'}`}>
-                      {stats.pendingIncidents}
-                    </p>
-                  </div>
-                  <Clock className={`${isDark ? 'text-yellow-400' : 'text-yellow-600'}`} size={32} />
-                </div>
-              </div>
-
-              <div className={`${isMobile ? "w-full p-4" : "p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-                <div className={`flex items-center justify-between ${isMobile ? "gap-2" : ""}`}>
-                  <div>
-                    <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>In Progress</p>
-                    <p className={`text-3xl font-bold mt-1 ${isDark ? 'text-blue-300' : 'text-blue-600'}`}>
-                      {stats.inProgressIncidents}
-                    </p>
-                  </div>
-                  <AlertCircle className={`${isDark ? 'text-blue-400' : 'text-blue-600'}`} size={32} />
-                </div>
-              </div>
-
-              <div className={`${isMobile ? "w-full p-4" : "p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-                <div className={`flex items-center justify-between ${isMobile ? "gap-2" : ""}`}>
-                  <div>
-                    <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Resolved</p>
-                    <p className={`text-3xl font-bold mt-1 ${isDark ? 'text-green-300' : 'text-green-600'}`}>
-                      {stats.resolvedIncidents}
-                    </p>
-                  </div>
-                  <CheckCircle className={`${isDark ? 'text-green-400' : 'text-green-600'}`} size={32} />
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {currentTab === 'incidents' && (
-          <>
-            {/* Filters */}
-            <div className={`${isMobile ? "mb-4 p-3" : "mb-6 p-4"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-              <div className="space-y-3">
-                <div>
-                  <label className={`block ${isMobile ? "text-xs" : "text-sm"} font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Status Filter
-                  </label>
-                  <div className="flex gap-2 flex-wrap">
-                    {['all', 'pending', 'in_progress', 'resolved'].map((status) => (
-                      <button
-                        key={status}
-                        onClick={() => setFilterStatus(status)}
-                        className={`${isMobile ? "px-3 py-1.5" : "px-4 py-2"} rounded-lg font-medium transition-colors ${
-                          filterStatus === status
-                            ? isDark
-                              ? 'bg-purple-600 text-white'
-                              : 'bg-purple-600 text-white'
-                            : isDark
-                            ? 'bg-slate-700 text-gray-300 hover:bg-slate-600'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className={`block ${isMobile ? "text-xs" : "text-sm"} font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Department Filter
-                  </label>
-                  <div className="flex gap-2 flex-wrap">
+                <label className={`block ${isMobile ? "text-xs" : "text-sm"} font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Status Filter
+                </label>
+                <div className="flex gap-2 flex-wrap">
+                  {['all', 'pending', 'in_progress', 'resolved'].map((status) => (
                     <button
-                      onClick={() => setFilterDepartment('all')}
-                      className={`${isMobile ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"} rounded-lg font-medium transition-colors ${
-                        filterDepartment === 'all'
+                      key={status}
+                      onClick={() => setFilterStatus(status)}
+                      className={`${isMobile ? "px-3 py-1.5" : "px-4 py-2"} rounded-lg font-medium transition-colors ${
+                        filterStatus === status
                           ? isDark
                             ? 'bg-purple-600 text-white'
                             : 'bg-purple-600 text-white'
@@ -440,109 +417,132 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
-                      All Departments
+                      {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
                     </button>
-                    {departments.map((dept) => (
-                      <button
-                        key={dept}
-                        onClick={() => setFilterDepartment(dept)}
-                        className={`${isMobile ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"} rounded-lg font-medium transition-colors ${
-                          filterDepartment === dept
-                            ? isDark
-                              ? 'bg-purple-600 text-white'
-                              : 'bg-purple-600 text-white'
-                            : isDark
-                            ? 'bg-slate-700 text-gray-300 hover:bg-slate-600'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        {dept}
-                      </button>
-                    ))}
-                  </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className={`block ${isMobile ? "text-xs" : "text-sm"} font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Department Filter
+                </label>
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    onClick={() => setFilterDepartment('all')}
+                    className={`${isMobile ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"} rounded-lg font-medium transition-colors ${
+                      filterDepartment === 'all'
+                        ? isDark
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-purple-600 text-white'
+                        : isDark
+                        ? 'bg-slate-700 text-gray-300 hover:bg-slate-600'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    All Departments
+                  </button>
+                  {departments.map((dept) => (
+                    <button
+                      key={dept}
+                      onClick={() => setFilterDepartment(dept)}
+                      className={`${isMobile ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"} rounded-lg font-medium transition-colors ${
+                        filterDepartment === dept
+                          ? isDark
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-purple-600 text-white'
+                          : isDark
+                          ? 'bg-slate-700 text-gray-300 hover:bg-slate-600'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {dept}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Incidents List */}
-            <div className={`rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg overflow-hidden`}>
-              <div className="p-6">
-                <h2 className={`${isMobile ? "text-lg" : "text-xl"} font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  All System Incidents ({filteredIncidents.length})
-                </h2>
+          {/* Incidents List */}
+          <div className={`rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg overflow-hidden`}>
+            <div className="p-6">
+              <h2 className={`${isMobile ? "text-lg" : "text-xl"} font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                All System Incidents ({filteredIncidents.length})
+              </h2>
 
-                {filteredIncidents.length === 0 ? (
-                  <div className="text-center py-12">
-                    <AlertTriangle className={`mx-auto mb-4 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} size={48} />
-                    <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                      No incidents found
-                    </p>
-                  </div>
-                ) : (
-                  <div className={`${isMobile ? "space-y-3" : "space-y-4"} max-h-[600px] overflow-y-auto hide-scrollbar`}>
-                    {filteredIncidents.map((incident) => (
-                      <div
-                        key={incident.id}
-                        className={`${isMobile ? "p-3" : "p-4"} rounded-lg border ${
-                          isDark ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-200'
-                        }`}
-                      >
-                        <div className={`flex ${isMobile ? "gap-2 flex-col" : "flex-row items-start justify-between"} mb-3`}>
-                          <div className="flex-1">
-                            <h3 className={`font-bold ${isMobile ? "text-base" : "text-lg"} ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                              {incident.title}
-                            </h3>
-                            <p className={`${isMobile ? "text-xs" : "text-sm"} mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                              {incident.description}
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            <span className={`${isMobile ? "px-2" : "px-3"} py-1 rounded-full text-xs font-bold ${getSeverityColor(incident.severity)}`}>
-                              {incident.severity}
-                            </span>
-                            <span className={`${isMobile ? "px-2" : "px-3"} py-1 rounded-full text-xs font-bold ${getStatusColor(incident.status)}`}>
-                              {incident.status.replace('_', ' ')}
-                            </span>
-                          </div>
+              {filteredIncidents.length === 0 ? (
+                <div className="text-center py-12">
+                  <AlertTriangle className={`mx-auto mb-4 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} size={48} />
+                  <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    No incidents found
+                  </p>
+                </div>
+              ) : (
+                <div className={`${isMobile ? "space-y-3" : "space-y-4"} max-h-[600px] overflow-y-auto hide-scrollbar`}>
+                  {filteredIncidents.map((incident) => (
+                    <div
+                      key={incident.id}
+                      className={`${isMobile ? "p-3" : "p-4"} rounded-lg border ${
+                        isDark ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-200'
+                      }`}
+                    >
+                      <div className={`flex ${isMobile ? "gap-2 flex-col" : "flex-row items-start justify-between"} mb-3`}>
+                        <div className="flex-1">
+                          <h3 className={`font-bold ${isMobile ? "text-base" : "text-lg"} ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            {incident.title}
+                          </h3>
+                          <p className={`${isMobile ? "text-xs" : "text-sm"} mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {incident.description}
+                          </p>
                         </div>
-
-                        <div className={`flex ${isMobile ? "flex-col gap-2 text-xs" : "flex-row items-center gap-4 text-sm"} ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                          {/* <span className="flex items-center gap-1">
-                            <MapPin size={14} />
-                            {incident.location}
-                          </span> */}
-                          <span className="flex items-center gap-1">
-                            <Building2 size={14} />
-                            {incident.department}
+                        <div className="flex gap-2">
+                          <span className={`${isMobile ? "px-2" : "px-3"} py-1 rounded-full text-xs font-bold ${getSeverityColor(incident.severity)}`}>
+                            {incident.severity}
                           </span>
-                          <span className="flex items-center gap-1">
-                            <Clock size={14} />
-                            {new Date(incident.created_at).toLocaleDateString()}
+                          <span className={`${isMobile ? "px-2" : "px-3"} py-1 rounded-full text-xs font-bold ${getStatusColor(incident.status)}`}>
+                            {incident.status.replace('_', ' ')}
                           </span>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+
+                      <div className={`flex ${isMobile ? "flex-col gap-2 text-xs" : "flex-row items-center gap-4 text-sm"} ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                        {/* <span className="flex items-center gap-1">
+                          <MapPin size={14} />
+                          {incident.location}
+                        </span> */}
+                        <span className="flex items-center gap-1">
+                          <Building2 size={14} />
+                          {incident.department}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock size={14} />
+                          {new Date(incident.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          </>
-        )}
-
-        {currentTab === 'admins' && <AdminList />}
-
-        {currentTab === 'analytics' && (
-          <div className={`p-12 rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg text-center`}>
-            <BarChart3 className={`mx-auto mb-4 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} size={64} />
-            <h3 className={`text-xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              Analytics Dashboard
-            </h3>
-            <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              Advanced analytics and reporting features coming soon
-            </p>
           </div>
-        )}
-      </div>
+        </>
+      )}
+
+      {currentTab === 'admins' && <AdminList />}
+
+      {currentTab === 'analytics' && (
+        <div className={`p-12 rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg text-center`}>
+          <BarChart3 className={`mx-auto mb-4 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} size={64} />
+          <h3 className={`text-xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            Analytics Dashboard
+          </h3>
+          <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+            Advanced analytics and reporting features coming soon
+          </p>
+        </div>
+      )}
     </div>
+  </div>
   );
 }
