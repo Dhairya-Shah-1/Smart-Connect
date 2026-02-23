@@ -15,11 +15,12 @@
       "dest": "/api/$1"
     },
     {
-      "handle": "filesystem"
+      "src": "/assets/(.*)",
+      "dest": "/build/assets/$1"
     },
     {
       "src": "/(.*)",
-      "dest": "/build/$1"
+      "dest": "/build/index.html"
     }
   ]
 }
