@@ -1,9 +1,9 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { supabase } from './components/supabaseClient';
-import { LandingPage } from './components/LandingPage';
-import { LoginPage } from './components/LoginPage';
-import { SignUpPage } from './components/SignUpPage';
+import LandingPage from './components/LandingPage';
+import LoginPage from './components/LoginPage';
+import SignUpPage from './components/SignUpPage';
 import { Dashboard } from './components/Dashboard';
 import { AdminDashboard } from './components/AdminDashboard';
 import { SuperAdminDashboard } from './components/SuperAdminDashboard';
