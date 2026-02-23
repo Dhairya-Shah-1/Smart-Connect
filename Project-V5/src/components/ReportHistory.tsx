@@ -1,4 +1,4 @@
- import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Clock, MapPin, Droplets, AlertTriangle, Flame, Car, Mountain, ShieldCheck, Building2, Loader2, Flag, XCircle } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { useTheme } from '../App';
@@ -58,9 +58,9 @@ useEffect(() => {
         }
       } catch {}
 
-      // Fetch fresh data
+      // Fetch fresh data from view (has lat/lng and ai_interpretation)
       const { data, error } = await supabase
-        .from('incident_reports')
+        .from('incident_reports_view')
         .select('*')
         .eq('user_id', user.id)
         .order('timestamp', { ascending: false });
@@ -70,22 +70,26 @@ useEffect(() => {
         return;
       }
 
-      if (data) {
+      if (data && data.length > 0) {
         allReports = data.map((r: any) => ({
           id: r.report_id,
           type: r.incident_type || 'Unknown',
           severity: r.severity || 'low',
-          location: r.location || 'Unknown Location',
+          // Use lat/lng from view to show coordinates
+          location: r.lat && r.lng ? `${r.lat.toFixed(4)}, ${r.lng.toFixed(4)}` : 'View on map',
+          lat: r.lat,
+          lng: r.lng,
           description: r.incident_description || '',
           photo: r.photo_url || null,
           status: r.status || 'pending',
           timestamp: r.timestamp || new Date().toISOString(),
           userName: user.user_metadata?.full_name || user.email,
-          aiVerified: r.ai_verified ?? true,
-          aiConfidence: r.ai_confidence,
-          aiReason: r.ai_reason,
-          isFlagged: r.is_flagged || r.status === 'rejected',
-          departmentNotified: r.department || 'Municipal Authority',
+          // Use ai_interpretation from view
+          aiVerified: r.ai_interpretation ? !r.ai_interpretation.toLowerCase().includes('fake') : true,
+          aiConfidence: r.ai_interpretation ? 0.8 : undefined,
+          aiReason: r.ai_interpretation || '',
+          isFlagged: r.status === 'rejected',
+          departmentNotified: 'Municipal Authority',
         }));
 
         try {
@@ -283,13 +287,13 @@ useEffect(() => {
                             </span>
                           )}
                         </div>
-                        {/* <p className="text-xs text-gray-500 flex items-center gap-1">
-                          <MapPin size={11} />
-                          {typeof report.location === 'string'
-                            ? report.location
-                            : JSON.stringify(report.location)}
-                        </p> */}
-                      </div>
+                          <p className="text-xs text-gray-500 flex items-center gap-1" onClick={() => window.open(`https://www.google.com/maps/place/${report.location}`, "_blank")}>
+                            <MapPin size={11} />
+                            {typeof report.location === 'string'
+                              ? report.location
+                              : JSON.stringify(report.location)}
+                          </p>
+                        </div>
 
                       <span className={`px-2 py-1 rounded-full text-xs border-2 flex-shrink-0 ml-2 font-bold ${getSeverityColor(report.severity)}`}>
                         {report.severity?.toUpperCase() || 'LOW'}
@@ -298,7 +302,7 @@ useEffect(() => {
 
                     {/* Description */}
                     <p className={`text-xs mb-3 leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{report.description}</p>
-
+                    
                     {/* AI Reason for flagged reports */}
                     {report.isFlagged && report.aiReason && (
                       <div className="mb-3 p-2 bg-red-100 border border-red-200 rounded-lg">
