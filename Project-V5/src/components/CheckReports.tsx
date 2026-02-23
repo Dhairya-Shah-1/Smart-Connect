@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MapPin, CheckCircle, Clock, Loader2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { useTheme } from '../App';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { isMobileOrTablet } from "../utils/deviceDetection";
 import { supabase } from './supabaseClient';
 
@@ -262,6 +262,7 @@ export function CheckReports() {
                       className={`flex items-center gap-1.5 text-xs cursor-pointer ${isDark ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`}
                       onClick={() => report.lat && report.lng && window.open(`https://www.google.com/maps/place/${report.lat},${report.lng}/@${report.lat},${report.lng},208m/data=!3m1!1e3`, "_blank")}
                     >
+                      {/* onClick={() => window.open(`https://www.google.com/maps/place/${selectedIssue.location}/@${selectedIssue.location},208m/data=!3m1!1e3`, "_blank")}> */}
                       <MapPin size={14} />
                       <span>{report.lat && report.lng ? `${report.lat.toFixed(4)}, ${report.lng.toFixed(4)}` : 'View on map'}</span>
                     </div>
