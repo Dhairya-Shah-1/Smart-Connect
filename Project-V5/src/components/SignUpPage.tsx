@@ -1,16 +1,11 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ASSETS } from '../config/assets';
 import { ArrowLeft, Loader2, Mail, CheckCircle } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
-type Page = 'landing' | 'login' | 'signup' | 'dashboard';
-
-interface SignUpPageProps {
-  onNavigate: (page: Page) => void;
-  onLogin: () => void;
-}
-
-export function SignUpPage({ onNavigate, onLogin }: SignUpPageProps) {
+export function SignUpPage() {
+  const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -105,7 +100,7 @@ export function SignUpPage({ onNavigate, onLogin }: SignUpPageProps) {
           </div>
 
           <button
-            onClick={() => onNavigate('login')}
+            onClick={() => navigate('/login')}
             className="w-full bg-white border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 transition-colors"
           >
             Back to Login
@@ -126,7 +121,7 @@ export function SignUpPage({ onNavigate, onLogin }: SignUpPageProps) {
     <div className="hide-scrollbar min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center px-4 py-8">
       <div className="max-w-md w-full">
         <button
-          onClick={() => onNavigate('landing')}
+          onClick={() => navigate('/')}
           className="flex items-center gap-2 text-gray-600 hover:text-blue-800 mb-8 transition-colors"
         >
           <ArrowLeft size={20} />
@@ -228,7 +223,7 @@ export function SignUpPage({ onNavigate, onLogin }: SignUpPageProps) {
           <p className="text-center mt-6 text-gray-600">
             Already have an account?{' '}
             <button
-              onClick={() => onNavigate('login')}
+              onClick={() => navigate('/login')}
               className="text-blue-800 hover:underline"
             >
               Log in
