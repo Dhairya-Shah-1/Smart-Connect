@@ -260,7 +260,7 @@ export function CheckReports() {
                     {/* Location Coordinates - use lat/lng from view */}
                     <div 
                       className={`flex items-center gap-1.5 text-xs cursor-pointer ${isDark ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`}
-                      onClick={() => report.lat && report.lng && window.open(`https://www.google.com/maps/place/${report.lat},${report.lng}`, "_blank")}
+                      onClick={() => report.lat && report.lng && window.open(`https://www.google.com/maps/place/${report.lat},${report.lng}/@${report.lat},${report.lng},208m/data=!3m1!1e3`, "_blank")}
                     >
                       <MapPin size={14} />
                       <span>{report.lat && report.lng ? `${report.lat.toFixed(4)}, ${report.lng.toFixed(4)}` : 'View on map'}</span>
