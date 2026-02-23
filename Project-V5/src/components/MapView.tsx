@@ -3,11 +3,8 @@ import { MapPin, Filter, Search, X, ShieldCheck, Loader2, ZoomIn, ZoomOut } from
 import { useTheme } from "../App";
 import { OpenLayersMap } from "./OpenLayersMap";
 import { isMobileOrTablet } from "../utils/deviceDetection";
-
-/* 🔹 ADDED */
 import { supabase } from "./supabaseClient";
 import { toast } from "sonner";
-
 interface Issue {
   id: string;
   type: string;
@@ -23,12 +20,10 @@ interface Issue {
   aiVerified: boolean;
   departmentNotified: string;
 }
-
 interface MapViewProps {
   onNavigateHome: () => void;
   urgentCount?: number;
 }
-
 export function MapView({
   onNavigateHome,
   urgentCount,
@@ -38,15 +33,9 @@ export function MapView({
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [loading, setLoading] = useState(true);
-  
-  // Get current user from localStorage
   const [currentUser, setCurrentUser] = useState<any>(null);
-  
-  // Use ref to always get current issues in event handlers
   const issuesRef = useRef<Issue[]>([]);
   issuesRef.current = issues;
-
-  // State for filters
   const [filterType, setFilterType] = useState<string>("all");
   const [filterSeverity, setFilterSeverity] =  useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -54,28 +43,19 @@ export function MapView({
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [imageZoom, setImageZoom] = useState(1);
   const isMobileTablet = isMobileOrTablet();
-  
-  // Check if user is admin or super_admin
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
-  
-  // Admin filter state
   const [adminFilter, setAdminFilter] = useState<'pending' | 'in-progress'>('pending');
-  
-  // Get user on mount
   useEffect(() => {
     const userStr = localStorage.getItem('currentUser');
     if (userStr) {
       setCurrentUser(JSON.parse(userStr));
     }
   }, []);
-  
-  // Handle reject action
   const handleReject = async (reportId: string) => {
     const { error } = await supabase
       .from('incident_reports')
       .update({ status: 'rejected' })
       .eq('report_id', reportId);
-    
     if (error) {
       toast.error("Failed to reject report");
     } else {
@@ -84,14 +64,11 @@ export function MapView({
       setSelectedIssue(null);
     }
   };
-  
-  // Handle verify and dispatch action
   const handleVerify = async (reportId: string) => {
     const { error } = await supabase
       .from('incident_reports')
       .update({ status: 'resolved' })
       .eq('report_id', reportId);
-    
     if (error) {
       toast.error("Failed to verify report");
     } else {
@@ -100,17 +77,14 @@ export function MapView({
       setSelectedIssue(null);
     }
   };
-
   const openFullscreenImage = (imageUrl: string) => {
     setFullscreenImage(imageUrl);
     setImageZoom(1);
   };
-
   const closeFullscreenImage = () => {
     setFullscreenImage(null);
     setImageZoom(1);
   };
-
   const getDistance = (
     lat1: number,
     lon1: number,
@@ -120,23 +94,18 @@ export function MapView({
   const R = 6371000;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
-
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(lat1 * Math.PI / 180) *
       Math.cos(lat2 * Math.PI / 180) *
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
-
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 };
-
 const groupNearbyIssues = (issues: Issue[]) => {
   const grouped: any[] = [];
-
   issues.forEach((issue) => {
     let found = false;
-
     for (let group of grouped) {
       const distance = getDistance(
         issue.lat,
@@ -144,53 +113,37 @@ const groupNearbyIssues = (issues: Issue[]) => {
         group.lat,
         group.lng
       );
-
       if (
         distance <= 30 &&
         issue.type.toLowerCase() === group.type.toLowerCase()
       ) {
         group.reportCount += 1;
-        group.ids.push(issue.id);   // 🔹 ADD THIS
+        group.ids.push(issue.id);
         found = true;
         break;
       }
     }
-
     if (!found) {
       grouped.push({
         ...issue,
         reportCount: 1,
-        ids: [issue.id],   // 🔹 ADD THIS
+        ids: [issue.id],
       });
     }
   });
-
   return grouped;
 };
-
-  /* ======================================================
-     🔹 SUPABASE DATA FETCH (REPLACES localStorage ONLY)
-     ====================================================== */
   const fetchIssues = async () => {
     try {
       setLoading(true);
-      
-      // For admins, fetch both pending and in-progress
-      // For users, only show in-progress
       let query = supabase.from("incident_reports_view").select("*");
-      
       if (isAdmin) {
-        // Admin sees both pending and in-progress based on filter
         query = query.in("status", [adminFilter, "in-progress"]).order("timestamp", { ascending: false });
       } else {
-        // Regular users only see in-progress
         query = query.eq("status", "in-progress").order("timestamp", { ascending: false });
       }
-      
       const { data, error } = await query;
-
       if (error) throw error;
-
       const mappedIssues: Issue[] = (data || []).map((report: any) => {
         return {
           id: report.report_id,
@@ -208,27 +161,21 @@ const groupNearbyIssues = (issues: Issue[]) => {
           departmentNotified: "Central Control",
         };
       });
-
-      // For admins, filter by adminFilter after fetching
       let filteredIssues = mappedIssues;
       if (isAdmin) {
         filteredIssues = mappedIssues.filter(issue => issue.status === adminFilter);
       }
-
       const grouped = groupNearbyIssues(filteredIssues);
       setIssues(grouped);
     } catch (err) {
       console.error(err);
       toast.error("Failed to load incident data");
     } finally {
-    setLoading(false);   // STOP LOADING
+    setLoading(false);
     }
   };
-
-  /* 🔹 ONLY CHANGE INSIDE useEffect */
   useEffect(() => {
     fetchIssues();
-
     const channel = supabase
   .channel("incident-realtime")
   .on(
@@ -244,14 +191,10 @@ const groupNearbyIssues = (issues: Issue[]) => {
     }
   )
   .subscribe();
-
     return () => {
       supabase.removeChannel(channel);
     };
   }, [adminFilter, isAdmin]);
-
-  /* ================= ORIGINAL CODE CONTINUES UNTOUCHED ================= */
-
   const getSeverityColor = (severity: string) => {
     switch (severity.toLowerCase()) {
       case "critical":
@@ -266,7 +209,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
         return "bg-gray-500 border-gray-600";
     }
   };
-
   const getStatusBadgeColor = (status: string) => {
     switch (status.toLowerCase()) {
       case "resolved":
@@ -277,8 +219,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
         return "bg-gray-100 text-gray-800 border-gray-200";
     }
   };
-
-  // Independent filtering for Type and Severity
   const filteredIssues = issues.filter((issue) => {
     const matchesType =
       filterType === "all" ||
@@ -298,8 +238,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
 
     return matchesType && matchesSeverity && matchesSearch;
   });
-
-  // Severity Counts for the sidebar
   const severityCounts = {
     critical: issues.filter((i) => i.severity === "critical")
       .length,
@@ -308,16 +246,8 @@ const groupNearbyIssues = (issues: Issue[]) => {
       .length,
     low: issues.filter((i) => i.severity === "low").length,
   };
-
-  /* 🔹 FROM HERE ONWARD:
-     EXACTLY YOUR ORIGINAL JSX
-     ZERO REMOVALS
-     ZERO RE-ORDERING
-  */
-
   return (
     <div className="h-full flex">
-      {/* FILTER PANEL */}
       <div
         className={`${showFilters ? "w-80" : "w-0"} transition-all duration-300 overflow-hidden flex-shrink-0 border-r ${
           isDark
@@ -339,8 +269,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
               <X size={20} />
             </button>
           </div>
-
-          {/* Search */}
           <div className="mb-4">
             <div className="relative">
               <Search
@@ -360,8 +288,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
               />
             </div>
           </div>
-
-          {/* Severity Filter with Colors */}
           <div className="mb-4">
             <label
               className={`block text-xs mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}
@@ -383,7 +309,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
               >
                 All Severities ({issues.length})
               </button>
-
               <button
                 onClick={() => setFilterSeverity("critical")}
                 className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between transition-colors ${
@@ -402,7 +327,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
                 </span>
                 <span>{severityCounts.critical}</span>
               </button>
-
               <button
                 onClick={() => setFilterSeverity("high")}
                 className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between transition-colors ${
@@ -421,7 +345,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
                 </span>
                 <span>{severityCounts.high}</span>
               </button>
-
               <button
                 onClick={() => setFilterSeverity("medium")}
                 className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between transition-colors ${
@@ -440,7 +363,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
                 </span>
                 <span>{severityCounts.medium}</span>
               </button>
-
               <button
                 onClick={() => setFilterSeverity("low")}
                 className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between transition-colors ${
@@ -461,8 +383,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
               </button>
             </div>
           </div>
-
-          {/* Type Filter */}
           <div className="mb-4">
             <label
               className={`block text-xs mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}
@@ -488,8 +408,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
               <option value="other">Other</option>
             </select>
           </div>
-
-          {/* Status Legend */}
           <div className="mb-4">
             <label
               className={`block text-xs mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}
@@ -535,8 +453,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
               </div>
             </div>
           </div>
-
-          {/* Clear Filters */}
           {(filterType !== "all" ||
             filterSeverity !== "all" ||
             searchQuery !== "") && (
@@ -557,8 +473,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
           )}
         </div>
       </div>
-
-      {/* MAP AREA */}
       <div
         className={`flex-1 relative ${isDark ? "bg-gradient-to-br from-slate-700 to-slate-900" : "bg-gradient-to-br from-slate-100 to-blue-50"}`}
       >
@@ -576,7 +490,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
           <OpenLayersMap
             issues={filteredIssues}
             onMarkerClick={(id) => {
-              // Use ref to get current issues
               const currentIssues = issuesRef.current;
               const currentFiltered = currentIssues.filter((issue) => {
                 const matchesType =
@@ -594,27 +507,16 @@ const groupNearbyIssues = (issues: Issue[]) => {
                   issue.description
                     .toLowerCase()
                     .includes(searchQuery.toLowerCase());
-
                 return matchesType && matchesSeverity && matchesSearch;
               });
-              
-              // console.log("Marker clicked with id:", id, "type:", typeof id);
-              // console.log("All issues count:", currentIssues.length);
-              // console.log("Filtered issues count:", currentFiltered.length);
-              // console.log("Filtered issues sample:", currentFiltered.slice(0, 3).map(i => ({ id: i.id, ids: i.ids })));
               const issue = currentFiltered.find(
                 (i: any) => String(i.id) === id || (i.ids && i.ids.some((issueId: any) => String(issueId) === id))
               );
-              // console.log("Found issue:", issue);
-              
               if (!issue) return;
-
               setSelectedIssue(issue);
             }}
           />
         </div>
-
-        {/* Admin Filter Buttons - Only show for admins */}
         {isAdmin ? (
           <div className="absolute top-4 left-4 z-10 flex gap-2">
             <button
@@ -649,7 +551,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
             </button>
           </div>
         ) : (
-          /* Urgent Indicator - Only show for non-admins */
           <button
             onClick={() => setFilterSeverity("critical")}
             className={`absolute top-4 left-4 z-10`}
@@ -678,8 +579,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
             )}
           </button>
         )}
-
-        {/* Filter Toggle */}
         {!showFilters && urgentCount > 0 && (
           <button
             onClick={() => setShowFilters(true)}
@@ -702,8 +601,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
             <span className="text-sm">Filters</span>
           </button>
         )}
-
-        {/* Stats - Hide on mobile/tablet when filters panel is open */}
         {!(isMobileTablet && showFilters) && (
           <div
             className={`absolute top-4 right-4 rounded-lg shadow-lg p-3 z-10 ${
@@ -722,8 +619,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
             </div>
           </div>
         )}
-
-        {/* Selected Issue Popup */}
         {selectedIssue && (
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl max-w-md w-full z-30 border border-gray-200">
             <button
@@ -751,7 +646,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
                   <h3 className="text-lg text-gray-900">
                     {selectedIssue.type}
                   </h3>
-                  <div className="flex items-center text-gray-600 text-sm mt-1" onClick={() => window.open(`https://www.google.com/maps/place/${selectedIssue.location}`, "_blank")}>
+                  <div className="flex items-center text-gray-600 text-sm mt-1" onClick={() => window.open(`https://www.google.com/maps/place/${selectedIssue.location}/@${selectedIssue.location},208m/data=!3m1!1e3`, "_blank")}>
                     <MapPin size={14} className="mr-1" />
                     {selectedIssue.location}
                   </div>
@@ -765,7 +660,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
               <p className="text-sm text-gray-700 mb-2">
                 {selectedIssue.description}
               </p>
-              {"reportCount" in selectedIssue && //added
+              {"reportCount" in selectedIssue &&
                 selectedIssue.reportCount > 1 && (
                   <div className="mb-3 text-sm text-red-600 font-semibold">
                     Reported by {selectedIssue.reportCount} people
@@ -807,8 +702,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
                   </span>
                 </div>
               )}
-              
-              {/* Admin Action Buttons - Only show for admins */}
               {isAdmin && (
                 <div className="flex gap-2 md:gap-3">
                   <button 
@@ -829,7 +722,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
                   </button>
                 </div>
               )}
-              
               <p className="text-xs text-gray-500 pt-2">
                 Reported by {selectedIssue.userName} on{" "}
                 {new Date(
@@ -843,8 +735,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
             </div>
           </div>
         )}
-
-        {/* Fullscreen Image Viewer with Zoom */}
         {fullscreenImage && (
           <div 
             className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4"
@@ -852,7 +742,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
               if (e.target === e.currentTarget) closeFullscreenImage();
             }}
           >
-            {/* Image Container */}
             <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
               <img
                 src={fullscreenImage}
@@ -864,8 +753,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
                 }}
                 draggable={false}
               />
-              
-              {/* Close Button */}
               <button
                 className="absolute top-4 right-4 bg-white/90 hover:bg-white rounded-full p-2.5 md:p-3 shadow-lg transition-all"
                 onClick={closeFullscreenImage}
@@ -873,9 +760,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
                 <X size={20} className="text-gray-800" />
               </button>
 
-              {/* Control Panel */}
               <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-3 bg-white/90 rounded-full px-4 py-3 shadow-2xl">
-                {/* Zoom Out */}
                 <button
                   className="p-2 hover:bg-gray-200 rounded-full transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                   onClick={() => setImageZoom((prev) => Math.max(prev - 0.25, 0.5))}
@@ -883,13 +768,9 @@ const groupNearbyIssues = (issues: Issue[]) => {
                 >
                   <ZoomOut size={20} className="text-gray-700" />
                 </button>
-
-                {/* Zoom Indicator */}
                 <span className="text-xs font-semibold text-gray-700 min-w-[50px] text-center">
                   {Math.round(imageZoom * 100)}%
                 </span>
-
-                {/* Zoom In */}
                 <button
                   className="p-2 hover:bg-gray-200 rounded-full transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                   onClick={() => setImageZoom((prev) => Math.min(prev + 0.25, 5))}
