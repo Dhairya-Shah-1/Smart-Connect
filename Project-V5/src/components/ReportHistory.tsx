@@ -287,7 +287,7 @@ useEffect(() => {
                             </span>
                           )}
                         </div>
-                          <p className="text-xs text-gray-500 flex items-center gap-1" onClick={() => window.open(`https://www.google.com/maps/place/${report.location}`, "_blank")}>
+                          <p className="text-xs text-gray-500 flex items-center gap-1" onClick={() => window.open(`https://www.google.com/maps/place/${selectedIssue.location}/@${selectedIssue.location},208m/data=!3m1!1e3`, "_blank")}>
                             <MapPin size={11} />
                             {typeof report.location === 'string'
                               ? report.location
