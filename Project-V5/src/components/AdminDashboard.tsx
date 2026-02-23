@@ -3,7 +3,7 @@ import { MapView } from './MapView';
 import { CheckReports } from './CheckReports';
 import { Notifications } from './Notifications';
 import { Profile } from './Profile';
-import { Map, CheckCircle, Bell, User, LogOut, Sun, Moon } from 'lucide-react';
+import { Map, CheckCircle, Bell, User, Sun, Moon } from 'lucide-react';
 import { ASSETS } from '../config/assets';
 import { useTheme } from '../App';
 
@@ -53,11 +53,20 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             {isDark ? <Sun size={20} /> : <Moon size={20} />}
           </button>
           <button
-            onClick={onLogout}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${isDark ? 'bg-red-900/30 text-red-400 hover:bg-red-900/50' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
+            onClick={() => setCurrentView(currentView === 'profile' ? 'map' : 'profile')}
+            className={`p-2 rounded-lg transition-colors ${
+              currentView === 'profile'
+                ? isDark
+                  ? 'bg-slate-700 text-blue-300 hover:bg-slate-600'
+                  : 'bg-gray-100 text-blue-700 hover:bg-gray-200'
+                : isDark
+                  ? 'bg-slate-700 text-gray-200 hover:bg-slate-600'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+            aria-label={currentView === 'profile' ? 'Go to map' : 'Go to profile'}
+            title={currentView === 'profile' ? 'Map' : 'Profile'}
           >
-            <LogOut size={18} />
-            <span className="text-sm font-medium">Logout</span>
+            {currentView === 'profile' ? <Map size={20} /> : <User size={20} />}
           </button>
         </div>
       </header>
