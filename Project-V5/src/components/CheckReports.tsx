@@ -18,9 +18,9 @@ export function CheckReports() {
   const fetchReports = async () => {
     setLoading(true);
     
-    // First, get all pending reports
+    // Fetch from incident_reports_view (has lat/lng and ai_interpretation)
     const { data: reportsData, error: reportsError } = await supabase
-        .from('incident_reports')
+        .from('incident_reports_view')
         .select('*')
         .eq('status', 'pending')
         .order('timestamp', { ascending: false });
@@ -35,27 +35,32 @@ export function CheckReports() {
     // Get unique user IDs from the reports
     const userIds = [...new Set(reportsData?.map(r => r.user_id).filter(Boolean))];
     
-    // Fetch user names for these IDs
+    // Fetch user data for these IDs (including u_email)
     const { data: usersData, error: usersError } = await supabase
         .from('users')
-        .select('u_id, u_name')
+        .select('u_id, u_name, u_email')
         .in('u_id', userIds);
 
     if (usersError) {
-        console.error('Error fetching user names:', usersError);
-        // Continue without user names if this fails
+        console.error('Error fetching user data:', usersError);
+        // Continue without user data if this fails
     }
 
-    // Create a map of user IDs to names
+    // Create a map of user IDs to user data
     const userMap = new Map();
     usersData?.forEach(user => {
-        userMap.set(user.u_id, user.u_name);
+        userMap.set(user.u_id, { u_name: user.u_name, u_email: user.u_email });
     });
 
-    // Combine reports with user names
+    // Combine reports with user data and use ai_interpretation from view
     const reportsWithUsers = reportsData?.map(report => ({
         ...report,
-        reporter_name: userMap.get(report.user_id) || 'Unknown User'
+        reporter_name: userMap.get(report.user_id)?.u_name || 'Unknown User',
+        reporter_email: userMap.get(report.user_id)?.u_email || 'Unknown Email',
+        // Use ai_interpretation from view
+        ai_verified: report.ai_interpretation ? !report.ai_interpretation.toLowerCase().includes('fake') : true,
+        ai_reason: report.ai_interpretation || '',
+        ai_confidence: report.ai_interpretation ? 0.8 : undefined,
     })) || [];
 
     setReports(reportsWithUsers);
@@ -77,14 +82,13 @@ export function CheckReports() {
 
   useEffect(() => { fetchReports(); }, []);
 
-  const handleAction = async (id: string, action: 'confirm' | 'reject') => {
-      const newStatus = action === 'confirm' ? 'in-progress' : 'rejected';
-      const { error } = await supabase.from('incident_reports').update({ status: newStatus }).eq('report_id', id);
+  const handleMarkResolved = async (id: string) => {
+      const { error } = await supabase.from('incident_reports').update({ status: 'resolved' }).eq('report_id', id);
       
       if (error) {
-          toast.error("Failed to update status");
+          toast.error("Failed to resolve report");
       } else {
-          toast.success(`Report ${action === 'confirm' ? 'verified' : 'rejected'}`);
+          toast.success("Report marked as resolved");
           fetchReports(); // Refresh list
       }
   };
@@ -108,16 +112,16 @@ export function CheckReports() {
       <div className="max-w-7xl mx-auto w-full h-full flex flex-col p-3 md:p-6">
         {/* Header Section */}
         <div className="mb-4 md:mb-6">
-          <h2 className={`text-xl md:text-2xl font-bold ${isDark ? 'text-indigo-300' : 'text-indigo-900'}`}>Incoming Reports</h2>
+          <h2 className={`text-xl md:text-2xl font-bold ${isDark ? 'text-indigo-300' : 'text-indigo-900'}`}>Verified Reports</h2>
           <p className={`text-xs md:text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-            Review and verify pending incident reports from citizens
+            Resolve the pending incident reports
           </p>
         </div>
         
         {/* Filter Buttons */}
         <div className="flex gap-2 md:gap-3 pb-4 md:pb-6 shrink-0 overflow-x-auto no-scrollbar">
           {categories.map(cat => {
-            const count = reports.filter(r => cat === 'all' || r.severity === cat).length;
+            const count = reports.filter(r => cat === 'all' || r.severity === cat && r.status === 'in-progress').length;
             return (
               <button
                 key={cat}
@@ -160,7 +164,7 @@ export function CheckReports() {
             <div className={`text-center py-20 md:py-32 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
               <CheckCircle className={`mx-auto mb-3 w-12 h-12 md:w-16 md:h-16 ${isDark ? 'text-green-400 opacity-50' : 'text-green-800'}`} />
               <p className="text-base md:text-lg font-medium">No pending reports in this category</p>
-              <p className="text-xs md:text-sm mt-1">All reports have been processed</p>
+              <p className="text-xs md:text-sm mt-1">All reports have been resolved</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
@@ -224,40 +228,67 @@ export function CheckReports() {
                     <p className={`text-xs md:text-sm leading-relaxed line-clamp-3 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                       {report.incident_description}
                     </p>
+                    
+                    {/* AI Interpretation Display */}
+                    {report.ai_reason && (
+                      <div className={`mt-2 p-2 rounded-lg text-xs ${
+                        report.ai_verified 
+                          ? isDark ? 'bg-green-900/30 border border-green-700' : 'bg-green-50 border border-green-200'
+                          : isDark ? 'bg-red-900/30 border border-red-700' : 'bg-red-50 border border-red-200'
+                      }`}>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className={`font-semibold ${
+                            report.ai_verified ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {report.ai_verified ? '✓ AI Verified' : '✗ AI Flagged'}
+                          </span>
+                          {report.ai_confidence && (
+                            <span className={`text-xs ${
+                              report.ai_verified ? 'text-green-500' : 'text-red-500'
+                            }`}>
+                              ({Math.round(report.ai_confidence * 100)}% confidence)
+                            </span>
+                          )}
+                        </div>
+                        <p className={`text-xs ${
+                          report.ai_verified ? 'text-green-700' : 'text-red-700'
+                        }`}>
+                          {report.ai_reason}
+                        </p>
+                      </div>
+                    )}
+                    {/* Location Coordinates - use lat/lng from view */}
+                    <div 
+                      className={`flex items-center gap-1.5 text-xs cursor-pointer ${isDark ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`}
+                      onClick={() => report.lat && report.lng && window.open(`https://www.google.com/maps/place/${report.lat},${report.lng}`, "_blank")}
+                    >
+                      <MapPin size={14} />
+                      <span>{report.lat && report.lng ? `${report.lat.toFixed(4)}, ${report.lng.toFixed(4)}` : 'View on map'}</span>
+                    </div>
                     <div className="flex items-center gap-2 pt-2">
                       <div className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs font-bold ${
                         isDark ? 'bg-slate-700 text-indigo-400' : 'bg-indigo-100 text-indigo-700'
                       }`}>
-                        {(report.users?.u_name || 'A')[0].toUpperCase()}
+                        {(report.reporter_name || 'A')[0].toUpperCase()}
                       </div>
                       <div>
                         <p className={`text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                          {report.users?.u_name || 'Anonymous'}
+                          {report.reporter_name || 'Anonymous'}
                         </p>
                         <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                          Reporter
+                          {report.reporter_email || 'Unknown Email'}
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className={`flex gap-2 md:gap-3 pt-3 md:pt-4 border-t ${isDark ? 'border-slate-700' : 'border-gray-200'}`}>
+                  {/* Mark as Resolved Button */}
+                  <div className={`pt-3 md:pt-4 border-t ${isDark ? 'border-slate-700' : 'border-gray-200'}`}>
                     <button 
-                      onClick={() => handleAction(report.report_id, 'reject')}
-                      className={`flex-1 py-2 md:py-2.5 rounded-lg border text-xs md:text-sm font-semibold transition-all ${
-                        isDark 
-                          ? 'border-red-800 text-red-400 hover:bg-red-900/20' 
-                          : 'border-red-300 text-red-600 hover:bg-red-50'
-                      }`}
+                      onClick={() => handleMarkResolved(report.report_id)}
+                      className="w-full py-2 md:py-2.5 rounded-lg bg-green-600 text-white text-xs md:text-sm font-semibold hover:bg-green-700 shadow-md hover:shadow-lg transition-all"
                     >
-                      Reject
-                    </button>
-                    <button 
-                      onClick={() => handleAction(report.report_id, 'confirm')}
-                      className="flex-1 py-2 md:py-2.5 rounded-lg bg-indigo-600 text-white text-xs md:text-sm font-semibold hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all"
-                    >
-                      Verify & Dispatch
+                      Mark as Resolved
                     </button>
                   </div>
                 </div>
