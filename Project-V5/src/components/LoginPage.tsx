@@ -1,17 +1,12 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ASSETS } from '../config/assets';
 import { MapPin, ArrowLeft } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
-type Page = 'landing' | 'login' | 'signup' | 'dashboard' | 'super_admin' | 'admin';
-
-interface LoginPageProps {
-  onNavigate: (page: Page) => void;
-  onLogin: () => void;
-}
-
-export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
+export function LoginPage() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -91,16 +86,13 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
 
       localStorage.setItem('currentUser', JSON.stringify(currentUser));
 
-      // 4. Continue existing navigation logic
-      onLogin();
-      
-      // Route based on role
+      // 4. Navigate based on role
       if (role === 'super_admin') {
-        onNavigate('super_admin' as Page);
+        navigate('/super-admin');
       } else if (role === 'admin') {
-        onNavigate('admin' as Page);
+        navigate('/admin');
       } else {
-        onNavigate('dashboard');
+        navigate('/dashboard');
       }
 
     } catch (err: any) {
@@ -115,7 +107,7 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center px-4">
       <div className="max-w-md w-full">
         <button
-          onClick={() => onNavigate('landing')}
+          onClick={() => navigate('/')}
           className="flex items-center gap-2 text-gray-600 hover:text-blue-800 mb-8 transition-colors"
         >
           <ArrowLeft size={20} />
@@ -191,7 +183,7 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
           <p className="text-center mt-6 text-gray-600">
             Don't have an account?{' '}
             <button
-              onClick={() => onNavigate('signup')}
+              onClick={() => navigate('/signup')}
               className="text-blue-800 hover:underline"
             >
               Sign up
