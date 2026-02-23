@@ -1,5 +1,6 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { supabase } from './components/supabaseClient';
 import { LandingPage } from './components/LandingPage';
 import { LoginPage } from './components/LoginPage';
 import { SignUpPage } from './components/SignUpPage';
@@ -148,7 +149,7 @@ function AppContent() {
             path="/admin" 
             element={
               <AdminRoute>
-                <AdminDashboard />
+                <AdminDashboardWrapper />
               </AdminRoute>
             } 
           />
@@ -166,7 +167,7 @@ function AppContent() {
             path="/super-admin" 
             element={
               <SuperAdminRoute>
-                <SuperAdminDashboard />
+                <SuperAdminDashboardWrapper />
               </SuperAdminRoute>
             } 
           />
@@ -181,16 +182,19 @@ function AppContent() {
 
 // Wrapper components to pass required props
 function DashboardWrapper() {
-  const navigate = useNavigate();
-  
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.log('SignOut error (can be ignored):', error);
+    }
     localStorage.removeItem('currentUser');
     localStorage.removeItem('reportHistory_cache');
-    navigate('/login');
+    window.location.href = '/login';
   };
   
   const handleNavigateHome = () => {
-    navigate('/');
+    window.location.href = '/';
   };
   
   return <Dashboard onLogout={handleLogout} onNavigateHome={handleNavigateHome} />;
@@ -221,17 +225,52 @@ function MapViewWrapper() {
 }
 
 function ProfileWrapper() {
-  const navigate = useNavigate();
-  
-  const handleBack = () => {
-    navigate(-1);
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.log('SignOut error (can be ignored):', error);
+    }
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('reportHistory_cache');
+    window.location.href = '/login';
   };
   
-  return <Profile onBack={handleBack} />;
+  return <Profile onLogout={handleLogout} />;
 }
 
 function CheckReportsWrapper() {
   return <CheckReports />;
+}
+
+function AdminDashboardWrapper() {
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.log('SignOut error (can be ignored):', error);
+    }
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('reportHistory_cache');
+    window.location.href = '/login';
+  };
+  
+  return <AdminDashboard onLogout={handleLogout} />;
+}
+
+function SuperAdminDashboardWrapper() {
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.log('SignOut error (can be ignored):', error);
+    }
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('reportHistory_cache');
+    window.location.href = '/login';
+  };
+  
+  return <SuperAdminDashboard onLogout={handleLogout} />;
 }
 
 export default function App() {
