@@ -82,10 +82,21 @@ function AppContent() {
     if (savedTheme) {
       setTheme(savedTheme);
     }
+
+    // Supabase recovery links may land on "/#...". Move them to /login while preserving hash params.
+    const hash = window.location.hash || '';
+    const isRecoveryHash =
+      hash.includes('type=recovery') ||
+      hash.includes('access_token=') ||
+      hash.includes('refresh_token=');
+
+    if (isRecoveryHash && window.location.pathname !== '/login') {
+      navigate(`/login${hash}`);
+    }
     
     // Note: We don't auto-redirect based on auth state here
     // React Router will handle this via the Routes
-  }, []);
+  }, [navigate]);
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
