@@ -166,11 +166,6 @@ export function LoginPage() {
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
   const hashType = hashParams.get('type');
   const isRecoveryLink = (token && type === 'recovery') || hashType === 'recovery';
-  
-  // If recovery state is detected, show update password component
-  if (isRecoveryLink || view === 'update-password') {
-    return <UpdatePasswordView />;
-  }
 
   // Initialize view based on URL params (only once on mount)
   useEffect(() => {
@@ -184,6 +179,10 @@ export function LoginPage() {
   }, []);
 
   useEffect(() => {
+    if (isRecoveryLink) {
+      setView('update-password');
+    }
+
     if (hashType === 'recovery') {
       setView('update-password');
     }
@@ -199,7 +198,7 @@ export function LoginPage() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [hashType]);
+  }, [hashType, isRecoveryLink]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -426,6 +425,9 @@ export function LoginPage() {
             </div>
           </div>
         );
+
+      case 'update-password':
+        return <UpdatePasswordView />;
 
       case 'login':
       default:
