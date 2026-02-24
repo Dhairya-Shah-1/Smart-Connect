@@ -1,10 +1,9 @@
-// Asset configuration for CivicAlert platform
-// This file contains paths to all static assets used throughout the application
-
 export const ASSETS = {
   Fire: 'https://sbbfbzytpshfnlhymkss.supabase.co/storage/v1/object/public/app-assets/fire(without-bg).png',
 
   Gemini_Logo: 'https://sbbfbzytpshfnlhymkss.supabase.co/storage/v1/object/public/app-assets/Google_Gemini_icon.png',
+
+  GoogleIcon: 'https://www.svgrepo.com/show/475656/google-color.svg',
 
   LandigPageImage: 'https://sbbfbzytpshfnlhymkss.supabase.co/storage/v1/object/public/app-assets/LandingPageImage.png',
 
