@@ -6,12 +6,14 @@ import { supabase } from './supabaseClient';
 
 export function SignUpPage() {
   const navigate = useNavigate();
+  const [signupMethod, setSignupMethod] = useState<'manual' | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -44,27 +46,21 @@ export function SignUpPage() {
 
       if (signUpError) throw signUpError;
 
-      // Create user profile in users table
       if (data.user) {
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert([
-            {
-              u_id: data.user.id,
-              u_name: name,
-              u_email: email,
-            },
-          ]);
+        const { error: profileError } = await supabase.from('users').insert([
+          {
+            u_id: data.user.id,
+            u_name: name,
+            u_email: email,
+          },
+        ]);
 
         if (profileError) {
           console.error('Error creating user profile:', profileError);
-          // Don't throw here, as the auth user was created successfully
         }
       }
 
-      // Show "Check your email" screen
       setEmailSent(true);
-
     } catch (err: any) {
       console.error('Signup Error:', err);
       setError(err.message || 'Error creating account');
@@ -73,9 +69,26 @@ export function SignUpPage() {
     }
   };
 
-  /* ----------------------------------------------------
-     VIEW 2: EMAIL VERIFICATION SENT
-  ---------------------------------------------------- */
+  const handleGoogleSignUp = async () => {
+    setError('');
+    setGoogleLoading(true);
+
+    try {
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: 'http://localhost:3000/login',
+        },
+      });
+
+      if (oauthError) throw oauthError;
+    } catch (err: any) {
+      console.error('Google Signup Error:', err);
+      setError(err.message || 'Failed to start Google sign up');
+      setGoogleLoading(false);
+    }
+  };
+
   if (emailSent) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center px-4 py-8">
@@ -94,8 +107,8 @@ export function SignUpPage() {
           <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-sm text-blue-800 mb-8 text-left flex gap-3">
             <CheckCircle size={18} className="flex-shrink-0 mt-0.5" />
             <p>
-              Click the link in the email to activate your account.
-              You’ll be able to log in after verification.
+              Click the link in the email to activate your account. You'll be able to log in after
+              verification.
             </p>
           </div>
 
@@ -106,17 +119,12 @@ export function SignUpPage() {
             Back to Login
           </button>
 
-          <p className="text-xs text-gray-400 mt-4">
-            Didn’t receive the email? Check your spam folder.
-          </p>
+          <p className="text-xs text-gray-400 mt-4">Didn't receive the email? Check your spam folder.</p>
         </div>
       </div>
     );
   }
 
-  /* ----------------------------------------------------
-     VIEW 1: SIGN UP FORM (Original UI preserved)
-  ---------------------------------------------------- */
   return (
     <div className="hide-scrollbar min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center px-4 py-8">
       <div className="max-w-md w-full">
@@ -137,95 +145,112 @@ export function SignUpPage() {
             </div>
           </div>
 
-          <h2 className="text-3xl text-center mb-8 text-gray-900">
-            Join the Platform
-          </h2>
+          <h2 className="text-3xl text-center mb-8 text-gray-900">Join the Platform</h2>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm mb-2 text-gray-700">
-                Full Name
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800"
-                placeholder="John Doe"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm mb-2 text-gray-700">
-                Email Address
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800"
-                placeholder="your@email.com"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm mb-2 text-gray-700">
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800"
-                placeholder="••••••••"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm mb-2 text-gray-700">
-                Confirm Password
-              </label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800"
-                placeholder="••••••••"
-                required
-              />
-            </div>
-
-            {error && (
-              <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm border border-red-200">
-                {error}
-              </div>
-            )}
-
+          <div className="space-y-3">
             <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-800 text-white py-3 rounded-lg hover:bg-blue-900 transition-colors shadow-md flex justify-center items-center"
+              type="button"
+              onClick={handleGoogleSignUp}
+              disabled={googleLoading}
+              className="w-full bg-white border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 transition-colors shadow-sm flex justify-center items-center gap-2"
             >
-              {loading ? (
-                <Loader2
-                  size={24}
-                  style={{ animation: 'spin 1s linear infinite' }}
-                />
+              {googleLoading ? (
+                <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
               ) : (
-                'Sign Up'
+                <>
+                  <img src={ASSETS.GoogleIcon} alt="Google" className="w-5 h-5" />
+                  Sign In with Google
+                </>
               )}
             </button>
-          </form>
+
+            <button
+              type="button"
+              onClick={() => {
+                setError('');
+                setSignupMethod('manual');
+              }}
+              className="w-full bg-blue-800 text-white py-3 rounded-lg hover:bg-blue-900 transition-colors shadow-md"
+            >
+              Enter details manually
+            </button>
+          </div>
+
+          {signupMethod === 'manual' && (
+            <form onSubmit={handleSubmit} className="space-y-6 mt-6">
+              <div>
+                <label className="block text-sm mb-2 text-gray-700">Full Name</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800"
+                  placeholder="John Doe"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm mb-2 text-gray-700">Email Address</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800"
+                  placeholder="your@email.com"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm mb-2 text-gray-700">Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800"
+                  placeholder="........"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm mb-2 text-gray-700">Confirm Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800"
+                  placeholder="........"
+                  required
+                />
+              </div>
+
+              {error && (
+                <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm border border-red-200">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-blue-800 text-white py-3 rounded-lg hover:bg-blue-900 transition-colors shadow-md flex justify-center items-center"
+              >
+                {loading ? <Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} /> : 'Sign Up'}
+              </button>
+            </form>
+          )}
+
+          {signupMethod !== 'manual' && error && (
+            <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm border border-red-200 mt-6">
+              {error}
+            </div>
+          )}
 
           <p className="text-center mt-6 text-gray-600">
             Already have an account?{' '}
-            <button
-              onClick={() => navigate('/login')}
-              className="text-blue-800 hover:underline"
-            >
+            <button onClick={() => navigate('/login')} className="text-blue-800 hover:underline">
               Log in
             </button>
           </p>
