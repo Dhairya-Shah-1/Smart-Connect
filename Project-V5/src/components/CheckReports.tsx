@@ -5,92 +5,173 @@ import { toast } from 'sonner';
 import { isMobileOrTablet } from "../utils/deviceDetection";
 import { supabase } from './supabaseClient';
 
+const PAGE_SIZE = 7;
+const categories = ['all', 'critical', 'high', 'medium', 'low'] as const;
+type Category = (typeof categories)[number];
+
 export function CheckReports() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const [filter, setFilter] = useState('critical');
+  const [filter, setFilter] = useState<Category>('critical');
   const [reports, setReports] = useState<any[]>([]);
+  const [counts, setCounts] = useState<Record<Category, number>>({
+    all: 0,
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+  });
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [lastTimestampCursor, setLastTimestampCursor] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [imageZoom, setImageZoom] = useState(1);
   const isMobile = isMobileOrTablet();
 
-  const fetchReports = async () => {
-    setLoading(true);
-    
-    // Fetch from incident_reports_view (has lat/lng and ai_interpretation)
-    const { data: reportsData, error: reportsError } = await supabase
-        .from('incident_reports_view')
-        .select('*')
-        .eq('status', 'pending')
-        .order('timestamp', { ascending: false });
+  const fetchCounts = async () => {
+    const [allRes, criticalRes, highRes, mediumRes, lowRes] = await Promise.all([
+      supabase.from('incident_reports').select('*', { count: 'exact', head: true }).eq('status', 'in-progress'),
+      supabase.from('incident_reports').select('*', { count: 'exact', head: true }).eq('status', 'in-progress').eq('severity', 'critical'),
+      supabase.from('incident_reports').select('*', { count: 'exact', head: true }).eq('status', 'in-progress').eq('severity', 'high'),
+      supabase.from('incident_reports').select('*', { count: 'exact', head: true }).eq('status', 'in-progress').eq('severity', 'medium'),
+      supabase.from('incident_reports').select('*', { count: 'exact', head: true }).eq('status', 'in-progress').eq('severity', 'low'),
+    ]);
 
-    if (reportsError) {
-        console.error('Error fetching reports:', reportsError);
-        toast.error("Error loading reports");
-        setLoading(false);
-        return;
-    }
-
-    // Get unique user IDs from the reports
-    const userIds = [...new Set(reportsData?.map(r => r.user_id).filter(Boolean))];
-    
-    // Fetch user data for these IDs (including u_email)
-    const { data: usersData, error: usersError } = await supabase
-        .from('users')
-        .select('u_id, u_name, u_email')
-        .in('u_id', userIds);
-
-    if (usersError) {
-        console.error('Error fetching user data:', usersError);
-        // Continue without user data if this fails
-    }
-
-    // Create a map of user IDs to user data
-    const userMap = new Map();
-    usersData?.forEach(user => {
-        userMap.set(user.u_id, { u_name: user.u_name, u_email: user.u_email });
-    });
-
-    // Combine reports with user data and use ai_interpretation from view
-    const reportsWithUsers = reportsData?.map(report => ({
-        ...report,
-        reporter_name: userMap.get(report.user_id)?.u_name || 'Unknown User',
-        reporter_email: userMap.get(report.user_id)?.u_email || 'Unknown Email',
-        // Use ai_interpretation from view
-        ai_verified: report.ai_interpretation ? !report.ai_interpretation.toLowerCase().includes('fake') : true,
-        ai_reason: report.ai_interpretation || '',
-        ai_confidence: report.ai_interpretation ? 0.8 : undefined,
-    })) || [];
-
-    setReports(reportsWithUsers);
-    
-    const counts = {
-        critical: reportsWithUsers?.filter(r => r.severity === 'critical').length || 0,
-        high: reportsWithUsers?.filter(r => r.severity === 'high').length || 0,
-        medium: reportsWithUsers?.filter(r => r.severity === 'medium').length || 0,
-        low: reportsWithUsers?.filter(r => r.severity === 'low').length || 0,
+    const nextCounts: Record<Category, number> = {
+      all: allRes.count ?? 0,
+      critical: criticalRes.count ?? 0,
+      high: highRes.count ?? 0,
+      medium: mediumRes.count ?? 0,
+      low: lowRes.count ?? 0,
     };
-    
-    if (counts.critical > 0) setFilter('critical');
-    else if (counts.high > 0) setFilter('high');
-    else if (counts.medium > 0) setFilter('medium');
-    else if (counts.low > 0) setFilter('low');
-
-    setLoading(false);
+    setCounts(nextCounts);
+    return nextCounts;
   };
 
-  useEffect(() => { fetchReports(); }, []);
+  const enrichWithUsers = async (rawReports: any[]) => {
+    const userIds = [...new Set(rawReports.map(r => r.user_id).filter(Boolean))];
+    if (userIds.length === 0) return rawReports;
+
+    const { data: usersData, error: usersError } = await supabase
+      .from('users')
+      .select('u_id, u_name, u_email')
+      .in('u_id', userIds);
+
+    if (usersError) {
+      console.error('Error fetching user data:', usersError);
+    }
+
+    const userMap = new Map();
+    usersData?.forEach(user => {
+      userMap.set(user.u_id, { u_name: user.u_name, u_email: user.u_email });
+    });
+
+    return rawReports.map(report => ({
+      ...report,
+      reporter_name: userMap.get(report.user_id)?.u_name || 'Unknown User',
+      reporter_email: userMap.get(report.user_id)?.u_email || 'Unknown Email',
+      ai_verified: report.ai_interpretation ? !report.ai_interpretation.toLowerCase().includes('fake') : true,
+      ai_reason: report.ai_interpretation || '',
+      ai_confidence: report.ai_interpretation ? 0.8 : undefined,
+    }));
+  };
+
+  const fetchBatch = async (activeFilter: Category, afterTimestamp: string | null, withLoader = true) => {
+    if (withLoader) setLoading(true);
+
+    let query = supabase
+      .from('incident_reports_view')
+      .select('*')
+      .eq('status', 'in-progress')
+      .order('timestamp', { ascending: true })
+      .limit(PAGE_SIZE + 1);
+
+    if (activeFilter !== 'all') {
+      query = query.eq('severity', activeFilter);
+    }
+
+    if (afterTimestamp) {
+      query = query.gt('timestamp', afterTimestamp);
+    }
+
+    const { data: reportsData, error: reportsError } = await query;
+
+    if (reportsError) {
+      console.error('Error fetching reports:', reportsError);
+      toast.error('Error loading reports');
+      if (withLoader) setLoading(false);
+      return;
+    }
+
+    const rows = reportsData || [];
+    const canLoadMore = rows.length > PAGE_SIZE;
+    const pageRows = canLoadMore ? rows.slice(0, PAGE_SIZE) : rows;
+    const reportsWithUsers = await enrichWithUsers(pageRows);
+
+    setReports(reportsWithUsers);
+    setHasMore(canLoadMore);
+    setLastTimestampCursor(pageRows.length > 0 ? pageRows[pageRows.length - 1].timestamp : null);
+    if (withLoader) setLoading(false);
+  };
+
+  useEffect(() => {
+    const initialize = async () => {
+      setLoading(true);
+      const nextCounts = await fetchCounts();
+
+      let defaultFilter: Category = 'all';
+      if (nextCounts.critical > 0) defaultFilter = 'critical';
+      else if (nextCounts.high > 0) defaultFilter = 'high';
+      else if (nextCounts.medium > 0) defaultFilter = 'medium';
+      else if (nextCounts.low > 0) defaultFilter = 'low';
+
+      setFilter(defaultFilter);
+      await fetchBatch(defaultFilter, null, false);
+      setLoading(false);
+      setIsInitialized(true);
+    };
+    initialize();
+  }, []);
+
+  useEffect(() => {
+    if (!isInitialized) return;
+    fetchBatch(filter, null);
+  }, [filter, isInitialized]);
 
   const handleMarkResolved = async (id: string) => {
       const { error } = await supabase.from('incident_reports').update({ status: 'resolved' }).eq('report_id', id);
-      
+
       if (error) {
-          toast.error("Failed to resolve report");
+          toast.error('Failed to resolve report');
       } else {
-          toast.success("Report marked as resolved");
-          fetchReports(); // Refresh list
+          toast.success('Report marked as resolved');
+          const remaining = reports.filter(r => r.report_id !== id);
+          setReports(remaining);
+          const nextCounts = await fetchCounts();
+
+          if (remaining.length === 0) {
+            if (hasMore && lastTimestampCursor) {
+              await fetchBatch(filter, lastTimestampCursor);
+            } else {
+              await fetchBatch(filter, null);
+            }
+          } else if (filter !== 'all' && nextCounts[filter] === 0) {
+            if (nextCounts.critical > 0) setFilter('critical');
+            else if (nextCounts.high > 0) setFilter('high');
+            else if (nextCounts.medium > 0) setFilter('medium');
+            else if (nextCounts.low > 0) setFilter('low');
+            else setFilter('all');
+          }
       }
+  };
+
+  const handleLoadMore = async () => {
+    if (!hasMore || !lastTimestampCursor || loadingMore) return;
+    setLoadingMore(true);
+    await fetchBatch(filter, lastTimestampCursor, false);
+    setLoadingMore(false);
   };
 
   const openFullscreenImage = (imageUrl: string) => {
@@ -103,8 +184,9 @@ export function CheckReports() {
     setImageZoom(1);
   };
 
-  const filteredReports = reports.filter(r => filter === 'all' ? true : r.severity === filter);
-  const categories = ['all', 'critical', 'high', 'medium', 'low'];
+  const filteredReports = [...reports].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
 
   return (
     <div className={`h-full flex flex-col ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
@@ -121,7 +203,7 @@ export function CheckReports() {
         {/* Filter Buttons */}
         <div className="flex gap-2 md:gap-3 pb-4 md:pb-6 shrink-0 overflow-x-auto no-scrollbar">
           {categories.map(cat => {
-            const count = reports.filter(r => cat === 'all' || r.severity === cat && r.status === 'in-progress').length;
+            const count = counts[cat];
             return (
               <button
                 key={cat}
@@ -294,6 +376,21 @@ export function CheckReports() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+          {!loading && filteredReports.length > 0 && hasMore && (
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+                  isDark
+                    ? 'bg-slate-700 text-gray-100 hover:bg-slate-600 disabled:opacity-60'
+                    : 'bg-white border border-blue-500 text-blue-700 hover:bg-blue-50 disabled:opacity-60'
+                }`}
+              >
+                {loadingMore ? 'Loading...' : 'More reports'}
+              </button>
             </div>
           )}
         </div>
