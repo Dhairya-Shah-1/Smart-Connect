@@ -9,22 +9,11 @@ type LoginView = 'login' | 'forgot-password' | 'email-sent' | 'update-password';
 // Separate component for password update (shown when user clicks email link)
 function UpdatePasswordView() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-
-  const token = searchParams.get('token');
-  const type = searchParams.get('type');
-
-  // Redirect if no token
-  useEffect(() => {
-    if (!token || type !== 'recovery') {
-      navigate('/login');
-    }
-  }, [token, type, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,9 +163,12 @@ export function LoginPage() {
   // Check if this is a password reset from email link
   const token = searchParams.get('token');
   const type = searchParams.get('type');
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const hashType = hashParams.get('type');
+  const isRecoveryLink = (token && type === 'recovery') || hashType === 'recovery';
   
-  // If token and type=recovery, show update password component
-  if (token && type === 'recovery') {
+  // If recovery state is detected, show update password component
+  if (isRecoveryLink || view === 'update-password') {
     return <UpdatePasswordView />;
   }
 
@@ -190,6 +182,24 @@ export function LoginPage() {
       window.history.replaceState({}, '', '/login');
     }
   }, []);
+
+  useEffect(() => {
+    if (hashType === 'recovery') {
+      setView('update-password');
+    }
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setView('update-password');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [hashType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -292,7 +302,7 @@ export function LoginPage() {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         resetEmail,
         {
-          redirectTo: `${window.location.origin}/login?type=recovery&token=1`,
+          redirectTo: `${window.location.origin}/login`,
         }
       );
 
