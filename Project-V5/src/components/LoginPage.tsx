@@ -157,6 +157,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   
@@ -189,9 +190,15 @@ export function LoginPage() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         setView('update-password');
+      }
+      if (event === 'SIGNED_IN' && session?.user && view === 'login') {
+        void resolveRoleAndRedirect(session.user).catch((err: any) => {
+          console.error('OAuth Sign-In Processing Error:', err);
+          setError(err.message || 'Failed to complete sign in');
+        });
       }
     });
 
@@ -199,6 +206,113 @@ export function LoginPage() {
       subscription.unsubscribe();
     };
   }, [hashType, isRecoveryLink]);
+
+  const resolveRoleAndRedirect = async (user: any) => {
+    let role: 'user' | 'admin' | 'super_admin' = 'user';
+    let profileData: any = null;
+
+    const { data: sa } = await supabase
+      .from('super_admins')
+      .select('*')
+      .eq('sa_id', user.id)
+      .maybeSingle();
+
+    if (sa) {
+      role = 'super_admin';
+      profileData = sa;
+    } else {
+      const { data: admin } = await supabase
+        .from('admins')
+        .select('*')
+        .eq('a_id', user.id)
+        .maybeSingle();
+
+      if (admin) {
+        role = 'admin';
+        profileData = admin;
+      } else {
+        const { data: usr } = await supabase
+          .from('users')
+          .select('*')
+          .eq('u_id', user.id)
+          .maybeSingle();
+
+        if (usr) {
+          role = 'user';
+          profileData = usr;
+        } else {
+          const fallbackName = user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'User';
+          const { error: insertError } = await supabase.from('users').insert([
+            {
+              u_id: user.id,
+              u_name: fallbackName,
+              u_email: user.email,
+            },
+          ]);
+
+          if (insertError) {
+            console.error('User profile bootstrap error:', insertError);
+          } else {
+            profileData = {
+              u_id: user.id,
+              u_name: fallbackName,
+              u_email: user.email,
+            };
+          }
+        }
+      }
+    }
+
+    const resolvedName =
+      profileData?.sa_name ??
+      profileData?.a_name ??
+      profileData?.u_name ??
+      user.user_metadata?.full_name ??
+      user.email?.split('@')[0];
+
+    const currentUser = {
+      id: user.id,
+      email: user.email,
+      role,
+      name: resolvedName,
+      profile: profileData,
+    };
+
+    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+
+    if (role === 'super_admin') {
+      navigate('/super-admin');
+    } else if (role === 'admin') {
+      navigate('/admin');
+    } else {
+      navigate('/dashboard');
+    }
+  };
+
+  useEffect(() => {
+    if (view !== 'login') return;
+
+    const oauthError =
+      searchParams.get('error_description') || searchParams.get('error');
+    if (oauthError) {
+      setError(oauthError);
+      return;
+    }
+
+    const finalizeOAuthLogin = async () => {
+      try {
+        const { data, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !data.session?.user) return;
+
+        await resolveRoleAndRedirect(data.session.user);
+      } catch (err: any) {
+        console.error('OAuth Session Error:', err);
+        setError(err.message || 'Failed to complete sign in');
+      }
+    };
+
+    finalizeOAuthLogin();
+  }, [searchParams, view]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -216,78 +330,33 @@ export function LoginPage() {
       if (authError) throw authError;
       if (!user) throw new Error('User not found');
 
-      // 2. Determine role
-      let role: 'user' | 'admin' | 'super_admin' = 'user';
-      let profileData: any = null;
-
-      // Super Admin
-      const { data: sa } = await supabase
-        .from('super_admins')
-        .select('*')
-        .eq('sa_id', user.id)
-        .maybeSingle();
-
-      if (sa) {
-        role = 'super_admin';
-        profileData = sa;
-      } else {
-        // Admin
-        const { data: admin } = await supabase
-          .from('admins')
-          .select('*')
-          .eq('a_id', user.id)
-          .maybeSingle();
-
-        if (admin) {
-          role = 'admin';
-          profileData = admin;
-        } else {
-          // User
-          const { data: usr } = await supabase
-            .from('users')
-            .select('*')
-            .eq('u_id', user.id)
-            .single();
-
-          if (usr) {
-            role = 'user';
-            profileData = usr;
-          }
-        }
-      }
-
-      const resolvedName =
-        profileData?.sa_name ??
-        profileData?.a_name ??
-        profileData?.u_name ??
-        user.user_metadata?.full_name ??
-        user.email?.split('@')[0];
-        
-      // 3. Preserve your app flow using localStorage
-      const currentUser = {
-        id: user.id,
-        email: user.email,
-        role,
-        name: resolvedName,
-        profile: profileData,
-      };
-
-      localStorage.setItem('currentUser', JSON.stringify(currentUser));
-
-      // 4. Navigate based on role
-      if (role === 'super_admin') {
-        navigate('/super-admin');
-      } else if (role === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/dashboard');
-      }
+      await resolveRoleAndRedirect(user);
 
     } catch (err: any) {
       console.error('Login Error:', err);
       setError(err.message || 'Invalid email or password');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setGoogleLoading(true);
+
+    try {
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: 'http://localhost:3000/login',
+        },
+      });
+
+      if (oauthError) throw oauthError;
+    } catch (err: any) {
+      console.error('Google Login Error:', err);
+      setError(err.message || 'Failed to start Google sign in');
+      setGoogleLoading(false);
     }
   };
 
@@ -508,6 +577,26 @@ export function LoginPage() {
                   </button>
                 </form>
 
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  disabled={googleLoading}
+                  className="w-full bg-white border border-gray-300 text-gray-700 py-3 rounded-lg mt-6 hover:bg-gray-50 transition-colors shadow-sm flex justify-center items-center gap-2"
+                >
+                  {googleLoading ? (
+                    <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+                  ) : (
+                    <>
+                      <img
+                        src={ASSETS.GoogleIcon}
+                        alt="Google"
+                        className="w-5 h-5"
+                      />
+                      Continue with Google
+                    </>
+                  )}
+                </button>
+
                 <div className="mt-4 text-center">
                   <button
                     onClick={() => setView('forgot-password')}
@@ -517,7 +606,7 @@ export function LoginPage() {
                   </button>
                 </div>
 
-                <p className="text-center mt-6 text-gray-600">
+                <p className="text-center mt-1 text-gray-600">
                   Don't have an account?{' '}
                   <button
                     onClick={() => navigate('/signup')}
