@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { MapPin, AlertTriangle, Droplets, Flame, Car, Mountain, Sun, Moon, LogOut } from "lucide-react";
 import { isMobileOrTablet } from "../utils/deviceDetection";
 import { ASSETS } from '../config/assets';
+import { supabase } from './supabaseClient';
 
 import { useTheme } from "../App";
 
@@ -56,10 +57,15 @@ export function LandingPage() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('SignOut error (can be ignored):', error);
+    }
     localStorage.removeItem('currentUser');
     localStorage.removeItem('reportHistory_cache');
-    navigate('/login');
+    navigate('/login', { replace: true });
   };
 
   return (
