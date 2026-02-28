@@ -99,7 +99,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
           }`}
         >
           <CheckCircle size={24} />
-          <span className="text-xs">Verify</span>
+          <span className="text-xs">Verified</span>
         </button>
 
         <button
