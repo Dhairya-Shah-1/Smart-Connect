@@ -173,24 +173,6 @@ export function LandingPage() {
         {/* py-11 */}
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>
-            <div
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6 ${
-                isDark
-                  ? "bg-blue-900 border-blue-700"
-                  : "bg-blue-50 border-blue-200"
-              } border`}
-            >
-              <img
-                src={ASSETS.Gemini_Logo}
-                alt="Gemini Icon"
-                className={` ${isMobile ? "w-4 h-4" : "w-6 h-6"}`}
-              />
-              <span
-                className={`text-sm ${isDark ? "text-blue-300" : "text-blue-800"}`}
-              >
-                Reviewed by Gemini AI
-              </span>
-            </div>
             <h1
               className={`text-3xl font-bold mb-6 ${isDark ? "text-gray-100" : "text-gray-900"}`}
             >
@@ -201,7 +183,7 @@ export function LandingPage() {
             >
               A trusted platform for citizens and authorities to
               report, track, and resolve civic incidents with
-              AI-powered verification and instant alerts.
+              interactive <map name=""></map> and instant alerts.
             </p>
             <button
               onClick={handleStartReporting}
@@ -236,27 +218,26 @@ export function LandingPage() {
           <div className="grid md:grid-cols-3 gap-8 text-center">
             <div>
               <img
-                src={ASSETS.Verified}
+                src={ASSETS.Map_Image}
                 alt="Verified Icon"
-                className="mx-auto mb-3 w-14 h-14"
+                className="mx-auto h-22"
               />
               <h3 className="text-2xl font-semibold mb-2">
-                AI-Verified
+                Map
               </h3>
               <p
                 className={
                   isDark ? "text-gray-300" : "text-blue-100"
                 }
               >
-                Every report verified for accuracy and
-                authenticity
+                A user friendly interactive map
               </p>
             </div>
             <div>
               <img
                 src={ASSETS.Lightning}
                 alt="Lightning Icon"
-                className="mx-auto mb-3 w-14 h-14"
+                className="mx-auto mb-3 w-20 h-20"
               />
               <h3 className="text-2xl font-semibold mb-2">
                 Real-Time
@@ -273,7 +254,7 @@ export function LandingPage() {
               <img
                 src={ASSETS.People}
                 alt="People Icon"
-                className="mx-auto mb-3 w-14 h-14"
+                className="mx-auto mb-3 w-20 h-20"
               />
               <h3 className="text-2xl font-semibold mb-2">
                 Trusted
