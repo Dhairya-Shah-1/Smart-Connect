@@ -13,7 +13,7 @@ export const ASSETS = {
 
   Shield: 'https://sbbfbzytpshfnlhymkss.supabase.co/storage/v1/object/public/app-assets/Shield(Gemini)(without-bg).png',
 
-  Verified: 'https://sbbfbzytpshfnlhymkss.supabase.co/storage/v1/object/public/app-assets/Verified(Gemini)(without-bg).png',
+  Map_Image : 'https://sbbfbzytpshfnlhymkss.supabase.co/storage/v1/object/public/app-assets/Map_Image.png',
 
   Water_drop: 'https://sbbfbzytpshfnlhymkss.supabase.co/storage/v1/object/public/app-assets/water-drop%20(image%20by%20freepik)(without%20bg).png'
 };
