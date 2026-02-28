@@ -183,7 +183,7 @@ export function LandingPage() {
             >
               A trusted platform for citizens and authorities to
               report, track, and resolve civic incidents with
-              interactive <map name=""></map> and instant alerts.
+              interactive map and instant alerts.
             </p>
             <button
               onClick={handleStartReporting}
