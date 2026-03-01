@@ -107,7 +107,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
 
       // Fetch all incidents from incident_reports table
       const { data: incidentData, error: incidentError } = await supabase
-        .from('incident_reports')
+        .from('incident_reports_view')
         .select('*')
         .order('timestamp', { ascending: false });
 
