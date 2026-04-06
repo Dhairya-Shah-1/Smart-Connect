@@ -77,7 +77,7 @@ export function SignUpPage() {
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: 'http://localhost:3000/login',
+          redirectTo: `${window.location.origin}/login`,
         },
       });
 
