@@ -49,15 +49,20 @@ export function Dashboard({ onLogout, onNavigateHome }: DashboardProps) {
         (r: any) => r.user_id === user.id && r.status !== 'resolved'
       ).length;
 
-      // Urgent = critical severity + pending or in-progress (global)
-      const urgentIncidents = reports.filter(
-        (r: any) =>
-          r.severity === 'critical' &&
-          (r.status === 'pending' || r.status === 'in-progress')
-      ).length;
+      // Urgent should match the Live Map critical filter exactly.
+      const { count: urgentIncidents, error: urgentError } = await supabase
+        .from('incident_reports_view')
+        .select('*', { count: 'exact', head: true })
+        .eq('severity', 'critical')
+        .in('status', ['pending', 'in-progress']);
+
+      if (urgentError) {
+        console.error('Supabase urgent count error:', urgentError);
+        return;
+      }
 
       setNotificationCount(unresolvedCount);
-      setUrgentCount(urgentIncidents);
+      setUrgentCount(urgentIncidents || 0);
     } catch (err) {
       console.error('Dashboard load failed:', err);
     }
