@@ -348,7 +348,7 @@ export function LoginPage() {
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: 'http://localhost:3000/login',
+          redirectTo: `${window.location.origin}/login`,
         },
       });
 
@@ -581,7 +581,7 @@ export function LoginPage() {
                   type="button"
                   onClick={handleGoogleSignIn}
                   disabled={googleLoading}
-                  className="w-full bg-white border border-gray-300 text-gray-700 py-3 rounded-lg mt-6 hover:bg-gray-50 transition-colors shadow-sm flex justify-center items-center gap-2"
+                  className="w-full bg-white border border-gray-300 text-gray-700 py-2 rounded-lg mt-6 hover:bg-gray-50 transition-colors shadow-sm flex justify-center items-center gap-2"
                 >
                   {googleLoading ? (
                     <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
@@ -590,7 +590,7 @@ export function LoginPage() {
                       <img
                         src={ASSETS.GoogleIcon}
                         alt="Google"
-                        className="w-5 h-5"
+                        className="w-8 h-8"
                       />
                       Continue with Google
                     </>
