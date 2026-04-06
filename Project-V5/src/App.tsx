@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from './components/supabaseClient';
 import { ASSETS } from './config/assets';
 import LandingPage from './components/LandingPage';
@@ -74,19 +74,39 @@ function SuperAdminRoute({ children }: { children: React.ReactNode }) {
 // Component to handle initial routing based on auth state
 function AppContent() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [theme, setTheme] = useState<Theme>('light');
 
+  const getRedirectPath = (userStr: string | null) => {
+    if (!userStr) return null;
+
+    try {
+      const user = JSON.parse(userStr);
+      if (user.role === 'super_admin') return '/super-admin';
+      if (user.role === 'admin') return '/admin';
+      return '/dashboard';
+    } catch {
+      return null;
+    }
+  };
+
   useEffect(() => {
-    const user = localStorage.getItem('currentUser');
     const savedTheme = localStorage.getItem('theme') as Theme;
     
     if (savedTheme) {
       setTheme(savedTheme);
     }
     
-    // Note: We don't auto-redirect based on auth state here
-    // React Router will handle this via the Routes
   }, []);
+
+  useEffect(() => {
+    const redirectPath = getRedirectPath(localStorage.getItem('currentUser'));
+    const isPublicRoute = location.pathname === '/' || location.pathname === '/login' || location.pathname === '/signup';
+
+    if (redirectPath && isPublicRoute) {
+      navigate(redirectPath, { replace: true });
+    }
+  }, [location.pathname, navigate]);
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
