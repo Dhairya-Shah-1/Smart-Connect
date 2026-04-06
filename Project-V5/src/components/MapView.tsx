@@ -40,6 +40,7 @@ export function MapView({
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [loading, setLoading] = useState(true);
+  const [liveIncidentCount, setLiveIncidentCount] = useState(0);
   
   // Get current user from localStorage
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -219,8 +220,9 @@ const groupNearbyIssues = (issues: Issue[]) => {
         filteredIssues = mappedIssues.filter(issue => issue.status === adminFilter);
       }
 
-      const grouped = groupNearbyIssues(filteredIssues);
-      setIssues(grouped);
+      setLiveIncidentCount(filteredIssues.length);
+
+      setIssues(filteredIssues);
     } catch (err) {
       console.error(err);
       toast.error("Failed to load incident data");
@@ -722,7 +724,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
             <div
               className={`text-2xl ${isDark ? "text-gray-100" : "text-gray-900"}`}
             >
-              {issues.length}
+              {liveIncidentCount}
             </div>
           </div>
         )}
