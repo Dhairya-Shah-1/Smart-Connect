@@ -1,390 +1,628 @@
-import { useNavigate } from "react-router-dom";
-import { MapPin, AlertTriangle, Droplets, Flame, Car, Mountain, Sun, Moon, LogOut } from "lucide-react";
-import { isMobileOrTablet } from "../utils/deviceDetection";
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ASSETS } from '../config/assets';
+import { ArrowLeft, Mail, CheckCircle, Loader2 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
-import { useTheme } from "../App";
+type LoginView = 'login' | 'forgot-password' | 'email-sent' | 'update-password';
 
-export function LandingPage() {
+// Separate component for password update (shown when user clicks email link)
+function UpdatePasswordView() {
   const navigate = useNavigate();
-  const { theme, toggleTheme } = useTheme();
-  const isDark = theme === "dark";
-  const isMobile = isMobileOrTablet();
-  
-  // Check if user is logged in
-  const user = localStorage.getItem('currentUser');
-  const isLoggedIn = !!user;
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
-  const issues = [
-    {
-      icon: Droplets,
-      label: "Floods & Puddles",
-      color: isDark ? "text-blue-400" : "text-blue-600",
-    },
-    {
-      icon: AlertTriangle,
-      label: "Potholes",
-      color: isDark ? "text-yellow-400" : "text-yellow-600",
-    },
-    {
-      icon: Mountain,
-      label: "Landslides",
-      color: isDark ? "text-orange-400" : "text-orange-600",
-    },
-    {
-      icon: Flame,
-      label: "Fire Hazards",
-      color: isDark ? "text-red-400" : "text-red-600",
-    },
-    {
-      icon: Car,
-      label: "Accidents",
-      color: isDark ? "text-purple-400" : "text-purple-600",
-    },
-    {
-      icon: MapPin,
-      label: "Other Issues",
-      color: isDark ? "text-green-400" : "text-green-600",
-    },
-  ];
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
 
-  const handleStartReporting = () => {
-    if (isLoggedIn) {
-      navigate("/dashboard");
-    } else {
-      navigate("/signup");
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
     }
-  };
 
-  const handleLogout = async () => {
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.error('SignOut error (can be ignored):', error);
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: password,
+      });
+
+      if (updateError) throw updateError;
+
+      setSuccess(true);
+      
+      // Redirect to login after 2 seconds
+      setTimeout(() => {
+        navigate('/login');
+      }, 2000);
+
+    } catch (err: any) {
+      console.error('Update Password Error:', err);
+      setError(err.message || 'Failed to update password');
+    } finally {
+      setLoading(false);
     }
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('reportHistory_cache');
-    navigate('/login', { replace: true });
   };
+
+  if (success) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 border border-gray-200 text-center">
+          <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="text-green-600" size={40} />
+          </div>
+          <h2 className="text-2xl text-gray-900 mb-3">Password Updated!</h2>
+          <p className="text-gray-600 mb-6">
+            Your password has been successfully updated. Redirecting to login...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div 
-      className={`min-h-screen ${!isMobile ? "" : ""} ${isDark ? "bg-gradient-to-b from-slate-800 to-slate-900" : "bg-gradient-to-b from-slate-50 to-white"}`}
-    >
-      {/* Navigation */}
-      <nav
-        className={`${isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-gray-200"} sticky top-0 shadow-sm border-b`}
-      >
-        {" "}
-        {/* sticky top-0 */}
-        <div
-          className={`max-w-7xl mx-auto min-h-screen" ${isMobile ? "px-1.5 sm:px-1.5 lg:px-1.5 py-0\.5" : "px-6 sm:px-3 lg:px-3 py-3"}`}
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center px-4">
+      <div className="max-w-md w-full">
+        <button
+          onClick={() => navigate('/login')}
+          className="flex items-center gap-2 text-gray-600 hover:text-blue-800 mb-8 transition-colors"
         >
-          {/* px-6 sm:px-3 lg:px-3 py-2 */}
-          <div className="flex justify-between items-center">
-            <div
-              className={`flex items-center ${isMobile ? "gap-2" : "gap-3"}`}
-            >
-              <img
-                src={ASSETS.Shield}
-                alt="Shield Icon"
-                className={`object-contain ${isMobile ? "w-13 h-13" : "w-16 h-16"}`}
-              />
-              <div>
-                <span
-                  className={`text-l font-bold block ${isDark ? "text-gray-100" : "text-gray-900"}`}
-                >
-                  Smart Connect
-                </span>
-                {!isMobile && (
-                  <p
-                    className={`text-xs ${isDark ? "text-gray-400" : "text-gray-600"}`}
-                  >
-                    Real-Time Incident Monitoring
-                  </p>
-                )}
-              </div>
-            </div>
+          <ArrowLeft size={20} />
+          Back to Login
+        </button>
 
-            <div
-              className={`flex items-center ${isMobile ? "text-xs gap-0\.5 px-2 sm:px-2 lg:px-2 py-2" : "gap-6 px-6 sm:px-3 lg:px-3 py-2"}`}
-            >
-              <button
-                onClick={toggleTheme}
-                className={`p-2 rounded-lg transition-colors ${
-                  isDark
-                    ? "bg-slate-700 text-yellow-400 hover:bg-slate-600"
-                    : "bg-slate-200 text-gray-600 hover:text-blue-800"
-                }`}
-                aria-label="Toggle theme"
-              >
-                {isDark ? (
-                  <Sun size={20} />
-                ) : (
-                  <Moon size={20} />
-                )}
-              </button>
-
-              {!isLoggedIn ? (
-                <>
-                  <button
-                    onClick={() => navigate("/login")}
-                    className={`px-4 py-2 transition-colors ${
-                      isDark
-                        ? "text-gray-300 hover:text-blue-400"
-                        : "text-gray-700 hover:text-blue-800"
-                    }`}
-                  >
-                    Login
-                  </button>
-                  <button
-                    onClick={() => navigate("/signup")}
-                    className={` ${isMobile ? "inline-flex mx-auto px-5 py-2" : "px-6 py-2"} rounded-lg transition-colors shadow-md ${
-                      isDark
-                        ? "bg-blue-600 text-white hover:bg-blue-700"
-                        : "bg-blue-800 text-white hover:bg-blue-900"
-                    }`}
-                  >
-                    Sign Up
-                  </button>
-                </>
-              ) : (
-                    <button
-                      onClick={handleLogout} className={`gap-2 flex items-center px-2 py-2 rounded-lg transition-colors border
-                      ${ !isMobile ? "small" : "" }
-                      ${ isDark
-                        ? "bg-transparent text-blue-300 border-red-500 hover:text-red-300"
-                        : "bg-white border-red-200 text-blue-600 hover:text-red-600"
-                       }`}
-                    >
-                      <LogOut size={16} />
-                      <span>Log Out</span>
-                    </button>
-                )}
+        <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
+          <div className="flex items-center justify-center gap-3 mb-8">
+            <img src={ASSETS.Shield} alt="Shield Icon" className="inline-flex w-12" />
+            <div className="text-center">
+              <span className="text-2xl text-gray-900">Smart Connect</span>
+              <p className="text-xs text-gray-600">Reset Password</p>
             </div>
           </div>
-        </div>
-      </nav>
 
-      {/* Hero Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {" "}
-        {/* py-11 */}
-        <div className="grid md:grid-cols-2 gap-12 items-center">
-          <div>
-            <h1
-              className={`text-3xl font-bold mb-6 ${isDark ? "text-gray-100" : "text-gray-900"}`}
-            >
-              Report & Monitor Civic Incidents in Real-Time
-            </h1>
-            <p
-              className={`text-lg mb-8 ${isDark ? "text-gray-300" : "text-gray-600"}`}
-            >
-              A trusted platform for citizens and authorities to
-              report, track, and resolve civic incidents with
-              interactive and instant alerts.
-            </p>
+          <h2 className="text-2xl text-center mb-8 text-gray-900">Create New Password</h2>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label htmlFor="password" className="block text-sm mb-2 text-gray-700">
+                New Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800"
+                placeholder="••••••••"
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm mb-2 text-gray-700">
+                Confirm Password
+              </label>
+              <input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800"
+                placeholder="••••••••"
+                required
+              />
+            </div>
+
+            {error && (
+              <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm border border-red-200">
+                {error}
+              </div>
+            )}
+
             <button
-              onClick={handleStartReporting}
-              className={`px-8 py-4 rounded-lg transition-colors text-lg font-semibold shadow-lg ${
-                isDark
-                  ? "bg-blue-600 text-white hover:bg-blue-700"
-                  : "bg-blue-800 text-white hover:bg-blue-900"
-              }`}
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-800 text-white py-3 rounded-lg hover:bg-blue-900 transition-colors shadow-md flex justify-center items-center"
             >
-              {isLoggedIn
-                ? "Go to Dashboard"
-                : "Start Reporting Now"}
+              {loading ? (
+                <Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} />
+              ) : (
+                'Change Password'
+              )}
             </button>
-          </div>
-          <div
-            className={`rounded-2xl overflow-hidden shadow-2xl ${isDark ? "border-slate-700" : "border-gray-200"} border`}
-          >
-            <img
-              src={ASSETS.LandigPageImage}
-              alt="Civic incident illustration"
-              className="w-full h-auto"
-            />
-          </div>
+          </form>
         </div>
       </div>
-
-      {/* Trust Indicators */}
-      <div
-        className={`py-12 ${isDark ? "bg-slate-800" : "bg-blue-800"} text-white`}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-3 gap-8 text-center">
-            <div>
-              <img
-                src={ASSETS.Map_Image}
-                alt="Verified Icon"
-                className="mx-auto h-22"
-              />
-              <h3 className="text-2xl font-semibold mb-2">
-                Map
-              </h3>
-              <p
-                className={
-                  isDark ? "text-gray-300" : "text-blue-100"
-                }
-              >
-                A user friendly interactive map
-              </p>
-            </div>
-            <div>
-              <img
-                src={ASSETS.Lightning}
-                alt="Lightning Icon"
-                className="mx-auto mb-3 w-20 h-20"
-              />
-              <h3 className="text-2xl font-semibold mb-2">
-                Real-Time
-              </h3>
-              <p
-                className={
-                  isDark ? "text-gray-300" : "text-blue-100"
-                }
-              >
-                Instant notifications and live incident tracking
-              </p>
-            </div>
-            <div>
-              <img
-                src={ASSETS.People}
-                alt="People Icon"
-                className="mx-auto mb-3 w-20 h-20"
-              />
-              <h3 className="text-2xl font-semibold mb-2">
-                Trusted
-              </h3>
-              <p
-                className={
-                  isDark ? "text-gray-300" : "text-blue-100"
-                }
-              >
-                Direct connection to municipal authorities
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Issues Grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h2
-          className={`text-3xl font-bold text-center mb-12 ${isDark ? "text-gray-100" : "text-gray-900"}`}
-        >
-          What You Can Report?
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-          {issues.map((issue) => (
-            <div
-              key={issue.label}
-              className={`p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow text-center border ${
-                isDark
-                  ? "bg-slate-800 border-slate-700"
-                  : "bg-slate-50 border-gray-200"
-              }`}
-            >
-              <issue.icon
-                className={`mx-auto mb-3 ${issue.color}`}
-                size={40}
-                strokeWidth={2}
-              />
-              <p
-                className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}
-              >
-                {issue.label}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Features Section */}
-      <div
-        className={`py-16 ${isDark ? "bg-slate-800" : "bg-blue-800"}`}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2
-            className={`text-3xl font-bold text-center mb-12 ${isDark ? "text-gray-100" : "text-white"}`}
-          >
-            How It Works?
-          </h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                step: "1",
-                title: "Report Instantly",
-                desc: "Spot an issue? Take a photo, select severity level, and submit with one tap.",
-              },
-              {
-                step: "2",
-                title: "Admin Verification",
-                desc: "Reports are reviewed by authorized department admins and routed appropriately.",
-              },
-              {
-                step: "3",
-                title: "Track Progress",
-                desc: "Receive real-time updates and view resolution status on an interactive map.",
-              },
-            ].map((item) => (
-              <div
-                key={item.step}
-                className={`text-center p-8 rounded-xl shadow-sm border ${
-                  isDark
-                    ? "bg-slate-700 border-slate-600"
-                    : "bg-white border-gray-200"
-                }`}
-              >
-                <div
-                  className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
-                    isDark ? "bg-blue-900" : "bg-blue-100"
-                  }`}
-                >
-                  <span
-                    className={`text-2xl font-bold ${isDark ? "text-white" : "text-blue-800"}`}
-                  >
-                    {item.step}
-                  </span>
-                </div>
-                <h3
-                  className={`text-xl font-semibold mb-3 ${isDark ? "text-gray-100" : "text-gray-900"}`}
-                >
-                  {item.title}
-                </h3>
-                <p
-                  className={
-                    isDark ? "text-gray-300" : "text-gray-600"
-                  }
-                >
-                  {item.desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <footer
-        className={`py-8 border-t ${isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-gray-200"}`}
-      >
-        <div
-          className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center ${isDark ? "text-gray-400" : "text-gray-600"}`}
-        >
-          <p>
-            &copy; 2025 Smart Connect.
-          </p>
-          <p>
-            Building safer communities through technology.
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }
 
-export default LandingPage;
+// Main Login Page Component
+export function LoginPage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  
+  // All state hooks at the top - always call them in the same order
+  const [view, setView] = useState<LoginView>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  
+  // Check if this is a password reset from email link
+  const token = searchParams.get('token');
+  const type = searchParams.get('type');
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const hashType = hashParams.get('type');
+  const isRecoveryLink = (token && type === 'recovery') || hashType === 'recovery';
+
+  // Initialize view based on URL params (only once on mount)
+  useEffect(() => {
+    // Check if redirected from password reset success
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('password_updated') === 'true') {
+      setView('login');
+      // Clean up URL
+      window.history.replaceState({}, '', '/login');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isRecoveryLink) {
+      setView('update-password');
+    }
+
+    if (hashType === 'recovery') {
+      setView('update-password');
+    }
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setView('update-password');
+      }
+      if (event === 'SIGNED_IN' && session?.user && view === 'login') {
+        void resolveRoleAndRedirect(session.user).catch((err: any) => {
+          console.error('OAuth Sign-In Processing Error:', err);
+          setError(err.message || 'Failed to complete sign in');
+        });
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [hashType, isRecoveryLink]);
+
+  const resolveRoleAndRedirect = async (user: any) => {
+    let role: 'user' | 'admin' | 'super_admin' = 'user';
+    let profileData: any = null;
+
+    const { data: sa } = await supabase
+      .from('super_admins')
+      .select('*')
+      .eq('sa_id', user.id)
+      .maybeSingle();
+
+    if (sa) {
+      role = 'super_admin';
+      profileData = sa;
+    } else {
+      const { data: admin } = await supabase
+        .from('admins')
+        .select('*')
+        .eq('a_id', user.id)
+        .maybeSingle();
+
+      if (admin) {
+        role = 'admin';
+        profileData = admin;
+      } else {
+        const { data: usr } = await supabase
+          .from('users')
+          .select('*')
+          .eq('u_id', user.id)
+          .maybeSingle();
+
+        if (usr) {
+          role = 'user';
+          profileData = usr;
+        } else {
+          const fallbackName = user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'User';
+          const { error: insertError } = await supabase.from('users').insert([
+            {
+              u_id: user.id,
+              u_name: fallbackName,
+              u_email: user.email,
+            },
+          ]);
+
+          if (insertError) {
+            console.error('User profile bootstrap error:', insertError);
+          } else {
+            profileData = {
+              u_id: user.id,
+              u_name: fallbackName,
+              u_email: user.email,
+            };
+          }
+        }
+      }
+    }
+
+    const resolvedName =
+      profileData?.sa_name ??
+      profileData?.a_name ??
+      profileData?.u_name ??
+      user.user_metadata?.full_name ??
+      user.email?.split('@')[0];
+
+    const currentUser = {
+      id: user.id,
+      email: user.email,
+      role,
+      name: resolvedName,
+      profile: profileData,
+    };
+
+    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+
+    if (role === 'super_admin') {
+      navigate('/super-admin');
+    } else if (role === 'admin') {
+      navigate('/admin');
+    } else {
+      navigate('/dashboard');
+    }
+  };
+
+  useEffect(() => {
+    if (view !== 'login') return;
+
+    const oauthError =
+      searchParams.get('error_description') || searchParams.get('error');
+    if (oauthError) {
+      setError(oauthError);
+      return;
+    }
+
+    const finalizeOAuthLogin = async () => {
+      try {
+        const { data, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !data.session?.user) return;
+
+        await resolveRoleAndRedirect(data.session.user);
+      } catch (err: any) {
+        console.error('OAuth Session Error:', err);
+        setError(err.message || 'Failed to complete sign in');
+      }
+    };
+
+    finalizeOAuthLogin();
+  }, [searchParams, view]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      // 1. Authenticate using Supabase Auth
+      const { data: { user }, error: authError } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+      if (authError) throw authError;
+      if (!user) throw new Error('User not found');
+
+      await resolveRoleAndRedirect(user);
+
+    } catch (err: any) {
+      console.error('Login Error:', err);
+      setError(err.message || 'Invalid email or password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setGoogleLoading(true);
+
+    try {
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/login`,
+        },
+      });
+
+      if (oauthError) throw oauthError;
+    } catch (err: any) {
+      console.error('Google Login Error:', err);
+      setError(err.message || 'Failed to start Google sign in');
+      setGoogleLoading(false);
+    }
+  };
+
+  // Handle forgot password request
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setResetLoading(true);
+
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        resetEmail,
+        {
+          redirectTo: `${window.location.origin}/login`,
+        }
+      );
+
+      if (resetError) throw resetError;
+
+      setView('email-sent');
+    } catch (err: any) {
+      console.error('Reset Password Error:', err);
+      setError(err.message || 'Failed to send reset email');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  // Render based on view state
+  const renderView = () => {
+    switch (view) {
+      case 'email-sent':
+        return (
+          <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center px-4">
+            <div className="max-w-md w-full">
+              <button
+                onClick={() => navigate('/')}
+                className="flex items-center gap-2 text-gray-600 hover:text-blue-800 mb-8 transition-colors"
+              >
+                <ArrowLeft size={20} />
+                Back to Home
+              </button>
+
+              <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-200 text-center">
+                <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Mail className="text-blue-600" size={40} />
+                </div>
+
+                <h2 className="text-2xl text-gray-900 mb-3">Check your inbox</h2>
+
+                <p className="text-gray-600 mb-6">
+                  We sent a password reset link to <br />
+                  <span className="font-semibold text-gray-900">{resetEmail}</span>
+                </p>
+
+                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-sm text-blue-800 mb-8 text-left flex gap-3">
+                  <CheckCircle size={18} className="flex-shrink-0 mt-0.5" />
+                  <p>
+                    Click the link in the email to reset your password.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setView('login')}
+                  className="w-full bg-white border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Back to Login
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'forgot-password':
+        return (
+          <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center px-4">
+            <div className="max-w-md w-full">
+              <button
+                onClick={() => setView('login')}
+                className="flex items-center gap-2 text-gray-600 hover:text-blue-800 mb-8 transition-colors"
+              >
+                <ArrowLeft size={20} />
+                Back to Login
+              </button>
+
+              <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
+                <div className="flex items-center justify-center gap-3 mb-8">
+                  <img src={ASSETS.Shield} alt="Shield Icon" className="inline-flex w-12" />
+                  <div className="text-center">
+                    <span className="text-2xl text-gray-900">Smart Connect</span>
+                    <p className="text-xs text-gray-600">Reset Password</p>
+                  </div>
+                </div>
+
+                <h2 className="text-2xl text-center mb-2 text-gray-900">Forgot Password?</h2>
+                <p className="text-gray-600 text-center mb-6">
+                  Enter your email and we'll send you a link to reset your password.
+                </p>
+
+                <form onSubmit={handleForgotPassword} className="space-y-6">
+                  <div>
+                    <label htmlFor="resetEmail" className="block text-sm mb-2 text-gray-700">
+                      Email Address
+                    </label>
+                    <input
+                      id="resetEmail"
+                      type="email"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800"
+                      placeholder="your@email.com"
+                      required
+                    />
+                  </div>
+
+                  {error && (
+                    <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm border border-red-200">
+                      {error}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={resetLoading}
+                    className="w-full bg-blue-800 text-white py-3 rounded-lg hover:bg-blue-900 transition-colors shadow-md flex justify-center items-center"
+                  >
+                    {resetLoading ? (
+                      <Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} />
+                    ) : (
+                      'Send Reset Link'
+                    )}
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'update-password':
+        return <UpdatePasswordView />;
+
+      case 'login':
+      default:
+        return (
+          <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center px-4">
+            <div className="max-w-md w-full">
+              <button
+                onClick={() => navigate('/')}
+                className="flex items-center gap-2 text-gray-600 hover:text-blue-800 mb-8 transition-colors"
+              >
+                <ArrowLeft size={20} />
+                Back to Home
+              </button>
+
+              <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
+                <div className="flex items-center justify-center gap-3 mb-8">
+                  <img src={ASSETS.Shield} alt="Shield Icon" className="inline-flex w-12" />
+                  <div className="text-center">
+                    <span className="text-2xl text-gray-900">Smart Connect</span>
+                    <p className="text-xs text-gray-600">Secure Login</p>
+                  </div>
+                </div>
+
+                <h2 className="text-3xl text-center mb-8 text-gray-900">Welcome Back</h2>
+
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div>
+                    <label htmlFor="email" className="block text-sm mb-2 text-gray-700">
+                      Email Address
+                    </label>
+                    <input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800"
+                      placeholder="your@email.com"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="password" className="block text-sm mb-2 text-gray-700">
+                      Password
+                    </label>
+                    <input
+                      id="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800"
+                      placeholder="••••••••"
+                      required
+                    />
+                  </div>
+
+                  {error && (
+                    <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm border border-red-200">
+                      {error}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-blue-800 text-white py-3 rounded-lg hover:bg-blue-900 transition-colors shadow-md flex justify-center items-center"
+                  >
+                    {loading ? (
+                      <Loader2
+                        size={24}
+                        style={{
+                          animation: 'spin 1s linear infinite',
+                        }}
+                      />
+                    ) : (
+                      'Log In'
+                    )}
+                  </button>
+                </form>
+
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  disabled={googleLoading}
+                  className="w-full bg-white border border-gray-300 text-gray-700 py-2 rounded-lg mt-6 hover:bg-gray-50 transition-colors shadow-sm flex justify-center items-center gap-2"
+                >
+                  {googleLoading ? (
+                    <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+                  ) : (
+                    <>
+                      <img
+                        src={ASSETS.GoogleIcon}
+                        alt="Google"
+                        className="w-8 h-8"
+                      />
+                      Continue with Google
+                    </>
+                  )}
+                </button>
+
+                <div className="mt-4 text-center">
+                  <button
+                    onClick={() => setView('forgot-password')}
+                    className="text-sm text-blue-800 hover:underline"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+
+                <p className="text-center mt-1 text-gray-600">
+                  Don't have an account?{' '}
+                  <button
+                    onClick={() => navigate('/signup')}
+                    className="text-blue-800 hover:underline"
+                  >
+                    Sign up
+                  </button>
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+    }
+  };
+
+  return renderView();
+}
+
+export default LoginPage;
