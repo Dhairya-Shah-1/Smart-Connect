@@ -267,7 +267,7 @@ export function Profile({ onLogout }: ProfileProps) {
           </h3>
           <div className="space-y-4">
             <div className={`flex items-center gap-3 p-3 rounded-lg ${
-              isDark ? 'bg-slate-700' : 'bg-gray-50'
+              isDark ? 'bg-slate-700' : 'bg-slate-200'
             }`}>
               <User className={isDark ? 'text-blue-400' : 'text-blue-600'} size={20} />
               <div>
@@ -277,7 +277,7 @@ export function Profile({ onLogout }: ProfileProps) {
             </div>
 
             <div className={`flex items-center gap-3 p-3 rounded-lg ${
-              isDark ? 'bg-slate-700' : 'bg-gray-50'
+              isDark ? 'bg-slate-700' : 'bg-slate-200'
             }`}>
               <Mail className={isDark ? 'text-blue-400' : 'text-blue-600'} size={20} />
               <div>
@@ -287,7 +287,7 @@ export function Profile({ onLogout }: ProfileProps) {
             </div>
 
             <div className={`flex items-center gap-3 p-3 rounded-lg ${
-              isDark ? 'bg-slate-700' : 'bg-gray-50'
+              isDark ? 'bg-slate-700' : 'bg-slate-200'
             }`}>
               <MapPinIcon className={isDark ? 'text-blue-400' : 'text-blue-600'} size={20} />
               <div>
@@ -300,45 +300,46 @@ export function Profile({ onLogout }: ProfileProps) {
           </div>
         </div>
 
-        {/* Activity Summary */}
-        <div className={`rounded-xl shadow-md border p-6 ${
-          isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'
-        }`}>
-          <h3 className={`text-lg mb-4 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-            Contribution Summary
-          </h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                Reports Submitted
-              </span>
-              <span className={`text-sm ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>
-                {totalReports}
-              </span>
-            </div>
-            <div className={`h-2 rounded-full overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`}>
-              <div 
-                className={`h-full ${isDark ? 'bg-blue-500' : 'bg-blue-600'}`}
-                style={{ width: `${Math.min((totalReports / 10) * 100, 100)}%` }}
-              ></div>
-            </div>
+        {user.role !== 'admin' && (
+          <div className={`rounded-xl shadow-md border p-6 ${
+            isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'
+          }`}>
+            <h3 className={`text-lg mb-4 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+              Contribution Summary
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Reports Submitted
+                </span>
+                <span className={`text-sm ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>
+                  {totalReports}
+                </span>
+              </div>
+              <div className={`h-2 rounded-full overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`}>
+                <div 
+                  className={`h-full ${isDark ? 'bg-blue-500' : 'bg-blue-600'}`}
+                  style={{ width: `${Math.min((totalReports / 10) * 100, 100)}%` }}
+                ></div>
+              </div>
 
-            <div className="flex items-center justify-between mt-4">
-              <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                Resolution Rate
-              </span>
-              <span className={`text-sm ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>
-                {totalReports > 0 ? Math.round((resolvedReports / totalReports) * 100) : 0}%
-              </span>
-            </div>
-            <div className={`h-2 rounded-full overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`}>
-              <div 
-                className={`h-full ${isDark ? 'bg-green-500' : 'bg-green-600'}`}
-                style={{ width: `${totalReports > 0 ? (resolvedReports / totalReports) * 100 : 0}%` }}
-              ></div>
+              <div className="flex items-center justify-between mt-4">
+                <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Resolution Rate
+                </span>
+                <span className={`text-sm ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>
+                  {totalReports > 0 ? Math.round((resolvedReports / totalReports) * 100) : 0}%
+                </span>
+              </div>
+              <div className={`h-2 rounded-full overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`}>
+                <div 
+                  className={`h-full ${isDark ? 'bg-green-500' : 'bg-green-600'}`}
+                  style={{ width: `${totalReports > 0 ? (resolvedReports / totalReports) * 100 : 0}%` }}
+                ></div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
       </div>
     </div>
