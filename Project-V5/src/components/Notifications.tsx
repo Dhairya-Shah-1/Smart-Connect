@@ -1,0 +1,326 @@
+import { useState, useEffect } from 'react';
+import { Bell, CheckCircle, Clock, AlertCircle, AlertTriangle, Loader2, MapPin } from 'lucide-react';
+import { supabase } from './supabaseClient';
+
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'success' | 'info' | 'warning' | 'urgent';
+  severity?: string;
+  timestamp: string;
+  read: boolean;
+  lat?: number;
+  lng?: number;
+}
+
+export function Notifications() {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+  const fetchNotifications = async () => {
+    const userStr = localStorage.getItem('currentUser');
+    if (!userStr) return;
+
+    const user = JSON.parse(userStr);
+
+    // 1. Fetch all reports (for nearby critical alerts)
+    const { data: allReports, error } = await supabase
+      .from('incident_reports_view')
+      .select('*')
+      .order('timestamp', { ascending: false });
+
+    if (error || !allReports) return;
+
+    // 2. User-specific reports
+    const userReports = allReports.filter(
+      (r: any) => r.user_id === user.id
+    );
+
+    const notifs: Notification[] = userReports.map((report: any) => {
+      let title = '';
+      let message = '';
+      let type: 'success' | 'info' | 'warning' | 'urgent' = 'info';
+
+      if (report.status === 'resolved') {
+        title = 'Incident Resolved ✓';
+        message = `Your ${report.severity} severity ${report.incident_type} report has been resolved.`;  //${report.location}
+        type = 'success';
+      } else if (report.status === 'in-progress') {
+        title = 'Incident Under Review';
+        message = `Authorities are working on your ${report.incident_type} report.`; //${report.location}
+        type = 'info';
+      } else {
+        if (report.severity === 'critical' || report.severity === 'high') {
+          title = 'Urgent Report Received';
+          message = `Your ${report.severity} severity ${report.incident_type} report was flagged for immediate attention.`;  //${report.location}
+          type = 'urgent';
+        } else {
+          title = 'Report Received & Pending';
+          message = `Your ${report.incident_type} report is pending review.`;  //${report.location}
+          type = 'warning';
+        }
+      }
+
+      return {
+        id: report.report_id,
+        title,
+        message,
+        type,
+        severity: report.severity,
+        timestamp: report.timestamp,
+        read: false,
+        lat: report.lat,
+        lng: report.lng,
+      };
+    });
+
+    // 3. Nearby critical incidents (other users)
+    const criticalNearby = allReports
+      .filter(
+        (r: any) =>
+          (r.severity === 'critical' || r.severity === 'high') &&
+          r.user_id !== user.id
+      )
+      .slice(0, 3);
+
+    criticalNearby.forEach((report: any) => {
+      notifs.push({
+        id: `nearby-${report.report_id}`,
+        title: '⚠️ Critical Incident Nearby',
+        message: `${report.incident_type} reported. Stay alert.`,
+        type: 'urgent',
+        severity: report.severity,
+        timestamp: report.timestamp,
+        read: false,
+        lat: report.lat,
+        lng: report.lng,
+      });
+    });
+
+    // 4. Sort newest first
+    setNotifications(
+      notifs.sort(
+        (a, b) =>
+          new Date(b.timestamp).getTime() -
+          new Date(a.timestamp).getTime()
+      )
+    );
+    setLoading(false);
+  };
+
+  fetchNotifications();
+}, []);
+
+  const markAsRead = (id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+  };
+
+  const markAllAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  const getIcon = (type: string) => {
+    switch (type) {
+      case 'success':
+        return CheckCircle;
+      case 'warning':
+        return AlertCircle;
+      case 'urgent':
+        return AlertTriangle;
+      default:
+        return Clock;
+    }
+  };
+
+  const getIconColor = (type: string) => {
+    switch (type) {
+      case 'success':
+        return 'text-green-600';
+      case 'warning':
+        return 'text-yellow-600';
+      case 'urgent':
+        return 'text-red-600';
+      default:
+        return 'text-blue-600';
+    }
+  };
+
+  const getBgColor = (type: string) => {
+    switch (type) {
+      case 'success':
+        return 'bg-green-50 border-green-200';
+      case 'warning':
+        return 'bg-yellow-50 border-yellow-200';
+      case 'urgent':
+        return 'bg-red-50 border-red-300';
+      default:
+        return 'bg-blue-50 border-blue-200';
+    }
+  };
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  const urgentCount = notifications.filter((n) => n.type === 'urgent' && !n.read).length;
+
+  // Show loading spinner while fetching data
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-10 h-10 animate-spin text-blue-800" />
+          <span className="text-sm text-gray-600">Loading alerts...</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full overflow-y-auto bg-gray-50">
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl text-gray-900 mb-1">Alert Center</h2>
+            <div className="flex items-center gap-3">
+              {unreadCount > 0 && (
+                <span className="bg-blue-800 text-white px-3 py-1 rounded-full text-xs">
+                  {unreadCount} new
+                </span>
+              )}
+              {urgentCount > 0 && (
+                <span className="bg-red-600 text-white px-3 py-1 rounded-full text-xs flex items-center gap-1 animate-pulse">
+                  <AlertTriangle size={12} />
+                  {urgentCount} urgent
+                </span>
+              )}
+            </div>
+          </div>
+          {unreadCount > 0 && (
+            <button
+              onClick={markAllAsRead}
+              className="text-blue-800 hover:underline text-sm"
+            >
+              Mark all as read
+            </button>
+          )}
+        </div>
+
+        {/* Urgent Alerts Section */}
+        {urgentCount > 0 && (
+          <div className="mb-6">
+            <h3 className="text-sm text-gray-700 mb-3 flex items-center gap-2">
+              <AlertTriangle size={16} className="text-red-600" />
+              Urgent Alerts
+            </h3>
+            <div className="space-y-3">
+              {notifications
+                .filter((n) => n.type === 'urgent' && !n.read)
+                .map((notification) => {
+                  const Icon = getIcon(notification.type);
+                  const iconColor = getIconColor(notification.type);
+                  const bgColor = getBgColor(notification.type);
+
+                  return (
+                    <div
+                      key={notification.id}
+                      className={`rounded-lg shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow border-2 ${bgColor}`}
+                      onClick={() => markAsRead(notification.id)}
+                    >
+                      <div className="flex gap-4">
+                        <div className={`flex-shrink-0 ${iconColor}`}>
+                          <Icon size={24} strokeWidth={2.5} />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between mb-1">
+                            <h3 className="text-sm text-gray-900">{notification.title}</h3>
+                            <span className="w-2 h-2 bg-red-600 rounded-full flex-shrink-0 animate-pulse"></span>
+                          </div>
+                          <p className="text-sm text-gray-700 mb-1">{notification.message}</p>
+                          {notification.lat && notification.lng && (
+                            <p 
+                              className="text-sm text-gray-500 flex items-center gap-1 cursor-pointer hover:underline"
+                              onClick={() => notification.lat && notification.lng && window.open(`https://www.google.com/maps/place/${notification.lat},${notification.lng}/@${notification.lat},${notification.lng},208m/data=!3m1!1e3`, "_blank")}
+                            >
+                              <MapPin size={13} />
+                              {notification.lat}, {notification.lng}
+                            </p>
+                          )}
+                          <p className="text-sm text-gray-500">
+                            {new Date(notification.timestamp).toLocaleDateString('en-GB')} at{" "}
+                            {new Date(notification.timestamp).toLocaleTimeString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
+
+        {/* All Notifications */}
+        <h3 className="text-sm text-gray-700 mb-3">All Notifications</h3>
+        
+        {notifications.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm p-8 text-center border border-gray-200">
+            <Bell className="mx-auto mb-4 text-gray-300" size={48} />
+            <p className="text-gray-500">No notifications yet</p>
+            <p className="text-sm text-gray-400 mt-2">
+              You'll receive real-time updates about your incident reports here
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {notifications.map((notification) => {
+              const Icon = getIcon(notification.type);
+              const iconColor = getIconColor(notification.type);
+              const bgColor = getBgColor(notification.type);
+
+              return (
+                <div
+                  key={notification.id}
+                  className={`bg-white rounded-lg shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow border ${
+                    !notification.read ? `border-l-4 ${notification.type === 'urgent' ? 'border-l-red-600' : 'border-l-blue-800'}` : 'border-gray-200'
+                  }`}
+                  onClick={() => markAsRead(notification.id)}
+                >
+                  <div className="flex gap-4">
+                    <div className={`flex-shrink-0 ${iconColor}`}>
+                      <Icon size={22} />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between mb-1">
+                        <h3 className={`text-sm ${!notification.read ? 'text-gray-900' : 'text-gray-600'}`}>
+                          {notification.title}
+                        </h3>
+                        {!notification.read && (
+                          <span className={`w-2 h-2 ${notification.type === 'urgent' ? 'bg-red-600' : 'bg-blue-800'} rounded-full flex-shrink-0`}></span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600 mb-1">{notification.message}</p>
+                      {notification.lat && notification.lng && (
+                        <p 
+                          className="text-sm mb-1 text-gray-500 flex items-center gap-1 cursor-pointer hover:underline"
+                          onClick={() => notification.lat && notification.lng && window.open(`https://www.google.com/maps/place/${notification.lat},${notification.lng}/@${notification.lat},${notification.lng},208m/data=!3m1!1e3`, "_blank")}
+                        >
+                          <MapPin size={13} />
+                          {notification.lat}, {notification.lng}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-400">
+                        {new Date(notification.timestamp).toLocaleDateString()} at{' '}
+                        {new Date(notification.timestamp).toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
