@@ -731,10 +731,14 @@ const groupNearbyIssues = (issues: Issue[]) => {
 
         {/* Selected Issue Popup */}
         {selectedIssue && (
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl max-w-md w-full z-30 border border-gray-200">
+          <div className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-xl shadow-2xl max-w-md w-[calc(100%-2rem)] md:w-full z-30 border overflow-hidden ${
+            isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'
+          }`}>
             <button
               onClick={() => setSelectedIssue(null)}
-              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 bg-gray-100 rounded-full p-1 z-40"
+              className={`absolute top-3 right-3 rounded-full p-1 z-40 transition-colors ${
+                isDark ? 'text-gray-300 hover:text-white bg-slate-700' : 'text-gray-400 hover:text-gray-600 bg-gray-100'
+              }`}
             >
               <X size={18} />
             </button>
@@ -751,13 +755,16 @@ const groupNearbyIssues = (issues: Issue[]) => {
                 </div>
               </div>
             )}
-            <div className="pt-3 pb-4 pl-pr-5">
+            <div className="px-5 pt-4 pb-5">
               <div className="flex items-start justify-between mb-2">
                 <div>
-                  <h3 className="text-lg text-gray-900">
+                  <h3 className={`text-lg ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
                     {selectedIssue.type}
                   </h3>
-                  <div className="flex items-center text-gray-600 text-sm mt-1" onClick={() => window.open(`https://www.google.com/maps/place/${selectedIssue.location}/@${selectedIssue.location},208m/data=!3m1!1e3`, "_blank")}>
+                  <div
+                    className={`flex items-center text-sm mt-1 cursor-pointer ${isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-800'}`}
+                    onClick={() => window.open(`https://www.google.com/maps/place/${selectedIssue.lat},${selectedIssue.lng}/@${selectedIssue.lat},${selectedIssue.lng},208m/data=!3m1!1e3`, "_blank")}
+                  >
                     <MapPin size={14} className="mr-1" />
                     {selectedIssue.location}
                   </div>
@@ -768,7 +775,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
                   {selectedIssue.severity.toUpperCase()}
                 </span>
               </div>
-              <p className="text-sm text-gray-700 mb-2">
+              <p className={`text-sm mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
                 {selectedIssue.description}
               </p>
               
@@ -808,8 +815,8 @@ const groupNearbyIssues = (issues: Issue[]) => {
                   </div>
               )}
               <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-300">
-                  <p className="text-xs text-gray-600 mb-1">
+                <div className={`rounded-lg p-3 border ${isDark ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-300'}`}>
+                  <p className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                     Status
                   </p>
                   <span
@@ -823,22 +830,24 @@ const groupNearbyIssues = (issues: Issue[]) => {
                         selectedIssue.status.slice(1)}
                   </span>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-300">
-                  <p className="text-xs text-gray-600 mb-1">
+                <div className={`rounded-lg p-3 border ${isDark ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-300'}`}>
+                  <p className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                     Department
                   </p>
-                  <p className="text-xs text-gray-900">
+                  <p className={`text-xs ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
                     {selectedIssue.departmentNotified}
                   </p>
                 </div>
               </div>
               {selectedIssue.aiVerified && (
-                <div className="flex items-center justify-center gap-2 bg-green-100 border border-green-200 rounded-lg px-3 py-2 mb-3">
+                <div className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2 mb-3 ${
+                  isDark ? 'bg-green-900/30 border border-green-700' : 'bg-green-100 border border-green-200'
+                }`}>
                   <ShieldCheck
-                    className="text-green-700"
+                    className={isDark ? 'text-green-300' : 'text-green-700'}
                     size={16}
                   />
-                  <span className="text-xs text-green-800">
+                  <span className={`text-xs ${isDark ? 'text-green-200' : 'text-green-800'}`}>
                     Verified by authorized personnel
                   </span>
                 </div>
@@ -866,7 +875,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
                 </div>
               )}
               
-              <p className="text-sm text-gray-500 pt-2 text-center">
+              <p className={`text-sm pt-2 text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                 Reported by {selectedIssue.userName} on{" "}
                 {new Date(
                   selectedIssue.timestamp,
