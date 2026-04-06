@@ -49,9 +49,11 @@ export function Dashboard({ onLogout, onNavigateHome }: DashboardProps) {
         (r: any) => r.user_id === user.id && r.status !== 'resolved'
       ).length;
 
-      // Urgent = critical or high (global)
+      // Urgent = critical severity + pending or in-progress (global)
       const urgentIncidents = reports.filter(
-        (r: any) => r.severity === 'critical' || r.severity === 'high'
+        (r: any) =>
+          r.severity === 'critical' &&
+          (r.status === 'pending' || r.status === 'in-progress')
       ).length;
 
       setNotificationCount(unresolvedCount);
