@@ -16,7 +16,7 @@ export function Profile({ onLogout }: ProfileProps) {
   const [totalReports, setTotalReports] = useState(0);
   const [resolvedReports, setResolvedReports] = useState(0);
   const [reportsChecked, setReportsChecked] = useState(0);
-  const [adminResolvedReports, setAdminResolvedReports] = useState(0);
+  const [adminRejectedReports, setAdminRejectedReports] = useState(0);
   const [departmentName, setDepartmentName] = useState<string>('');
 
   // 🔹 ADDED
@@ -28,44 +28,64 @@ export function Profile({ onLogout }: ProfileProps) {
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
         setUser(currentUser);
 
-        // Fetch user's own reports
-        const { data, error } = await supabase
-          .from('incident_reports')
-          .select('status')
-          .eq('user_id', currentUser.id);
-
-        if (error) throw error;
-
-        if (data) {
-          setTotalReports(data.length);
-          setResolvedReports(
-            data.filter((r: any) => r.status === 'resolved').length
-          );
-        }
-
         // Fetch admin-specific data if user is admin or super_admin
         if (currentUser.role === 'admin' || currentUser.role === 'super_admin') {
+          const [
+            adminResult,
+            availableReportsResult,
+            checkedReportsResult,
+          ] = await Promise.all([
+            supabase
+              .from('admins')
+              .select('department_name')
+              .eq('a_id', currentUser.id)
+              .single(),
+            supabase
+              .from('incident_reports')
+              .select('status')
+              .not('status', 'in', '("resolved","rejected")'),
+            supabase
+              .from('incident_reports')
+              .select('status')
+              .eq('a_id', currentUser.id),
+          ]);
+
           // Fetch department name from admins table
-          const { data: adminData, error: adminError } = await supabase
-            .from('admins')
-            .select('department_name')
-            .eq('a_id', currentUser.id)
-            .single();
+          const { data: adminData, error: adminError } = adminResult;
 
           if (!adminError && adminData) {
             setDepartmentName(adminData.department_name);
           }
 
-          // Fetch reports checked by this admin (where a_id = admin's id)
-          const { data: checkedData, error: checkedError } = await supabase
-            .from('incident_reports')
-            .select('status')
-            .eq('a_id', currentUser.id);
+          const { data: availableReportsData, error: availableReportsError } = availableReportsResult;
+          if (availableReportsError) throw availableReportsError;
+
+          setTotalReports(availableReportsData?.length ?? 0);
+
+          const { data: checkedData, error: checkedError } = checkedReportsResult;
 
           if (!checkedError && checkedData) {
             setReportsChecked(checkedData.length);
-            setAdminResolvedReports(
+            setResolvedReports(
               checkedData.filter((r: any) => r.status === 'resolved').length
+            );
+            setAdminRejectedReports(
+              checkedData.filter((r: any) => r.status === 'rejected').length
+            );
+          }
+        } else {
+          // Fetch user's own reports
+          const { data, error } = await supabase
+            .from('incident_reports_view')
+            .select('status')
+            .eq('user_id', currentUser.id);
+
+          if (error) throw error;
+
+          if (data) {
+            setTotalReports(data.length);
+            setResolvedReports(
+              data.filter((r: any) => r.status === 'resolved').length
             );
           }
         }
@@ -215,7 +235,7 @@ export function Profile({ onLogout }: ProfileProps) {
               {totalReports}
             </div>
             <div className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              Total Reports
+              {user.role === 'admin' || user.role === 'super_admin' ? 'Total Reports Available' : 'Total Reports'}
             </div>
           </div>
 
@@ -249,10 +269,10 @@ export function Profile({ onLogout }: ProfileProps) {
               isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'
             }`}>
               <div className={`text-3xl mb-2 ${isDark ? 'text-orange-400' : 'text-orange-600'}`}>
-                {reportsChecked > 0 ? Math.round((adminResolvedReports / reportsChecked) * 100) : 0}%
+                {adminRejectedReports}
               </div>
               <div className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                Resolution Rate
+                Reports Rejected
               </div>
             </div>
           </div>
