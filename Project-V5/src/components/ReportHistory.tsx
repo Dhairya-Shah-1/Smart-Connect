@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Clock, MapPin, Droplets, AlertTriangle, Flame, Car, Mountain, ShieldCheck, Building2, Loader2, Flag, XCircle } from 'lucide-react';
+import { Clock, MapPin, Droplets, AlertTriangle, Flame, Car, Mountain, Building2, Loader2, Flag, XCircle } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { useTheme } from '../App';
 
@@ -364,16 +364,6 @@ export function ReportHistory() {
                         </p>
                       </div>
                     </div>
-
-                    {/* AI Verified Badge */}
-                    {report.aiVerified && !report.isFlagged && (
-                      <div className="inline-flex items-center gap-1 bg-green-50 border border-green-200 rounded-lg px-2 py-1 mb-2">
-                        <ShieldCheck size={12} className="text-green-700" />
-                        <span className="text-xs text-green-800">
-                          Verified
-                        </span>
-                      </div>
-                    )}
 
                     {/* Timestamp */}
                     <p className="text-xs text-gray-500 flex gap-1 items-center">
