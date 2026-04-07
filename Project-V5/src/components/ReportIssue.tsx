@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Camera, MapPin, AlertCircle, ShieldCheck, X, Monitor, Navigation, RefreshCw, HelpCircle, Loader2 } from 'lucide-react';
+import { Camera, MapPin, AlertCircle, X, Monitor, Navigation, RefreshCw, HelpCircle, Loader2 } from 'lucide-react';
 import { canReportIncident } from '../utils/deviceDetection';
 import { useTheme } from '../App';
 import { toast } from 'sonner';
@@ -399,10 +399,6 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
             </svg>
           </div>
           <h2 className={`text-2xl mb-3 text-blue-800`}>Incident Report Submitted</h2>
-          <div className="flex items-center justify-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-3 mb-4">
-            <ShieldCheck className="text-green-700" size={20} />
-            <span className="text-sm text-green-800">AI verification in progress</span>
-          </div>
           <p className={`${isDark ? "text-gray-600" : "text-gray-50" }`}>
             Local authorities have been notified. You'll receive real-time updates on the resolution progress.
           </p>
