@@ -559,7 +559,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                     <p className="text-xs md:text-sm mt-1">Try another status or department</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
+                  <div className="grid grid-cols-1 min-[700px]:grid-cols-2 min-[1210px]:grid-cols-3 gap-4 md:gap-5">
                     {filteredIncidents.map((incident) => (
                       <div
                         key={incident.id}
