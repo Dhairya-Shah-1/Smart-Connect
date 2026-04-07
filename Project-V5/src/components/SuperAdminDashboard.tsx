@@ -245,6 +245,8 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
         return isDark ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800';
       case 'resolved':
         return isDark ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800';
+      case 'rejected':
+        return isDark ? 'bg-red-900 text-red-200' : 'bg-red-100 text-red-800';
       default:
         return isDark ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800';
     }
@@ -476,7 +478,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                   Status Filter
                 </label>
                 <div className="flex gap-2 flex-wrap">
-                  {['all', 'pending', 'in-progress', 'resolved'].map((status) => (
+                  {['all', 'pending', 'in-progress', 'resolved', 'rejected'].map((status) => (
                     <button
                       key={status}
                       onClick={() => setFilterStatus(status)}
