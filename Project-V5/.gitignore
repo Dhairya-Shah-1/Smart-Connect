@@ -6,3 +6,4 @@ Attributions.md
 .env.*
 !.env.example
 dist
+README.md
