@@ -3,6 +3,7 @@ import { MapPin, AlertTriangle, Droplets, Flame, Car, Mountain, Sun, Moon, LogOu
 import { isMobileOrTablet } from "../utils/deviceDetection";
 import { ASSETS } from '../config/assets';
 import { supabase } from './supabaseClient';
+import { notifyCurrentUserChanged } from "../App";
 
 import { useTheme } from "../App";
 
@@ -65,6 +66,7 @@ export function LandingPage() {
     }
     localStorage.removeItem('currentUser');
     localStorage.removeItem('reportHistory_cache');
+    notifyCurrentUserChanged();
     navigate('/login', { replace: true });
   };
 

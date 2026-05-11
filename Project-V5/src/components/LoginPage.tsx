@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ASSETS } from '../config/assets';
 import { ArrowLeft, Mail, CheckCircle, Loader2 } from 'lucide-react';
 import { supabase } from './supabaseClient';
+import { notifyCurrentUserChanged } from '../App';
 
 type LoginView = 'login' | 'forgot-password' | 'email-sent' | 'update-password';
 
@@ -279,6 +280,7 @@ export function LoginPage() {
     };
 
     localStorage.setItem('currentUser', JSON.stringify(currentUser));
+    notifyCurrentUserChanged();
 
     if (role === 'super_admin') {
       navigate('/super-admin');

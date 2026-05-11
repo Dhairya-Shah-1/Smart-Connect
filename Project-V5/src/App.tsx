@@ -30,6 +30,12 @@ const ThemeContext = createContext<ThemeContextType>({
 
 export const useTheme = () => useContext(ThemeContext);
 
+const CURRENT_USER_EVENT = 'current-user-changed';
+
+export function notifyCurrentUserChanged() {
+  window.dispatchEvent(new Event(CURRENT_USER_EVENT));
+}
+
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const user = localStorage.getItem('currentUser');
@@ -78,6 +84,7 @@ function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const [theme, setTheme] = useState<Theme>('light');
+  const [authRefreshKey, setAuthRefreshKey] = useState(0);
 
   const getRedirectPath = (userStr: string | null) => {
     if (!userStr) return null;
@@ -108,7 +115,19 @@ function AppContent() {
     if (redirectPath && isPublicRoute) {
       navigate(redirectPath, { replace: true });
     }
-  }, [location.pathname, navigate]);
+  }, [authRefreshKey, location.pathname, navigate]);
+
+  useEffect(() => {
+    const refreshAuthState = () => setAuthRefreshKey((value) => value + 1);
+
+    window.addEventListener('storage', refreshAuthState);
+    window.addEventListener(CURRENT_USER_EVENT, refreshAuthState);
+
+    return () => {
+      window.removeEventListener('storage', refreshAuthState);
+      window.removeEventListener(CURRENT_USER_EVENT, refreshAuthState);
+    };
+  }, []);
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
@@ -205,6 +224,8 @@ function AppContent() {
 
 // Wrapper components to pass required props
 function DashboardWrapper() {
+  const navigate = useNavigate();
+
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
@@ -213,11 +234,12 @@ function DashboardWrapper() {
     }
     localStorage.removeItem('currentUser');
     localStorage.removeItem('reportHistory_cache');
-    window.location.href = '/login';
+    notifyCurrentUserChanged();
+    navigate('/login', { replace: true });
   };
   
   const handleNavigateHome = () => {
-    window.location.href = '/';
+    navigate('/', { replace: true });
   };
   
   return <Dashboard onLogout={handleLogout} onNavigateHome={handleNavigateHome} />;
@@ -248,6 +270,8 @@ function MapViewWrapper() {
 }
 
 function ProfileWrapper() {
+  const navigate = useNavigate();
+
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
@@ -256,7 +280,8 @@ function ProfileWrapper() {
     }
     localStorage.removeItem('currentUser');
     localStorage.removeItem('reportHistory_cache');
-    window.location.href = '/login';
+    notifyCurrentUserChanged();
+    navigate('/login', { replace: true });
   };
   
   return <Profile onLogout={handleLogout} />;
@@ -297,6 +322,8 @@ function CheckReportsWrapper() {
 }
 
 function AdminDashboardWrapper() {
+  const navigate = useNavigate();
+
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
@@ -305,13 +332,16 @@ function AdminDashboardWrapper() {
     }
     localStorage.removeItem('currentUser');
     localStorage.removeItem('reportHistory_cache');
-    window.location.href = '/login';
+    notifyCurrentUserChanged();
+    navigate('/login', { replace: true });
   };
   
   return <AdminDashboard onLogout={handleLogout} />;
 }
 
 function SuperAdminDashboardWrapper() {
+  const navigate = useNavigate();
+
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
@@ -320,7 +350,8 @@ function SuperAdminDashboardWrapper() {
     }
     localStorage.removeItem('currentUser');
     localStorage.removeItem('reportHistory_cache');
-    window.location.href = '/login';
+    notifyCurrentUserChanged();
+    navigate('/login', { replace: true });
   };
   
   return <SuperAdminDashboard onLogout={handleLogout} />;
