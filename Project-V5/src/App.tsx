@@ -13,6 +13,8 @@ import { ReportIssue } from './components/ReportIssue';
 import { ReportHistory } from './components/ReportHistory';
 import { MapView } from './components/MapView';
 import { CheckReports } from './components/CheckReports';
+import { processAllUnprocessedReports, getUnprocessedReportsCount } from './utils/aiVerification';
+import { toast } from 'sonner';
 
 type Theme = 'light' | 'dark';
 
@@ -261,6 +263,36 @@ function ProfileWrapper() {
 }
 
 function CheckReportsWrapper() {
+  const [isProcessing, setIsProcessing] = useState(false);
+  
+  useEffect(() => {
+    // Automatically process unprocessed reports when admin logs in
+    const autoProcessAI = async () => {
+      try {
+        const count = await getUnprocessedReportsCount(supabase);
+        
+        if (count > 0) {
+          setIsProcessing(true);
+          toast.info(`Processing ${count} unprocessed reports with AI...`, { duration: 3000 });
+          
+          const result = await processAllUnprocessedReports();
+          
+          if (result.success) {
+            toast.success(`AI processing complete! Processed: ${result.processed}, Failed: ${result.failed}`, { duration: 5000 });
+          } else {
+            toast.error(result.error || 'Failed to process reports', { duration: 5000 });
+          }
+        }
+      } catch (error: any) {
+        console.error('Auto AI processing error:', error);
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+    
+    autoProcessAI();
+  }, []);
+  
   return <CheckReports />;
 }
 

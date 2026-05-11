@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { MapPin, Filter, Search, X, ShieldCheck, Loader2, ZoomIn, ZoomOut } from "lucide-react";
+import { MapPin, Filter, Search, X, ShieldCheck, ZoomIn, ZoomOut } from "lucide-react";
 import { useTheme } from "../App";
 import { OpenLayersMap } from "./OpenLayersMap";
 import { isMobileOrTablet } from "../utils/deviceDetection";
+import { BlurredVideoLoader } from "./ui/blurred-video-loader";
 
 /* 🔹 ADDED */
 import { supabase } from "./supabaseClient";
@@ -195,6 +196,8 @@ const groupNearbyIssues = (issues: Issue[]) => {
       if (error) throw error;
 
       const mappedIssues: Issue[] = (data || []).map((report: any) => {
+        const aiInterpretation = report.ai_interpretation || '';
+
         return {
           id: report.report_id,
           type: report.incident_type,
@@ -207,9 +210,11 @@ const groupNearbyIssues = (issues: Issue[]) => {
           timestamp: report.timestamp,
           userName: "Anonymous",
           photo: report.photo_url,
-          aiVerified: report.ai_verified ?? true,
-          aiConfidence: report.ai_confidence,
-          aiReason: report.ai_reason,
+          aiVerified: aiInterpretation
+            ? !aiInterpretation.toLowerCase().includes('fake')
+            : false,
+          aiConfidence: undefined,
+          aiReason: aiInterpretation,
           departmentNotified: "Central Control",
         };
       });
@@ -569,14 +574,12 @@ const groupNearbyIssues = (issues: Issue[]) => {
         className={`flex-1 relative ${isDark ? "bg-gradient-to-br from-slate-700 to-slate-900" : "bg-gradient-to-br from-slate-100 to-blue-50"}`}
       >
         {loading && (
-            <div className="z-0 absolute inset-0 flex bg-slate-50-opacity-70 items-center justify-center backdrop-blur-sm z-40">
-              <div className="flex flex-col items-center gap-3">
-                <Loader2 className="z-10 w-10 h-10 animate-spin text-blue-800" />
-                <span className="z-50 text-sm text-blue-800 font-medium">
-                  Loading incidents...
-                </span>
-              </div>
-            </div>
+          <BlurredVideoLoader
+            label="Loading incidents..."
+            containerClassName="absolute inset-0 z-40 flex items-center justify-center bg-slate-50/30 backdrop-blur-sm"
+            cardClassName="flex flex-col items-center gap-3"
+            textClassName="z-50 text-sm font-medium text-blue-800"
+          />
           )}
         <div className="absolute inset-0 z-0">
           <OpenLayersMap
@@ -782,26 +785,27 @@ const groupNearbyIssues = (issues: Issue[]) => {
               {/* AI Interpretation Display */}
               {selectedIssue.aiReason && (
                 <div className={`mb-3 p-2 rounded-lg text-xs ${
-                  selectedIssue.aiVerified 
+                  selectedIssue.aiReason.includes('Potentially Real')
                     ? 'bg-green-50 border border-green-200'
-                    : 'bg-red-50 border border-red-200'
+                    : selectedIssue.aiReason.includes('Potentially Fake')
+                    ? 'bg-red-50 border border-red-200'
+                    : 'bg-yellow-50 border border-yellow-200'
                 }`}>
                   <div className="flex items-center gap-1.5 mb-1">
                     <span className={`font-semibold ${
-                      selectedIssue.aiVerified ? 'text-green-700' : 'text-red-700'
+                      selectedIssue.aiReason.includes('Potentially Real') ? 'text-green-700'
+                      : selectedIssue.aiReason.includes('Potentially Fake') ? 'text-red-700'
+                      : 'text-yellow-700'
                     }`}>
-                      {selectedIssue.aiVerified ? '✓ AI Verified' : '✗ AI Flagged'}
+                      {selectedIssue.aiReason.includes('Potentially Real') && '✓ Potentially Real'}
+                      {selectedIssue.aiReason.includes('Potentially Fake') && '✗ Potentially Fake'}
+                      {!selectedIssue.aiReason.includes('Potentially Real') && !selectedIssue.aiReason.includes('Potentially Fake') && '🤖 AI Interpretation'}
                     </span>
-                    {selectedIssue.aiConfidence && (
-                      <span className={`text-xs ${
-                        selectedIssue.aiVerified ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        ({Math.round(selectedIssue.aiConfidence * 100)}% confidence)
-                      </span>
-                    )}
                   </div>
                   <p className={`text-xs ${
-                    selectedIssue.aiVerified ? 'text-green-600' : 'text-red-600'
+                    selectedIssue.aiReason.includes('Potentially Real') ? 'text-green-600'
+                    : selectedIssue.aiReason.includes('Potentially Fake') ? 'text-red-600'
+                    : 'text-yellow-600'
                   }`}>
                     {selectedIssue.aiReason}
                   </p>

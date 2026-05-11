@@ -1,43 +1,35 @@
-  # Project Structure
+# Smart Connect
 
-  `Project Dev (V6)/`
-  ├── `api/verify-incidents.ts`
-  ├── `node_modules/...`
-  ├── `src/`
-  │   ├── `components/`
-  │   │   ├── figma/ImageWithFallback.tsx
-  │   │   ├── `ui/...`
-  │   │   ├── Dashboard.tsx
-  │   │   ├── LandingPage.tsx
-  │   │   ├── LiveMap.tsx
-  │   │   ├── LoginMap.tsx
-  │   │   ├── MapplsMap.tsx
-  │   │   ├── MapView.tsx
-  │   │   ├── Notifications.tsx
-  │   │   ├── ReportHistory.tsx
-  │   │   ├── ReportIssue.tsx
-  │   │   └── SignUpPage.tsx
-  │   ├── `config/assets.ts`
-  │   ├── `guidelines/Guidelines.md`
-  │   ├── `styles/global.css`
-  │   ├── `utils/deviceDetection.tsx`
-  │   ├── App.tsx
-  │   ├── Attributions.md
-  │   ├── index.css
-  │   └── main.tsx
-  ├── `index.html`
-  ├── `package.json`
-  ├── `package-lock.json`
-  ├── `Readme.md`
-  ├── `vercel.json`
-  └── `vite.config.ts`
-  
-  # Smart Connect Website UI Design
+Smart Connect is a Vite + React incident-reporting app backed by Supabase, with AI-assisted incident verification through Gemini.
 
-  This is a code bundle for Website UI Design. The original project is available at https://www.figma.com/design/04mBacnwziYUYIDw73ndjU/Website-UI-Design.
+## Environment setup
 
-  ## Running the code
+1. Copy `.env.example` to `.env`.
+2. Fill in the required values:
 
-  Run `npm ci` to install the dependencies.
+```env
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_ANON_KEY=your-supabase-anon-key
+GEMINI_API_KEY=your-gemini-api-key
+```
 
-  Run `npm run dev` to start the development server.
+Notes:
+- `VITE_` variables are used by the frontend.
+- `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `GEMINI_API_KEY` are used by the server/API route.
+- `.env` files are ignored by git, while `.env.example` is safe to commit.
+
+## Running locally
+
+```bash
+npm ci
+npm run dev
+```
+
+## GitHub readiness
+
+This repo is configured so that:
+- secrets are loaded from environment variables instead of being hardcoded
+- `.env` files are excluded from git
+- `.env.example` documents the required configuration for new contributors

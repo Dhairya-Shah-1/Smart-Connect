@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Camera, MapPin, AlertCircle, X, Monitor, Navigation, RefreshCw, HelpCircle, Loader2 } from 'lucide-react';
+import { Camera, MapPin, AlertCircle, ShieldCheck, X, Monitor, Navigation, RefreshCw, HelpCircle, Loader2 } from 'lucide-react';
 import { canReportIncident } from '../utils/deviceDetection';
 import { useTheme } from '../App';
 import { toast } from 'sonner';
 import { supabase } from './supabaseClient';
+import { verifySingleIncident } from '../utils/aiVerification';
 
 interface ReportIssueProps {
   onSuccess: () => void;
@@ -235,13 +236,6 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         return;
       }
 
-      setSuccess(true);
-      setTimeout(() => {
-        onSuccess();
-      }, 2000);
-
-      // 2. SAVE TO LOCALSTORAGE (immediate display in history) - deleted
-
       // Set default status as pending
       const reportStatus = 'pending';
 
@@ -269,53 +263,25 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       }
 
       console.log('Report saved to Supabase:', data);
+      setSuccess(true);
+      toast.success('Report submitted successfully.');
 
-      // 2. CALL AI VERIFICATION API
+      // Trigger AI verification using the saved report id so the API can
+      // fetch the canonical incident record, analyze it, and persist the result.
       try {
         toast.info('Verifying incident with AI...');
-        
-        // Use relative URL - for production it works, for local use vercel dev
-        const apiUrl = '/api/verify-incident';
-        
-        const aiResponse = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            incidentType: issueType,
-            description: description,
-            lat: lat,
-            lng: lng,
-            photoUrl: photo,
-          }),
-        });
 
-        if (!aiResponse.ok) {
-          throw new Error('AI verification failed');
+        const aiResult = await verifySingleIncident(data.report_id);
+
+        if (!aiResult.success) {
+          throw new Error(aiResult.error || 'AI verification failed');
         }
 
-        const aiResult = await aiResponse.json();
-        console.log('AI Verification Result:', aiResult);
-
-        // Update the report with AI results
-        const { error: updateError } = await supabase
-          .from('incident_reports')
-          .update({
-            ai_verified: aiResult.verified,
-            ai_confidence: aiResult.confidence,
-            ai_reason: aiResult.reason,
-          })
-          .eq('report_id', data.report_id);
-
-        if (updateError) {
-          console.error('Failed to update AI results:', updateError);
-        } else {
-          console.log('AI results saved to report');
-        }
+        console.log('AI Verification Result:', aiResult.data);
+        toast.success('AI verification completed.');
       } catch (aiError: any) {
         console.error('AI verification error:', aiError);
-        // Continue even if AI fails - report is still saved
+        toast.error(aiError.message || 'AI verification could not be completed right now.');
       }
 
       // Dispatch events to update ReportHistory
@@ -342,10 +308,10 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         setLat(null);
         setLng(null);
         onSuccess();
-      }, 3000);
+      }, 2000);
     } catch (err: any) {
       console.error('Submit error:', err);
-      // toast.error(err.message || 'Submission failed');
+      toast.error(err.message || 'Submission failed');
     } finally {
       setIsSubmitting(false);
     }
@@ -399,6 +365,10 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
             </svg>
           </div>
           <h2 className={`text-2xl mb-3 text-blue-800`}>Incident Report Submitted</h2>
+          <div className="flex items-center justify-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-3 mb-4">
+            <ShieldCheck className="text-green-700" size={20} />
+            <span className="text-sm text-green-800">AI verification in progress</span>
+          </div>
           <p className={`${isDark ? "text-gray-600" : "text-gray-50" }`}>
             Local authorities have been notified. You'll receive real-time updates on the resolution progress.
           </p>

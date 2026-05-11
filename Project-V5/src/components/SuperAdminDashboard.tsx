@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from '../App';
 import { supabase } from './supabaseClient';
-import { AlertTriangle, CheckCircle, Clock, MapPin, Mail, Building2, LogOut, Sun, Moon, TrendingUp, Users, AlertCircle, UserPlus, Activity, BarChart3, ZoomIn, ZoomOut, X, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, MapPin, Mail, Building2, LogOut, Sun, Moon, TrendingUp, Users, AlertCircle, UserPlus, Activity, BarChart3, ZoomIn, ZoomOut, X, ShieldCheck } from 'lucide-react';
 import { AdminList } from './AdminList';
 import { toast } from 'sonner';
 import { ASSETS } from '../config/assets';
 import { isMobileOrTablet } from '../utils/deviceDetection';
+import { BlurredVideoLoader } from './ui/blurred-video-loader';
 
 interface SuperAdminDashboardProps {
   onLogout: () => void;
@@ -175,6 +176,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
         photo_url: inc.photo_url || null,
         lat: typeof inc.lat === 'number' ? inc.lat : null,
         lng: typeof inc.lng === 'number' ? inc.lng : null,
+        ai_interpretation: inc.ai_interpretation || null,
       })) || [];
 
       setIncidents(mappedIncidents);
@@ -245,8 +247,6 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
         return isDark ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800';
       case 'resolved':
         return isDark ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800';
-      case 'rejected':
-        return isDark ? 'bg-red-900 text-red-200' : 'bg-red-100 text-red-800';
       default:
         return isDark ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800';
     }
@@ -264,12 +264,14 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
 
   if (loading) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className={`mt-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Loading Super Admin Dashboard...</p>
-        </div>
-      </div>
+      <BlurredVideoLoader
+        label="Loading Super Admin Dashboard..."
+        containerClassName={`min-h-screen flex items-center justify-center ${
+          isDark ? 'bg-slate-900' : 'bg-gray-50'
+        }`}
+        cardClassName="flex flex-col items-center gap-3"
+        textClassName={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}
+      />
     );
   }
 
@@ -375,16 +377,12 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
       {/* Tab Content */}
       {tabLoading ? (
         <div className={`rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-          <div className="flex flex-col items-center justify-center min-h-[320px] p-8">
-            <Loader2
-              size={48}
-              className={isDark ? 'text-indigo-400' : 'text-indigo-600'}
-              style={{ animation: 'spin 1s linear infinite' }}
-            />
-            <p className={`mt-4 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              Loading {currentTab === 'incidents' ? 'all incidents' : currentTab}...
-            </p>
-          </div>
+          <BlurredVideoLoader
+            label={`Loading ${currentTab === 'incidents' ? 'all incidents' : currentTab}...`}
+            containerClassName="flex min-h-[320px] items-center justify-center rounded-xl p-8"
+            cardClassName="flex flex-col items-center gap-3"
+            textClassName={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}
+          />
         </div>
       ) : currentTab === 'overview' && (
         <>
@@ -478,7 +476,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                   Status Filter
                 </label>
                 <div className="flex gap-2 flex-wrap">
-                  {['all', 'pending', 'in-progress', 'resolved', 'rejected'].map((status) => (
+                  {['all', 'pending', 'in-progress', 'resolved'].map((status) => (
                     <button
                       key={status}
                       onClick={() => setFilterStatus(status)}
@@ -559,7 +557,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                     <p className="text-xs md:text-sm mt-1">Try another status or department</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 min-[700px]:grid-cols-2 min-[1210px]:grid-cols-3 gap-4 md:gap-5">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
                     {filteredIncidents.map((incident) => (
                       <div
                         key={incident.id}
@@ -615,6 +613,36 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                           <p className={`text-xs md:text-sm leading-relaxed line-clamp-3 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                             {incident.description}
                           </p>
+
+                          {/* AI Interpretation Display */}
+                          {incident.ai_interpretation && (
+                            <div className={`mt-2 p-2 rounded-lg text-xs ${
+                              incident.ai_interpretation.includes('Potentially Real')
+                                ? isDark ? 'bg-green-900/30 border border-green-700' : 'bg-green-50 border border-green-200'
+                                : incident.ai_interpretation.includes('Potentially Fake')
+                                ? isDark ? 'bg-red-900/30 border border-red-700' : 'bg-red-50 border border-red-200'
+                                : isDark ? 'bg-yellow-900/30 border border-yellow-700' : 'bg-yellow-50 border border-yellow-200'
+                            }`}>
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <span className={`font-semibold ${
+                                  incident.ai_interpretation.includes('Potentially Real') ? 'text-green-600'
+                                  : incident.ai_interpretation.includes('Potentially Fake') ? 'text-red-600'
+                                  : 'text-yellow-600'
+                                }`}>
+                                  {incident.ai_interpretation.includes('Potentially Real') && '✓ Potentially Real'}
+                                  {incident.ai_interpretation.includes('Potentially Fake') && '✗ Potentially Fake'}
+                                  {!incident.ai_interpretation.includes('Potentially Real') && !incident.ai_interpretation.includes('Potentially Fake') && '🤖 AI Interpretation'}
+                                </span>
+                              </div>
+                              <p className={`text-xs ${
+                                incident.ai_interpretation.includes('Potentially Real') ? 'text-green-600'
+                                : incident.ai_interpretation.includes('Potentially Fake') ? 'text-red-600'
+                                : 'text-yellow-600'
+                              }`}>
+                                {incident.ai_interpretation}
+                              </p>
+                            </div>
+                          )}
 
                           <div className={`flex items-center gap-1.5 text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                             <Building2 size={14} />

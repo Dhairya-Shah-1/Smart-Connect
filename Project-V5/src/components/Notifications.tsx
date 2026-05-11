@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Bell, CheckCircle, Clock, AlertCircle, AlertTriangle, Loader2, MapPin } from 'lucide-react';
+import { Bell, CheckCircle, Clock, AlertCircle, AlertTriangle, MapPin } from 'lucide-react';
 import { supabase } from './supabaseClient';
+import { useTheme } from '../App';
+import { BlurredVideoLoader } from './ui/blurred-video-loader';
 
 interface Notification {
   id: string;
@@ -15,6 +17,8 @@ interface Notification {
 }
 
 export function Notifications() {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -168,12 +172,14 @@ export function Notifications() {
   // Show loading spinner while fetching data
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-10 h-10 animate-spin text-blue-800" />
-          <span className="text-sm text-gray-600">Loading alerts...</span>
-        </div>
-      </div>
+      <BlurredVideoLoader
+        label="Loading alerts..."
+        containerClassName={`h-full flex items-center justify-center ${
+          isDark ? 'bg-slate-900' : 'bg-slate-50'
+        }`}
+        cardClassName="flex flex-col items-center gap-3"
+        textClassName={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}
+      />
     );
   }
 

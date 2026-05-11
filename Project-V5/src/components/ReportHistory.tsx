@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Clock, MapPin, Droplets, AlertTriangle, Flame, Car, Mountain, Building2, Loader2, Flag, XCircle } from 'lucide-react';
+import { Clock, MapPin, Droplets, AlertTriangle, Flame, Car, Mountain, ShieldCheck, Building2, Flag, XCircle, CheckCircle } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { useTheme } from '../App';
+import { BlurredVideoLoader } from './ui/blurred-video-loader';
 
 const PAGE_SIZE = 5;
 
@@ -204,11 +205,14 @@ export function ReportHistory() {
 
   if (loading) {
     return (
-      <div className={`h-full flex items-center justify-center ${
-        isDark ? 'bg-slate-900' : 'bg-slate-500'
-      }`}>
-        <Loader2 className="spin text-blue-600" style={{ animation: 'spin 1s linear infinite' }} size={40} />
-      </div>
+      <BlurredVideoLoader
+        label="Loading reports..."
+        containerClassName={`h-full flex items-center justify-center ${
+          isDark ? 'bg-slate-900' : 'bg-slate-500'
+        }`}
+        cardClassName="flex flex-col items-center gap-3"
+        textClassName={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}
+      />
     );
   }
 
@@ -317,20 +321,43 @@ export function ReportHistory() {
                     {/* Description */}
                     <p className={`text-xs mb-3 leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{report.description}</p>
                     
-                    {/* AI Reason for flagged reports */}
-                    {report.isFlagged && report.aiReason && (
-                      <div className="mb-3 p-2 bg-red-100 border border-red-200 rounded-lg">
+                    {/* AI Interpretation Display for all reports */}
+                    {report.aiReason && (
+                      <div className={`mb-3 p-2 rounded-lg text-xs ${
+                        report.aiReason.includes('Potentially Real')
+                          ? 'bg-green-100 border border-green-200'
+                          : report.aiReason.includes('Potentially Fake')
+                          ? 'bg-red-100 border border-red-200'
+                          : 'bg-yellow-100 border border-yellow-200'
+                      }`}>
                         <div className="flex items-start gap-2">
-                          <XCircle size={14} className="text-red-600 mt-0.5 flex-shrink-0" />
-                          <div className="text-xs">
-                            <p className="font-medium text-red-800 mb-0.5">AI Analysis:</p>
-                            <p className="text-red-700">{report.aiReason}</p>
-                            {report.aiConfidence !== undefined && (
-                              <p className="text-red-600 mt-1">
-                                Confidence: {Math.round(report.aiConfidence * 100)}%
-                              </p>
-                            )}
-                          </div>
+                          {report.aiReason.includes('Potentially Real') && (
+                            <>
+                              <CheckCircle size={14} className="text-green-600 mt-0.5 flex-shrink-0" />
+                              <div className="text-xs">
+                                <p className="font-medium text-green-800 mb-0.5">✓ Potentially Real</p>
+                                <p className="text-green-700">{report.aiReason}</p>
+                              </div>
+                            </>
+                          )}
+                          {report.aiReason.includes('Potentially Fake') && (
+                            <>
+                              <XCircle size={14} className="text-red-600 mt-0.5 flex-shrink-0" />
+                              <div className="text-xs">
+                                <p className="font-medium text-red-800 mb-0.5">✗ Potentially Fake</p>
+                                <p className="text-red-700">{report.aiReason}</p>
+                              </div>
+                            </>
+                          )}
+                          {!report.aiReason.includes('Potentially Real') && !report.aiReason.includes('Potentially Fake') && (
+                            <>
+                              <ShieldCheck size={14} className="text-yellow-600 mt-0.5 flex-shrink-0" />
+                              <div className="text-xs">
+                                <p className="font-medium text-yellow-800 mb-0.5">🤖 AI Interpretation</p>
+                                <p className="text-yellow-700">{report.aiReason}</p>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     )}
@@ -364,6 +391,16 @@ export function ReportHistory() {
                         </p>
                       </div>
                     </div>
+
+                    {/* AI Verified Badge */}
+                    {report.aiVerified && !report.isFlagged && (
+                      <div className="inline-flex items-center gap-1 bg-green-50 border border-green-200 rounded-lg px-2 py-1 mb-2">
+                        <ShieldCheck size={12} className="text-green-700" />
+                        <span className="text-xs text-green-800">
+                          Verified
+                        </span>
+                      </div>
+                    )}
 
                     {/* Timestamp */}
                     <p className="text-xs text-gray-500 flex gap-1 items-center">

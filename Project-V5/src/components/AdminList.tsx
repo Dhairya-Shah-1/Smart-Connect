@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Mail, MapPin, Trash2, Building2, Loader2 } from 'lucide-react';
+import { Mail, MapPin, Trash2, Building2 } from 'lucide-react';
 import { useTheme } from '../App';
 import { supabase } from './supabaseClient';
 import { toast } from 'sonner';
+import { BlurredVideoLoader } from './ui/blurred-video-loader';
 
 export function AdminList() {
   const { theme } = useTheme();
@@ -38,14 +39,12 @@ export function AdminList() {
       </div>
 
       {loading ? (
-        <div className="flex-1 flex flex-col items-center justify-center min-h-[320px]">
-          <Loader2
-            size={48}
-            className={isDark ? 'text-rose-400' : 'text-rose-600'}
-            style={{ animation: 'spin 1s linear infinite' }}
-          />
-          <p className={`mt-4 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Loading admins...</p>
-        </div>
+        <BlurredVideoLoader
+          label="Loading admins..."
+          containerClassName="flex-1 flex min-h-[320px] items-center justify-center rounded-xl"
+          cardClassName="flex flex-col items-center gap-3"
+          textClassName={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}
+        />
       ) : (
       <div className="flex-1 overflow-y-auto space-y-3 pb-20">
         {admins.map((admin) => (

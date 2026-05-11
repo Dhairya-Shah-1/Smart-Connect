@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { MapPin, CheckCircle, Clock, Loader2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { MapPin, CheckCircle, Clock, X, ZoomIn, ZoomOut, Sparkles } from 'lucide-react';
 import { useTheme } from '../App';
 import { toast } from 'sonner';
 import { isMobileOrTablet } from "../utils/deviceDetection";
 import { supabase } from './supabaseClient';
+import { processAllUnprocessedReports, getUnprocessedReportsCount } from '../utils/aiVerification';
+import { BlurredVideoLoader } from './ui/blurred-video-loader';
 
 const PAGE_SIZE = 7;
 const categories = ['all', 'critical', 'high', 'medium', 'low'] as const;
@@ -16,7 +18,7 @@ export function CheckReports() {
   const [reports, setReports] = useState<any[]>([]);
   const [counts, setCounts] = useState<Record<Category, number>>({
     all: 0,
-    critical: 0,
+    critical: 0, 
     high: 0,
     medium: 0,
     low: 0,
@@ -28,6 +30,8 @@ export function CheckReports() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [imageZoom, setImageZoom] = useState(1);
+  const [processingAI, setProcessingAI] = useState(false);
+  const [unprocessedCount, setUnprocessedCount] = useState(0);
   const isMobile = isMobileOrTablet();
   const formatDisplayDate = (value: string) =>
     new Date(value).toLocaleDateString('en-GB', {
@@ -137,6 +141,7 @@ export function CheckReports() {
       await fetchBatch(defaultFilter, null, false);
       setLoading(false);
       setIsInitialized(true);
+      checkUnprocessedReports();
     };
     initialize();
   }, []);
@@ -162,23 +167,52 @@ export function CheckReports() {
       } else {
           toast.success('Report marked as resolved');
           const remaining = reports.filter(r => r.report_id !== id);
-          setReports(remaining);
-          const nextCounts = await fetchCounts();
+      setReports(remaining);
+      const nextCounts = await fetchCounts();
 
-          if (remaining.length === 0) {
-            if (hasMore && lastTimestampCursor) {
-              await fetchBatch(filter, lastTimestampCursor);
-            } else {
-              await fetchBatch(filter, null);
-            }
-          } else if (filter !== 'all' && nextCounts[filter] === 0) {
-            if (nextCounts.critical > 0) setFilter('critical');
-            else if (nextCounts.high > 0) setFilter('high');
-            else if (nextCounts.medium > 0) setFilter('medium');
-            else if (nextCounts.low > 0) setFilter('low');
-            else setFilter('all');
-          }
+      if (remaining.length === 0) {
+        if (hasMore && lastTimestampCursor) {
+          await fetchBatch(filter, lastTimestampCursor);
+        } else {
+          await fetchBatch(filter, null);
+        }
+      } else if (filter !== 'all' && nextCounts[filter] === 0) {
+        if (nextCounts.critical > 0) setFilter('critical');
+        else if (nextCounts.high > 0) setFilter('high');
+        else if (nextCounts.medium > 0) setFilter('medium');
+        else if (nextCounts.low > 0) setFilter('low');
+        else setFilter('all');
       }
+      }
+  };
+
+  const handleProcessAIReports = async () => {
+    if (processingAI) return;
+    
+    setProcessingAI(true);
+    toast.info('Processing AI verification for all unprocessed reports...');
+    
+    try {
+      const result = await processAllUnprocessedReports();
+      
+      if (result.success) {
+        toast.success(`AI processing complete! Processed: ${result.processed}, Failed: ${result.failed}`);
+        // Refresh the reports list
+        await fetchBatch(filter, null);
+        setUnprocessedCount(0);
+      } else {
+        toast.error(result.error || 'Failed to process reports');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'An error occurred');
+    } finally {
+      setProcessingAI(false);
+    }
+  };
+
+  const checkUnprocessedReports = async () => {
+    const count = await getUnprocessedReportsCount(supabase);
+    setUnprocessedCount(count);
   };
 
   const handleLoadMore = async () => {
@@ -207,11 +241,31 @@ export function CheckReports() {
       {/* Responsive Layout - Mobile & Desktop Optimized */}
       <div className="max-w-7xl mx-auto w-full h-full flex flex-col p-3 md:p-6">
         {/* Header Section */}
-        <div className="mb-4 md:mb-6">
-          <h2 className={`text-xl md:text-2xl font-bold ${isDark ? 'text-indigo-300' : 'text-indigo-900'}`}>Verified Reports</h2>
-          <p className={`text-xs md:text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-            Resolve the pending incident reports
-          </p>
+        <div className="mb-4 md:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h2 className={`text-xl md:text-2xl font-bold ${isDark ? 'text-indigo-300' : 'text-indigo-900'}`}>Verified Reports</h2>
+            <p className={`text-xs md:text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              Resolve the pending incident reports
+            </p>
+          </div>
+          
+          {/* Process AI Button */}
+          {unprocessedCount > 0 && (
+            <button
+              onClick={handleProcessAIReports}
+              disabled={processingAI}
+              className={`px-4 py-2 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-2 transition-all shadow-md hover:shadow-lg ${
+                processingAI
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : isDark
+                  ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                  : 'bg-purple-600 hover:bg-purple-700 text-white'
+              }`}
+            >
+              <Sparkles size={16} />
+              {processingAI ? 'Processing...' : `Process AI (${unprocessedCount})`}
+            </button>
+          )}
         </div>
         
         {/* Filter Buttons */}
@@ -246,16 +300,12 @@ export function CheckReports() {
         {/* Reports Grid - Responsive */}
         <div className="flex-1 overflow-y-auto pb-20 md:pb-6 hide-scrollbar">
           {loading ? (
-            <div className="flex flex-col items-center justify-center h-64">
-              <Loader2
-                size={48}
-                className={isDark ? 'text-indigo-400' : 'text-indigo-600'}
-                style={{
-                  animation: 'spin 1s linear infinite',
-                }}
-              />
-              <p className={`mt-4 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Loading reports...</p>
-            </div>
+            <BlurredVideoLoader
+              label="Loading reports..."
+              containerClassName="flex h-64 items-center justify-center rounded-xl"
+              cardClassName="flex flex-col items-center gap-3"
+              textClassName={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}
+            />
           ) : filteredReports.length === 0 ? (
             <div className={`text-center py-20 md:py-32 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
               <CheckCircle className={`mx-auto mb-3 w-12 h-12 md:w-16 md:h-16 ${isDark ? 'text-green-400 opacity-50' : 'text-green-800'}`} />
@@ -323,26 +373,27 @@ export function CheckReports() {
                     {/* AI Interpretation Display */}
                     {report.ai_reason && (
                       <div className={`mt-2 p-2 rounded-lg text-xs ${
-                        report.ai_verified 
+                        report.ai_reason.includes('Potentially Real')
                           ? isDark ? 'bg-green-900/30 border border-green-700' : 'bg-green-50 border border-green-200'
-                          : isDark ? 'bg-red-900/30 border border-red-700' : 'bg-red-50 border border-red-200'
+                          : report.ai_reason.includes('Potentially Fake')
+                          ? isDark ? 'bg-red-900/30 border border-red-700' : 'bg-red-50 border border-red-200'
+                          : isDark ? 'bg-yellow-900/30 border border-yellow-700' : 'bg-yellow-50 border border-yellow-200'
                       }`}>
                         <div className="flex items-center gap-1.5 mb-1">
                           <span className={`font-semibold ${
-                            report.ai_verified ? 'text-green-600' : 'text-red-600'
+                            report.ai_reason.includes('Potentially Real') ? 'text-green-600' 
+                            : report.ai_reason.includes('Potentially Fake') ? 'text-red-600'
+                            : 'text-yellow-600'
                           }`}>
-                            {report.ai_verified ? '✓ AI Verified' : '✗ AI Flagged'}
+                            {report.ai_reason.includes('Potentially Real') && '✓ Potentially Real'}
+                            {report.ai_reason.includes('Potentially Fake') && '✗ Potentially Fake'}
+                            {!report.ai_reason.includes('Potentially Real') && !report.ai_reason.includes('Potentially Fake') && '🤖 AI Interpretation'}
                           </span>
-                          {report.ai_confidence && (
-                            <span className={`text-xs ${
-                              report.ai_verified ? 'text-green-500' : 'text-red-500'
-                            }`}>
-                              ({Math.round(report.ai_confidence * 100)}% confidence)
-                            </span>
-                          )}
                         </div>
                         <p className={`text-xs ${
-                          report.ai_verified ? 'text-green-700' : 'text-red-700'
+                          report.ai_reason.includes('Potentially Real') ? 'text-green-700' 
+                          : report.ai_reason.includes('Potentially Fake') ? 'text-red-700'
+                          : 'text-yellow-700'
                         }`}>
                           {report.ai_reason}
                         </p>
