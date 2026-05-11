@@ -1,9 +1,0 @@
-node_modules
-guidelines
-build
-Attributions.md
-.env
-.env.*
-!.env.example
-dist
-README.md
