@@ -199,20 +199,52 @@ export interface LoadCachedOrFreshOptions<T> {
   onFinishedLoading?: () => void;
   /** Freshness window in milliseconds (defaults to 2 minutes). */
   ttlMs?: number;
+  /** Optional label used in console logs so you can verify which path ran. */
+  logLabel?: string;
 }
 
 const inflight: Record<string, Promise<void>> = {};
 
+// Remembers the last time we actually asked the database for this storage key in
+// the current browser session. Used as a defensive extra guard so a re-visit can
+// never hit the database twice within 2 minutes, even if cookies/localStorage
+// were wiped mid-session.
+const lastDbCheck: Record<string, number> = {};
+
+// In-memory copy of the last data loaded per storage key. Used only when browser
+// storage (cookies + localStorage) is completely unavailable, so a re-visit
+// within 2 minutes still shows the stored reports without a database call.
+const memoryData: Record<string, { data: unknown; fetchedAt: number }> = {};
+
 const runLoadCachedOrFresh = async <T,>(options: LoadCachedOrFreshOptions<T>) => {
-  const { cookieKey, storageKey, fetchSignature, fetchFull, applyData, onFinishedLoading, ttlMs } = options;
+  const { cookieKey, storageKey, fetchSignature, fetchFull, applyData, onFinishedLoading, ttlMs, logLabel } = options;
+
+  const log = (message: string) => {
+    if (logLabel) console.log(`[${logLabel}] ${message}`);
+  };
 
   const cached = getBrowserCache<T>(cookieKey, storageKey);
 
+  // Storage completely blocked? Fall back to the data we already loaded earlier
+  // in this session (no database call while it is younger than 2 minutes).
+  if (!cached) {
+    const memory = memoryData[storageKey];
+    if (memory && Date.now() - memory.fetchedAt <= (ttlMs ?? BROWSER_CACHE_TTL_MS)) {
+      log('Browser storage unavailable - reusing data loaded earlier this session. NO database call.');
+      applyData(memory.data as T);
+      onFinishedLoading?.();
+      return;
+    }
+  }
+
   // First request: nothing is stored in the browser yet → load everything.
   if (!cached) {
+    log('First visit - loading reports from the database and storing them in the browser.');
     try {
       const fresh = await fetchFull();
       if (fresh) {
+        lastDbCheck[storageKey] = Date.now();
+        memoryData[storageKey] = { data: fresh.data, fetchedAt: Date.now() };
         setBrowserCache(cookieKey, storageKey, fresh.data, fresh.signature);
         applyData(fresh.data);
       }
@@ -229,21 +261,37 @@ const runLoadCachedOrFresh = async <T,>(options: LoadCachedOrFreshOptions<T>) =>
   onFinishedLoading?.();
 
   // Still inside the 2 minute window → do not query the database at all.
-  if (isBrowserCacheFresh(cached.metadata.updatedAt, ttlMs)) return;
+  if (isBrowserCacheFresh(cached.metadata.updatedAt, ttlMs)) {
+    log(`Using the reports already stored in the browser (last checked ${Math.round((Date.now() - cached.metadata.updatedAt) / 1000)}s ago) - NO database call.`);
+    return;
+  }
+
+  // Defensive extra guard: if we already asked the database within the last
+  // 2 minutes in THIS session (even though the cookie is older), skip too.
+  const sessionCheckedAt = lastDbCheck[storageKey];
+  if (sessionCheckedAt && Date.now() - sessionCheckedAt <= (ttlMs ?? BROWSER_CACHE_TTL_MS)) {
+    log(`Already verified with the database ${Math.round((Date.now() - sessionCheckedAt) / 1000)}s ago - keeping the stored reports.`);
+    return;
+  }
 
   // Older than 2 minutes → ask the database only whether anything changed.
+  log('Stored reports are older than 2 minutes - asking the database whether new data exists.');
   try {
+    lastDbCheck[storageKey] = Date.now();
     const latestSignature = await fetchSignature();
 
     if (latestSignature !== cached.metadata.signature) {
       // New data exists → reload and refresh the stored cache.
+      log('New data found - reloading from the database.');
       const fresh = await fetchFull();
       if (fresh) {
+        memoryData[storageKey] = { data: fresh.data, fetchedAt: Date.now() };
         setBrowserCache(cookieKey, storageKey, fresh.data, fresh.signature);
         applyData(fresh.data);
       }
     } else {
       // Nothing changed → keep showing cached data, only refresh the time.
+      log('No new data - keeping the stored reports.');
       setBrowserCache(cookieKey, storageKey, cached.data, latestSignature);
     }
   } catch (err) {

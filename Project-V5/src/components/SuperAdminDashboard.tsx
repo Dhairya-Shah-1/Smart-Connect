@@ -421,6 +421,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
         fetchFull: () => fetchSuperAdminSnapshot(user),
         applyData: applySuperAdminSnapshot,
         onFinishedLoading: () => setLoading(false),
+        logLabel: 'SuperAdmin',
       });
     } catch (error: any) {
       console.error('Error loading super admin data:', error);

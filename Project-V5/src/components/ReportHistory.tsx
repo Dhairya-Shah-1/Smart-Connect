@@ -227,6 +227,7 @@ export function ReportHistory() {
       fetchFull: () => fetchFirstPageSnapshot(targetUserId, activeFilter),
       applyData: (snapshot) => applyReportHistoryCache(snapshot),
       onFinishedLoading: () => setLoading(false),
+      logLabel: 'ReportHistory',
     });
   };
 
