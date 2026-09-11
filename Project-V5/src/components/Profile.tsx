@@ -4,9 +4,26 @@ import { useTheme } from '../App';
 import { supabase } from './supabaseClient';
 import { toast } from 'sonner';
 import { BlurredVideoLoader } from './ui/blurred-video-loader';
+import {
+  getBrowserCache,
+  isBrowserCacheFresh,
+  sanitizeCacheKeyPart,
+  setBrowserCache,
+} from '../utils/browserCache';
+
+const PROFILE_CACHE_PREFIX = 'smart_connect_profile';
 
 interface ProfileProps {
   onLogout: () => void;
+}
+
+interface ProfileCacheData {
+  user: any;
+  totalReports: number;
+  resolvedReports: number;
+  reportsChecked: number;
+  adminResolvedReports: number;
+  departmentName: string;
 }
 
 export function Profile({ onLogout }: ProfileProps) {
@@ -23,11 +40,62 @@ export function Profile({ onLogout }: ProfileProps) {
   // 🔹 ADDED
   const [loading, setLoading] = useState(true);
 
+  const applyProfileData = (profileData: ProfileCacheData) => {
+    setUser(profileData.user);
+    setTotalReports(profileData.totalReports);
+    setResolvedReports(profileData.resolvedReports);
+    setReportsChecked(profileData.reportsChecked);
+    setAdminResolvedReports(profileData.adminResolvedReports);
+    setDepartmentName(profileData.departmentName);
+  };
+
+  const getProfileCacheKeys = (currentUser: any) => {
+    const suffix = sanitizeCacheKeyPart(`${currentUser.role || 'user'}_${currentUser.id || 'anonymous'}`);
+
+    return {
+      cookieKey: `${PROFILE_CACHE_PREFIX}_meta_${suffix}`,
+      storageKey: `${PROFILE_CACHE_PREFIX}_data_${suffix}`,
+    };
+  };
+
+  const buildProfileSignature = (
+    currentUser: any,
+    userReports: any[],
+    checkedReports: any[],
+    currentDepartmentName: string,
+  ) =>
+    [
+      currentUser.id,
+      currentUser.role,
+      currentUser.name,
+      currentUser.email,
+      currentDepartmentName,
+      userReports.map((report: any) => report.status).join(','),
+      checkedReports.map((report: any) => report.status).join(','),
+    ].join('|');
+
   useEffect(() => {
     const fetchProfile = async () => {
       try {
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
         setUser(currentUser);
+        const { cookieKey, storageKey } = getProfileCacheKeys(currentUser);
+        const cached = getBrowserCache<ProfileCacheData>(cookieKey, storageKey);
+
+        if (cached) {
+          applyProfileData(cached.data);
+
+          if (isBrowserCacheFresh(cached.metadata.updatedAt)) {
+            return;
+          }
+        }
+
+        let currentTotalReports = 0;
+        let currentResolvedReports = 0;
+        let currentReportsChecked = 0;
+        let currentAdminResolvedReports = 0;
+        let currentDepartmentName = '';
+        let currentCheckedData: any[] = [];
 
         // Fetch user's own reports
         const { data, error } = await supabase
@@ -38,10 +106,10 @@ export function Profile({ onLogout }: ProfileProps) {
         if (error) throw error;
 
         if (data) {
-          setTotalReports(data.length);
-          setResolvedReports(
-            data.filter((r: any) => r.status === 'resolved').length
-          );
+          currentTotalReports = data.length;
+          currentResolvedReports = data.filter((r: any) => r.status === 'resolved').length;
+          setTotalReports(currentTotalReports);
+          setResolvedReports(currentResolvedReports);
         }
 
         // Fetch admin-specific data if user is admin or super_admin
@@ -54,7 +122,8 @@ export function Profile({ onLogout }: ProfileProps) {
             .single();
 
           if (!adminError && adminData) {
-            setDepartmentName(adminData.department_name);
+            currentDepartmentName = adminData.department_name;
+            setDepartmentName(currentDepartmentName);
           }
 
           // Fetch reports checked by this admin (where a_id = admin's id)
@@ -64,12 +133,27 @@ export function Profile({ onLogout }: ProfileProps) {
             .eq('a_id', currentUser.id);
 
           if (!checkedError && checkedData) {
-            setReportsChecked(checkedData.length);
-            setAdminResolvedReports(
-              checkedData.filter((r: any) => r.status === 'resolved').length
-            );
+            currentCheckedData = checkedData;
+            currentReportsChecked = checkedData.length;
+            currentAdminResolvedReports = checkedData.filter((r: any) => r.status === 'resolved').length;
+            setReportsChecked(currentReportsChecked);
+            setAdminResolvedReports(currentAdminResolvedReports);
           }
         }
+
+        setBrowserCache<ProfileCacheData>(
+          cookieKey,
+          storageKey,
+          {
+            user: currentUser,
+            totalReports: currentTotalReports,
+            resolvedReports: currentResolvedReports,
+            reportsChecked: currentReportsChecked,
+            adminResolvedReports: currentAdminResolvedReports,
+            departmentName: currentDepartmentName,
+          },
+          buildProfileSignature(currentUser, data || [], currentCheckedData, currentDepartmentName),
+        );
       } catch (err) {
         console.error(err);
         toast.error('Failed to load profile data');

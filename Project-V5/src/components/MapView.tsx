@@ -19,7 +19,6 @@ interface Issue {
   severity: string;
   description: string;
   timestamp: string;
-  userName: string;
   photo?: string | null;
   aiVerified: boolean;
   aiConfidence?: number;
@@ -31,6 +30,45 @@ interface MapViewProps {
   onNavigateHome: () => void;
   urgentCount?: number;
 }
+
+const MAP_CACHE_TTL_MS = 2 * 60 * 1000;
+const MAP_CACHE_COOKIE_PREFIX = "smart_connect_map_cache_meta";
+const MAP_CACHE_STORAGE_PREFIX = "smart_connect_map_cache_data";
+
+interface MapCacheMetadata {
+  updatedAt: number;
+  signature: string;
+  storageKey: string;
+}
+
+const getStoredCurrentUser = () => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const userStr = localStorage.getItem("currentUser");
+    return userStr ? JSON.parse(userStr) : null;
+  } catch {
+    return null;
+  }
+};
+
+const getCookieValue = (name: string) => {
+  if (typeof document === "undefined") return null;
+
+  const cookie = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${name}=`));
+
+  return cookie ? decodeURIComponent(cookie.split("=")[1]) : null;
+};
+
+const setCookieValue = (name: string, value: string) => {
+  if (typeof document === "undefined") return;
+
+  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=86400; SameSite=Lax`;
+};
+
+const sanitizeCacheKeyPart = (value: string) => value.replace(/[^a-z0-9_-]/gi, "_");
 
 export function MapView({
   onNavigateHome,
@@ -44,7 +82,7 @@ export function MapView({
   const [liveIncidentCount, setLiveIncidentCount] = useState(0);
   
   // Get current user from localStorage
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(() => getStoredCurrentUser());
   
   // Use ref to always get current issues in event handlers
   const issuesRef = useRef<Issue[]>([]);
@@ -67,10 +105,7 @@ export function MapView({
   
   // Get user on mount
   useEffect(() => {
-    const userStr = localStorage.getItem('currentUser');
-    if (userStr) {
-      setCurrentUser(JSON.parse(userStr));
-    }
+    setCurrentUser(getStoredCurrentUser());
   }, []);
   
   // Handle reject action
@@ -172,12 +207,115 @@ const groupNearbyIssues = (issues: Issue[]) => {
   return grouped;
 };
 
+  const getMapCacheKeys = () => {
+    const role = currentUser?.role || "user";
+    const filter = isAdmin ? adminFilter : "all";
+    const suffix = sanitizeCacheKeyPart(`${role}_${filter}`);
+
+    return {
+      cookieKey: `${MAP_CACHE_COOKIE_PREFIX}_${suffix}`,
+      storageKey: `${MAP_CACHE_STORAGE_PREFIX}_${suffix}`,
+    };
+  };
+
+  const getCachedIssues = () => {
+    if (typeof window === "undefined") return null;
+
+    const { cookieKey, storageKey } = getMapCacheKeys();
+    const metadataValue = getCookieValue(cookieKey);
+    const dataValue = localStorage.getItem(storageKey);
+
+    if (!metadataValue || !dataValue) return null;
+
+    try {
+      const metadata = JSON.parse(metadataValue) as MapCacheMetadata;
+      const cachedIssues = JSON.parse(dataValue) as Issue[];
+
+      if (!Array.isArray(cachedIssues) || metadata.storageKey !== storageKey) {
+        return null;
+      }
+
+      return { metadata, issues: cachedIssues };
+    } catch {
+      return null;
+    }
+  };
+
+  const cacheIssues = (nextIssues: Issue[], signature: string) => {
+    if (typeof window === "undefined") return;
+
+    const { cookieKey, storageKey } = getMapCacheKeys();
+    const metadata: MapCacheMetadata = {
+      updatedAt: Date.now(),
+      signature,
+      storageKey,
+    };
+
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(nextIssues));
+      setCookieValue(cookieKey, JSON.stringify(metadata));
+    } catch (err) {
+      console.warn("Failed to cache map incidents", err);
+    }
+  };
+
+  const applyIssues = (nextIssues: Issue[]) => {
+    setLiveIncidentCount(nextIssues.length);
+    setIssues(nextIssues);
+  };
+
+  const buildIssuesSignature = (nextIssues: Issue[]) =>
+    nextIssues
+      .map((issue) => [
+        issue.id,
+        issue.status,
+        issue.timestamp,
+        issue.severity,
+        issue.type,
+      ].join(":"))
+      .join("|");
+
+  const getIssuesSignature = async () => {
+    let query = supabase
+      .from("incident_reports_view")
+      .select("report_id,status,timestamp,severity,incident_type")
+      .order("timestamp", { ascending: false });
+
+    if (isAdmin) {
+      query = query.in("status", [adminFilter, "in-progress"]);
+    } else {
+      query = query.in("status", ["pending", "in-progress"]);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    const visibleRows = isAdmin
+      ? (data || []).filter((report: any) => report.status === adminFilter)
+      : data || [];
+
+    return visibleRows
+      .map((report: any) => [
+        report.report_id,
+        report.status,
+        report.timestamp,
+        report.severity,
+        report.incident_type,
+      ].join(":"))
+      .join("|");
+  };
+
   /* ======================================================
      🔹 SUPABASE DATA FETCH (REPLACES localStorage ONLY)
      ====================================================== */
-  const fetchIssues = async () => {
+  const fetchIssues = async (options: { showLoader?: boolean } = {}) => {
+    const { showLoader = true } = options;
+
     try {
-      setLoading(true);
+      if (showLoader) {
+        setLoading(true);
+      }
       
       // For admins, fetch both pending and in-progress
       // For users, only show in-progress
@@ -208,7 +346,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
           severity: report.severity,
           description: report.incident_description,
           timestamp: report.timestamp,
-          userName: "Anonymous",
           photo: report.photo_url,
           aiVerified: aiInterpretation
             ? !aiInterpretation.toLowerCase().includes('fake')
@@ -225,20 +362,48 @@ const groupNearbyIssues = (issues: Issue[]) => {
         filteredIssues = mappedIssues.filter(issue => issue.status === adminFilter);
       }
 
-      setLiveIncidentCount(filteredIssues.length);
-
-      setIssues(filteredIssues);
+      cacheIssues(filteredIssues, buildIssuesSignature(filteredIssues));
+      applyIssues(filteredIssues);
     } catch (err) {
       console.error(err);
       toast.error("Failed to load incident data");
     } finally {
-    setLoading(false);   // STOP LOADING
+      if (showLoader) {
+        setLoading(false);   // STOP LOADING
+      }
+    }
+  };
+
+  const loadIssuesFromCacheOrDatabase = async () => {
+    const cached = getCachedIssues();
+
+    if (!cached) {
+      await fetchIssues();
+      return;
+    }
+
+    applyIssues(cached.issues);
+    setLoading(false);
+
+    if (Date.now() - cached.metadata.updatedAt <= MAP_CACHE_TTL_MS) return;
+
+    try {
+      const latestSignature = await getIssuesSignature();
+
+      if (latestSignature !== cached.metadata.signature) {
+        await fetchIssues({ showLoader: false });
+      } else {
+        cacheIssues(cached.issues, latestSignature);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to check for new incident data");
     }
   };
 
   /* 🔹 ONLY CHANGE INSIDE useEffect */
   useEffect(() => {
-    fetchIssues();
+    loadIssuesFromCacheOrDatabase();
 
     const channel = supabase
   .channel("incident-realtime")
@@ -251,7 +416,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
       filter: "status=eq.in-progress",
     },
     () => {
-      fetchIssues();
+      fetchIssues({ showLoader: false });
     }
   )
   .subscribe();
@@ -880,7 +1045,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
               )}
               
               <p className={`text-sm pt-2 text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                Reported by {selectedIssue.userName} on{" "}
+                Reported by Anonymous on{" "}
                 {new Date(
                   selectedIssue.timestamp,
                 ).toLocaleDateString('en-GB')}{" "}

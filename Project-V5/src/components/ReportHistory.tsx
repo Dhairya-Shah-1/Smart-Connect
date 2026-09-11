@@ -3,6 +3,11 @@ import { Clock, MapPin, Droplets, AlertTriangle, Flame, Car, Mountain, ShieldChe
 import { supabase } from './supabaseClient';
 import { useTheme } from '../App';
 import { BlurredVideoLoader } from './ui/blurred-video-loader';
+import {
+  loadCachedOrFresh,
+  REPORT_HISTORY_CACHE_PREFIX,
+  sanitizeCacheKeyPart,
+} from '../utils/browserCache';
 
 const PAGE_SIZE = 5;
 
@@ -23,6 +28,12 @@ interface Report {
   departmentNotified: string;
 }
 
+interface ReportHistoryCacheData {
+  reports: Report[];
+  hasMore: boolean;
+  page: number;
+}
+
 export function ReportHistory() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -41,6 +52,14 @@ export function ReportHistory() {
       year: 'numeric',
     });
 
+  const getCurrentUser = () => {
+    try {
+      return JSON.parse(localStorage.getItem('currentUser') || '{}');
+    } catch {
+      return {};
+    }
+  };
+
   const mapReports = (data: any[], user: any): Report[] =>
     data.map((r: any) => ({
       id: r.report_id,
@@ -53,7 +72,7 @@ export function ReportHistory() {
       photo: r.photo_url || null,
       status: r.status || 'pending',
       timestamp: r.timestamp || new Date().toISOString(),
-      userName: user.user_metadata?.full_name || user.email,
+      userName: user.user_metadata?.full_name || user.name || user.email || 'User',
       aiVerified: r.ai_interpretation ? !r.ai_interpretation.toLowerCase().includes('fake') : true,
       aiConfidence: r.ai_interpretation ? 0.8 : undefined,
       aiReason: r.ai_interpretation || '',
@@ -61,105 +80,178 @@ export function ReportHistory() {
       departmentNotified: 'Municipal Authority',
     }));
 
-  const fetchReports = async (
-    targetUserId: string,
-    pageIndex: number,
-    activeFilter: string,
-    append: boolean
-  ) => {
+  const getReportHistoryCacheKeys = (targetUserId: string, activeFilter: string) => {
+    const suffix = sanitizeCacheKeyPart(`${targetUserId}_${activeFilter}`);
+
+    return {
+      cookieKey: `${REPORT_HISTORY_CACHE_PREFIX}_meta_${suffix}`,
+      storageKey: `${REPORT_HISTORY_CACHE_PREFIX}_data_${suffix}`,
+    };
+  };
+
+  const applyReportHistoryCache = (cacheData: ReportHistoryCacheData) => {
+    setReports(cacheData.reports);
+    setHasMore(cacheData.hasMore);
+    setPage(cacheData.page);
+  };
+
+  const buildReportsSignature = (data: any[]) =>
+    data
+      .map((report: any) => [
+        report.report_id,
+        report.status,
+        report.timestamp,
+        report.severity,
+        report.incident_type,
+      ].join(':'))
+      .join('|');
+
+  // Builds a Supabase query for one page of the signed-in user's reports.
+  // `report_id` is used as a secondary sort key so the order (and therefore the
+  // cache signature) stays deterministic even when two reports share a timestamp.
+  const runPageQuery = (targetUserId: string, pageIndex: number, activeFilter: string) => {
+    const from = pageIndex * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    let query = supabase
+      .from('incident_reports_view')
+      .select('*')
+      .eq('user_id', targetUserId)
+      .order('timestamp', { ascending: false })
+      .order('report_id', { ascending: false })
+      .range(from, to);
+
+    if (activeFilter !== 'all') {
+      if (activeFilter === 'pending') {
+        query = query.or('status.eq.pending,status.is.null');
+      } else {
+        query = query.eq('status', activeFilter);
+      }
+    }
+
+    return query;
+  };
+
+  // Cheap database call: only checks whether the user's reports changed.
+  const getReportsSignature = async (targetUserId: string, activeFilter: string) => {
+    let query = supabase
+      .from('incident_reports_view')
+      .select('report_id,status,timestamp,severity,incident_type')
+      .eq('user_id', targetUserId)
+      .order('timestamp', { ascending: false })
+      .order('report_id', { ascending: false })
+      .range(0, PAGE_SIZE - 1);
+
+    if (activeFilter !== 'all') {
+      if (activeFilter === 'pending') {
+        query = query.or('status.eq.pending,status.is.null');
+      } else {
+        query = query.eq('status', activeFilter);
+      }
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return buildReportsSignature(data || []);
+  };
+
+  // Full database call for the first page; applies it and returns snapshot + signature.
+  const fetchFirstPageSnapshot = async (targetUserId: string, activeFilter: string) => {
+    const user = getCurrentUser();
+    if (!user?.id) return null;
+
+    const { data, error } = await runPageQuery(targetUserId, 0, activeFilter);
+    if (error) {
+      console.error('Supabase fetch error:', error);
+      throw error;
+    }
+
+    const rows = data || [];
+    const mapped = mapReports(rows, user);
+    const nextHasMore = rows.length === PAGE_SIZE;
+    const snapshot: ReportHistoryCacheData = {
+      reports: mapped,
+      hasMore: nextHasMore,
+      page: 0,
+    };
+
+    setReports(mapped);
+    setHasMore(nextHasMore);
+    setPage(0);
+
+    return {
+      data: snapshot,
+      signature: buildReportsSignature(rows),
+    };
+  };
+
+  // "Load more" pagination - fetches and appends the next page.
+  const loadMoreReports = async (targetUserId: string, activeFilter: string) => {
+    if (loadingMore) return;
+
+    setLoadingMore(true);
     try {
-      if (!append) setLoading(true);
-      else setLoadingMore(true);
+      const user = getCurrentUser();
+      if (!user?.id) return;
 
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      if (authError || !authData?.user) {
-        setUserId(null);
-        setReports([]);
-        setHasMore(false);
-        return;
-      }
-
-      const user = authData.user;
-      const from = pageIndex * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
-
-      let query = supabase
-        .from('incident_reports_view')
-        .select('*')
-        .eq('user_id', targetUserId)
-        .order('timestamp', { ascending: false })
-        .range(from, to);
-
-      if (activeFilter !== 'all') {
-        if (activeFilter === 'pending') {
-          query = query.or('status.eq.pending,status.is.null');
-        } else {
-          query = query.eq('status', activeFilter);
-        }
-      }
-
-      const { data, error } = await query;
+      const nextPage = page + 1;
+      const { data, error } = await runPageQuery(targetUserId, nextPage, activeFilter);
       if (error) {
         console.error('Supabase fetch error:', error);
         return;
       }
 
-      const mapped = mapReports(data || [], user);
-      setHasMore((data?.length || 0) === PAGE_SIZE);
-      setReports(prev => (append ? [...prev, ...mapped] : mapped));
-      setPage(pageIndex);
+      const rows = data || [];
+      const nextHasMore = rows.length === PAGE_SIZE;
+      setHasMore(nextHasMore);
+      setReports((prev) => [...prev, ...mapReports(rows, user)]);
+      setPage(nextPage);
     } finally {
-      setLoading(false);
       setLoadingMore(false);
     }
   };
 
+  const loadReportsFromCacheOrDatabase = async (targetUserId: string, activeFilter: string) => {
+    const { cookieKey, storageKey } = getReportHistoryCacheKeys(targetUserId, activeFilter);
+
+    // Policy implemented by loadCachedOrFresh:
+    //  - first visit  → fetch from the database and store it in the browser,
+    //  - next visits  → show the stored reports instantly and, ONLY if the
+    //                   cookie says more than 2 minutes have passed, ask the
+    //                   database whether anything changed (reload only if yes).
+    await loadCachedOrFresh<ReportHistoryCacheData>({
+      cookieKey,
+      storageKey,
+      fetchSignature: () => getReportsSignature(targetUserId, activeFilter),
+      fetchFull: () => fetchFirstPageSnapshot(targetUserId, activeFilter),
+      applyData: (snapshot) => applyReportHistoryCache(snapshot),
+      onFinishedLoading: () => setLoading(false),
+    });
+  };
+
   // Resolve current user once
   useEffect(() => {
-    const resolveUser = async () => {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      if (authError || !authData?.user) {
-        setUserId(null);
-        setReports([]);
-        return;
-      }
-      setUserId(authData.user.id);
-    };
-    resolveUser();
+    const currentUser = getCurrentUser();
+    if (!currentUser?.id) {
+      setUserId(null);
+      setReports([]);
+      setLoading(false);
+      return;
+    }
+
+    setUserId(currentUser.id);
   }, []);
 
   // Fetch first page whenever user/filter changes
   useEffect(() => {
     if (!userId) return;
-    fetchReports(userId, 0, filter, false);
+    loadReportsFromCacheOrDatabase(userId, filter);
   }, [userId, filter]);
 
-  // Realtime refresh for current filter
-  useEffect(() => {
-    if (!userId) return;
-    const refresh = () => fetchReports(userId, 0, filter, false);
-    const channel = supabase
-      .channel(`incident_reports_${userId}_${filter}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'incident_reports',
-          filter: `user_id=eq.${userId}`,
-        },
-        refresh
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [userId, filter]);
-
-  const handleLoadMore = async () => {
+  const handleLoadMore = () => {
     if (!userId || loadingMore || !hasMore) return;
-    await fetchReports(userId, page + 1, filter, true);
+    loadMoreReports(userId, filter);
   };
 
   const getIssueIcon = (type: string) => {

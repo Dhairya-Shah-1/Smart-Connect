@@ -9,6 +9,14 @@ import { useTheme } from '../App';
 import { ASSETS } from '../config/assets';
 import { canReportIncident } from '../utils/deviceDetection';
 import { supabase } from './supabaseClient';
+import {
+  getBrowserCache,
+  isBrowserCacheFresh,
+  sanitizeCacheKeyPart,
+  setBrowserCache,
+} from '../utils/browserCache';
+
+const DASHBOARD_STATS_CACHE_PREFIX = 'smart_connect_dashboard_stats';
 
 interface DashboardProps {
   onLogout: () => void;
@@ -16,6 +24,12 @@ interface DashboardProps {
 }
 
 type View = 'map' | 'report' | 'history' | 'notifications' | 'profile';
+
+interface DashboardStatsCacheData {
+  userName: string;
+  notificationCount: number;
+  urgentCount: number;
+}
 
 export function Dashboard({ onLogout, onNavigateHome }: DashboardProps) {
   const { theme, toggleTheme } = useTheme();
@@ -26,6 +40,68 @@ export function Dashboard({ onLogout, onNavigateHome }: DashboardProps) {
   const [urgentCount, setUrgentCount] = useState(0);
   const canReport = canReportIncident();
 
+  const getDashboardStatsCacheKeys = (user: any) => {
+    const suffix = sanitizeCacheKeyPart(`${user.role || 'user'}_${user.id || 'anonymous'}`);
+
+    return {
+      cookieKey: `${DASHBOARD_STATS_CACHE_PREFIX}_meta_${suffix}`,
+      storageKey: `${DASHBOARD_STATS_CACHE_PREFIX}_data_${suffix}`,
+    };
+  };
+
+  const applyDashboardStats = (stats: DashboardStatsCacheData) => {
+    setUserName(stats.userName);
+    setNotificationCount(stats.notificationCount);
+    setUrgentCount(stats.urgentCount);
+  };
+
+  const buildDashboardStatsSignature = (reports: any[], urgentIncidents: number) =>
+    [
+      urgentIncidents,
+      ...reports.map((report: any) => [
+        report.report_id,
+        report.user_id,
+        report.status,
+        report.severity,
+      ].join(':')),
+    ].join('|');
+
+  const fetchDashboardStats = async (user: any) => {
+    const { data: reports, error } = await supabase
+      .from('incident_reports')
+      .select('report_id, severity, status, user_id')
+      .order('report_id', { ascending: true });
+
+    if (error) {
+      console.error('Supabase dashboard error:', error);
+      return null;
+    }
+
+    const unresolvedCount = (reports || []).filter(
+      (r: any) => r.user_id === user.id && r.status !== 'resolved'
+    ).length;
+
+    const { count: urgentIncidents, error: urgentError } = await supabase
+      .from('incident_reports_view')
+      .select('*', { count: 'exact', head: true })
+      .eq('severity', 'critical')
+      .in('status', ['pending', 'in-progress']);
+
+    if (urgentError) {
+      console.error('Supabase urgent count error:', urgentError);
+      return null;
+    }
+
+    return {
+      data: {
+        userName: user.name || 'User',
+        notificationCount: unresolvedCount,
+        urgentCount: urgentIncidents || 0,
+      },
+      signature: buildDashboardStatsSignature(reports || [], urgentIncidents || 0),
+    };
+  };
+
   useEffect(() => {
   const loadDashboardStats = async () => {
     try {
@@ -33,36 +109,32 @@ export function Dashboard({ onLogout, onNavigateHome }: DashboardProps) {
       const userStr = localStorage.getItem('currentUser');
       const user = userStr ? JSON.parse(userStr) : {};
       setUserName(user.name || 'User');
+      const { cookieKey, storageKey } = getDashboardStatsCacheKeys(user);
+      const cached = getBrowserCache<DashboardStatsCacheData>(cookieKey, storageKey);
 
-      // Fetch required fields from Supabase
-      const { data: reports, error } = await supabase
-        .from('incident_reports')
-        .select('severity, status, user_id');
+      if (cached) {
+        applyDashboardStats(cached.data);
 
-      if (error) {
-        console.error('Supabase dashboard error:', error);
-        return;
+        if (isBrowserCacheFresh(cached.metadata.updatedAt)) {
+          return;
+        }
       }
 
-      // Notifications = unresolved reports by this user
-      const unresolvedCount = reports.filter(
-        (r: any) => r.user_id === user.id && r.status !== 'resolved'
-      ).length;
+      const freshStats = await fetchDashboardStats(user);
+      if (!freshStats) return;
 
-      // Urgent should match the Live Map critical filter exactly.
-      const { count: urgentIncidents, error: urgentError } = await supabase
-        .from('incident_reports_view')
-        .select('*', { count: 'exact', head: true })
-        .eq('severity', 'critical')
-        .in('status', ['pending', 'in-progress']);
-
-      if (urgentError) {
-        console.error('Supabase urgent count error:', urgentError);
-        return;
+      if (!cached || freshStats.signature !== cached.metadata.signature) {
+        applyDashboardStats(freshStats.data);
       }
 
-      setNotificationCount(unresolvedCount);
-      setUrgentCount(urgentIncidents || 0);
+      setBrowserCache<DashboardStatsCacheData>(
+        cookieKey,
+        storageKey,
+        !cached || freshStats.signature !== cached.metadata.signature
+          ? freshStats.data
+          : cached.data,
+        freshStats.signature,
+      );
     } catch (err) {
       console.error('Dashboard load failed:', err);
     }

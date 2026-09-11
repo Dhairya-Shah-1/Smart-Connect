@@ -5,6 +5,7 @@ import { useTheme } from '../App';
 import { toast } from 'sonner';
 import { supabase } from './supabaseClient';
 import { verifySingleIncident } from '../utils/aiVerification';
+import { clearBrowserCache, REPORT_HISTORY_CACHE_PREFIX } from '../utils/browserCache';
 
 interface ReportIssueProps {
   onSuccess: () => void;
@@ -265,6 +266,10 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       console.log('Report saved to Supabase:', data);
       setSuccess(true);
       toast.success('Report submitted successfully.');
+
+      // A fresh report was just created - drop the stored browser cache for the
+      // History tab so the next visit loads the updated list immediately.
+      clearBrowserCache([REPORT_HISTORY_CACHE_PREFIX]);
 
       // Trigger AI verification using the saved report id so the API can
       // fetch the canonical incident record, analyze it, and persist the result.

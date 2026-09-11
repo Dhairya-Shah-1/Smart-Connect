@@ -3,6 +3,14 @@ import { Bell, CheckCircle, Clock, AlertCircle, AlertTriangle, MapPin } from 'lu
 import { supabase } from './supabaseClient';
 import { useTheme } from '../App';
 import { BlurredVideoLoader } from './ui/blurred-video-loader';
+import {
+  getBrowserCache,
+  isBrowserCacheFresh,
+  sanitizeCacheKeyPart,
+  setBrowserCache,
+} from '../utils/browserCache';
+
+const NOTIFICATIONS_CACHE_PREFIX = 'smart_connect_notifications';
 
 interface Notification {
   id: string;
@@ -22,22 +30,39 @@ export function Notifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-  const fetchNotifications = async () => {
+  const getCurrentUser = () => {
     const userStr = localStorage.getItem('currentUser');
-    if (!userStr) return;
+    if (!userStr) return null;
 
-    const user = JSON.parse(userStr);
+    try {
+      return JSON.parse(userStr);
+    } catch {
+      return null;
+    }
+  };
 
-    // 1. Fetch all reports (for nearby critical alerts)
-    const { data: allReports, error } = await supabase
-      .from('incident_reports_view')
-      .select('*')
-      .order('timestamp', { ascending: false });
+  const getNotificationsCacheKeys = (user: any) => {
+    const suffix = sanitizeCacheKeyPart(`${user.role || 'user'}_${user.id}`);
 
-    if (error || !allReports) return;
+    return {
+      cookieKey: `${NOTIFICATIONS_CACHE_PREFIX}_meta_${suffix}`,
+      storageKey: `${NOTIFICATIONS_CACHE_PREFIX}_data_${suffix}`,
+    };
+  };
 
-    // 2. User-specific reports
+  const buildNotificationsSignature = (reports: any[]) =>
+    reports
+      .map((report: any) => [
+        report.report_id,
+        report.user_id,
+        report.status,
+        report.timestamp,
+        report.severity,
+        report.incident_type,
+      ].join(':'))
+      .join('|');
+
+  const buildNotifications = (allReports: any[], user: any) => {
     const userReports = allReports.filter(
       (r: any) => r.user_id === user.id
     );
@@ -104,18 +129,99 @@ export function Notifications() {
     });
 
     // 4. Sort newest first
-    setNotifications(
-      notifs.sort(
+    return notifs.sort(
         (a, b) =>
           new Date(b.timestamp).getTime() -
           new Date(a.timestamp).getTime()
-      )
-    );
-    setLoading(false);
+      );
   };
 
-  fetchNotifications();
-}, []);
+  const fetchReportsForNotifications = async (columns = '*') => {
+    const { data, error } = await supabase
+      .from('incident_reports_view')
+      .select(columns)
+      .order('timestamp', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  };
+
+  const fetchNotifications = async (options: { showLoader?: boolean } = {}) => {
+    const { showLoader = true } = options;
+    const user = getCurrentUser();
+
+    if (!user) {
+      setNotifications([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      if (showLoader) setLoading(true);
+
+      const allReports = await fetchReportsForNotifications();
+      const nextNotifications = buildNotifications(allReports, user);
+      const { cookieKey, storageKey } = getNotificationsCacheKeys(user);
+
+      setNotifications(nextNotifications);
+      setBrowserCache<Notification[]>(
+        cookieKey,
+        storageKey,
+        nextNotifications,
+        buildNotificationsSignature(allReports),
+      );
+    } catch (err) {
+      console.error(err);
+    } finally {
+      if (showLoader) setLoading(false);
+    }
+  };
+
+  const getNotificationsSignature = async () => {
+    const reports = await fetchReportsForNotifications(
+      'report_id,user_id,status,timestamp,severity,incident_type',
+    );
+
+    return buildNotificationsSignature(reports);
+  };
+
+  const loadNotificationsFromCacheOrDatabase = async () => {
+    const user = getCurrentUser();
+
+    if (!user) {
+      setNotifications([]);
+      setLoading(false);
+      return;
+    }
+
+    const { cookieKey, storageKey } = getNotificationsCacheKeys(user);
+    const cached = getBrowserCache<Notification[]>(cookieKey, storageKey);
+
+    if (!cached) {
+      await fetchNotifications();
+      return;
+    }
+
+    setNotifications(cached.data);
+    setLoading(false);
+
+    if (isBrowserCacheFresh(cached.metadata.updatedAt)) return;
+
+    try {
+      const latestSignature = await getNotificationsSignature();
+      if (latestSignature !== cached.metadata.signature) {
+        await fetchNotifications({ showLoader: false });
+      } else {
+        setBrowserCache(cookieKey, storageKey, cached.data, latestSignature);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    loadNotificationsFromCacheOrDatabase();
+  }, []);
 
   const markAsRead = (id: string) => {
     setNotifications((prev) =>

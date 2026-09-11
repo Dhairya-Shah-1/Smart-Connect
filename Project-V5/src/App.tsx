@@ -15,6 +15,7 @@ import { MapView } from './components/MapView';
 import { CheckReports } from './components/CheckReports';
 import { processAllUnprocessedReports, getUnprocessedReportsCount } from './utils/aiVerification';
 import { toast } from 'sonner';
+import { APP_CACHE_PREFIXES, clearBrowserCache } from './utils/browserCache';
 
 type Theme = 'light' | 'dark';
 
@@ -233,7 +234,7 @@ function DashboardWrapper() {
       console.log('SignOut error (can be ignored):', error);
     }
     localStorage.removeItem('currentUser');
-    localStorage.removeItem('reportHistory_cache');
+    clearBrowserCache(APP_CACHE_PREFIXES);
     notifyCurrentUserChanged();
     navigate('/login', { replace: true });
   };
@@ -279,7 +280,7 @@ function ProfileWrapper() {
       console.log('SignOut error (can be ignored):', error);
     }
     localStorage.removeItem('currentUser');
-    localStorage.removeItem('reportHistory_cache');
+    clearBrowserCache(APP_CACHE_PREFIXES);
     notifyCurrentUserChanged();
     navigate('/login', { replace: true });
   };
@@ -331,7 +332,7 @@ function AdminDashboardWrapper() {
       console.log('SignOut error (can be ignored):', error);
     }
     localStorage.removeItem('currentUser');
-    localStorage.removeItem('reportHistory_cache');
+    clearBrowserCache(APP_CACHE_PREFIXES);
     notifyCurrentUserChanged();
     navigate('/login', { replace: true });
   };
@@ -349,7 +350,7 @@ function SuperAdminDashboardWrapper() {
       console.log('SignOut error (can be ignored):', error);
     }
     localStorage.removeItem('currentUser');
-    localStorage.removeItem('reportHistory_cache');
+    clearBrowserCache(APP_CACHE_PREFIXES);
     notifyCurrentUserChanged();
     navigate('/login', { replace: true });
   };

@@ -6,10 +6,26 @@ import { isMobileOrTablet } from "../utils/deviceDetection";
 import { supabase } from './supabaseClient';
 import { processAllUnprocessedReports, getUnprocessedReportsCount } from '../utils/aiVerification';
 import { BlurredVideoLoader } from './ui/blurred-video-loader';
+import {
+  getBrowserCache,
+  isBrowserCacheFresh,
+  sanitizeCacheKeyPart,
+  setBrowserCache,
+} from '../utils/browserCache';
 
 const PAGE_SIZE = 7;
+const CHECK_REPORTS_CACHE_PREFIX = 'smart_connect_check_reports';
 const categories = ['all', 'critical', 'high', 'medium', 'low'] as const;
 type Category = (typeof categories)[number];
+
+interface CheckReportsCacheData {
+  filter: Category;
+  reports: any[];
+  counts: Record<Category, number>;
+  hasMore: boolean;
+  lastTimestampCursor: string | null;
+  unprocessedCount: number;
+}
 
 export function CheckReports() {
   const { theme } = useTheme();
@@ -39,6 +55,59 @@ export function CheckReports() {
       month: 'short',
       year: 'numeric',
     });
+
+  const getCurrentUser = () => {
+    try {
+      return JSON.parse(localStorage.getItem('currentUser') || '{}');
+    } catch {
+      return {};
+    }
+  };
+
+  const getCheckReportsCacheKeys = (activeFilter: Category) => {
+    const currentUser = getCurrentUser();
+    const suffix = sanitizeCacheKeyPart(`${currentUser.role || 'admin'}_${currentUser.id || 'anonymous'}_${activeFilter}`);
+
+    return {
+      cookieKey: `${CHECK_REPORTS_CACHE_PREFIX}_meta_${suffix}`,
+      storageKey: `${CHECK_REPORTS_CACHE_PREFIX}_data_${suffix}`,
+    };
+  };
+
+  const applyCheckReportsCache = (cacheData: CheckReportsCacheData) => {
+    setFilter(cacheData.filter);
+    setReports(cacheData.reports);
+    setCounts(cacheData.counts);
+    setHasMore(cacheData.hasMore);
+    setLastTimestampCursor(cacheData.lastTimestampCursor);
+    setUnprocessedCount(cacheData.unprocessedCount);
+  };
+
+  const buildCheckReportsSignature = (rows: any[], nextUnprocessedCount: number) =>
+    [
+      nextUnprocessedCount,
+      ...rows.map((report: any) => [
+        report.report_id,
+        report.status,
+        report.severity,
+        report.timestamp,
+        report.ai_interpretation || '',
+      ].join(':')),
+    ].join('|');
+
+  const getCheckReportsSignature = async () => {
+    const { data, error } = await supabase
+      .from('incident_reports_view')
+      .select('report_id,status,severity,timestamp,ai_interpretation')
+      .eq('status', 'in-progress')
+      .order('timestamp', { ascending: true })
+      .order('report_id', { ascending: true });
+
+    if (error) throw error;
+
+    const nextUnprocessedCount = await getUnprocessedReportsCount(supabase);
+    return buildCheckReportsSignature(data || [], nextUnprocessedCount);
+  };
 
   const fetchCounts = async () => {
     const [allRes, criticalRes, highRes, mediumRes, lowRes] = await Promise.all([
@@ -96,6 +165,7 @@ export function CheckReports() {
       .select('*')
       .eq('status', 'in-progress')
       .order('timestamp', { ascending: true })
+      .order('report_id', { ascending: true })
       .limit(PAGE_SIZE + 1);
 
     if (activeFilter !== 'all') {
@@ -112,7 +182,7 @@ export function CheckReports() {
       console.error('Error fetching reports:', reportsError);
       toast.error('Error loading reports');
       if (withLoader) setLoading(false);
-      return;
+      return null;
     }
 
     const rows = reportsData || [];
@@ -122,33 +192,157 @@ export function CheckReports() {
 
     setReports(reportsWithUsers);
     setHasMore(canLoadMore);
-    setLastTimestampCursor(pageRows.length > 0 ? pageRows[pageRows.length - 1].timestamp : null);
+    const nextCursor = pageRows.length > 0 ? pageRows[pageRows.length - 1].timestamp : null;
+    setLastTimestampCursor(nextCursor);
     if (withLoader) setLoading(false);
+
+    return {
+      reports: reportsWithUsers,
+      hasMore: canLoadMore,
+      lastTimestampCursor: nextCursor,
+    };
+  };
+
+  const cacheCheckReportsState = (
+    activeFilter: Category,
+    nextReports: any[],
+    nextCounts: Record<Category, number>,
+    nextHasMore: boolean,
+    nextCursor: string | null,
+    nextUnprocessedCount: number,
+    signature: string,
+  ) => {
+    const { cookieKey, storageKey } = getCheckReportsCacheKeys(activeFilter);
+    setBrowserCache<CheckReportsCacheData>(
+      cookieKey,
+      storageKey,
+      {
+        filter: activeFilter,
+        reports: nextReports,
+        counts: nextCounts,
+        hasMore: nextHasMore,
+        lastTimestampCursor: nextCursor,
+        unprocessedCount: nextUnprocessedCount,
+      },
+      signature,
+    );
+  };
+
+  const initializeFromDatabase = async (withLoader = true) => {
+    if (withLoader) setLoading(true);
+    const nextCounts = await fetchCounts();
+
+    let defaultFilter: Category = 'all';
+    if (nextCounts.critical > 0) defaultFilter = 'critical';
+    else if (nextCounts.high > 0) defaultFilter = 'high';
+    else if (nextCounts.medium > 0) defaultFilter = 'medium';
+    else if (nextCounts.low > 0) defaultFilter = 'low';
+
+    setFilter(defaultFilter);
+    const batch = await fetchBatch(defaultFilter, null, false);
+    const nextUnprocessedCount = await getUnprocessedReportsCount(supabase);
+    setUnprocessedCount(nextUnprocessedCount);
+    const signature = await getCheckReportsSignature();
+
+    if (batch) {
+      cacheCheckReportsState(
+        defaultFilter,
+        batch.reports,
+        nextCounts,
+        batch.hasMore,
+        batch.lastTimestampCursor,
+        nextUnprocessedCount,
+        signature,
+      );
+    }
+
+    if (withLoader) setLoading(false);
+    setIsInitialized(true);
+  };
+
+  const loadInitialReportsFromCacheOrDatabase = async () => {
+    const cacheLookupOrder: Category[] = ['critical', 'high', 'medium', 'low', 'all'];
+    const cachedEntry = cacheLookupOrder
+      .map((cacheFilter) => {
+        const keys = getCheckReportsCacheKeys(cacheFilter);
+        const cached = getBrowserCache<CheckReportsCacheData>(keys.cookieKey, keys.storageKey);
+        return cached ? { ...keys, cached } : null;
+      })
+      .find(Boolean);
+
+    if (!cachedEntry) {
+      await initializeFromDatabase();
+      return;
+    }
+
+    const { cookieKey, storageKey, cached } = cachedEntry;
+
+    applyCheckReportsCache(cached.data);
+    setLoading(false);
+    setIsInitialized(true);
+
+    if (isBrowserCacheFresh(cached.metadata.updatedAt)) return;
+
+    try {
+      const latestSignature = await getCheckReportsSignature();
+      if (latestSignature !== cached.metadata.signature) {
+        await initializeFromDatabase(false);
+      } else {
+        setBrowserCache(cookieKey, storageKey, cached.data, latestSignature);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const loadFilteredReportsFromCacheOrDatabase = async (activeFilter: Category) => {
+    const { cookieKey, storageKey } = getCheckReportsCacheKeys(activeFilter);
+    const cached = getBrowserCache<CheckReportsCacheData>(cookieKey, storageKey);
+
+    if (cached) {
+      applyCheckReportsCache(cached.data);
+      setLoading(false);
+
+      if (isBrowserCacheFresh(cached.metadata.updatedAt)) return;
+    }
+
+    try {
+      const latestSignature = await getCheckReportsSignature();
+
+      if (!cached || latestSignature !== cached.metadata.signature) {
+        const batch = await fetchBatch(activeFilter, null, !cached);
+        const nextCounts = cached?.data.counts || counts;
+        const nextUnprocessedCount = cached?.data.unprocessedCount ?? unprocessedCount;
+
+        if (batch) {
+          cacheCheckReportsState(
+            activeFilter,
+            batch.reports,
+            nextCounts,
+            batch.hasMore,
+            batch.lastTimestampCursor,
+            nextUnprocessedCount,
+            latestSignature,
+          );
+        }
+      } else {
+        setBrowserCache(cookieKey, storageKey, cached.data, latestSignature);
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   useEffect(() => {
     const initialize = async () => {
-      setLoading(true);
-      const nextCounts = await fetchCounts();
-
-      let defaultFilter: Category = 'all';
-      if (nextCounts.critical > 0) defaultFilter = 'critical';
-      else if (nextCounts.high > 0) defaultFilter = 'high';
-      else if (nextCounts.medium > 0) defaultFilter = 'medium';
-      else if (nextCounts.low > 0) defaultFilter = 'low';
-
-      setFilter(defaultFilter);
-      await fetchBatch(defaultFilter, null, false);
-      setLoading(false);
-      setIsInitialized(true);
-      checkUnprocessedReports();
+      await loadInitialReportsFromCacheOrDatabase();
     };
     initialize();
   }, []);
 
   useEffect(() => {
     if (!isInitialized) return;
-    fetchBatch(filter, null);
+    loadFilteredReportsFromCacheOrDatabase(filter);
   }, [filter, isInitialized]);
 
   const handleMarkResolved = async (id: string) => {

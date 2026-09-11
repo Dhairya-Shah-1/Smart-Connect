@@ -4,6 +4,7 @@ import { isMobileOrTablet } from "../utils/deviceDetection";
 import { ASSETS } from '../config/assets';
 import { supabase } from './supabaseClient';
 import { notifyCurrentUserChanged } from "../App";
+import { APP_CACHE_PREFIXES, clearBrowserCache } from '../utils/browserCache';
 
 import { useTheme } from "../App";
 
@@ -65,7 +66,7 @@ export function LandingPage() {
       console.error('SignOut error (can be ignored):', error);
     }
     localStorage.removeItem('currentUser');
-    localStorage.removeItem('reportHistory_cache');
+    clearBrowserCache(APP_CACHE_PREFIXES);
     notifyCurrentUserChanged();
     navigate('/login', { replace: true });
   };

@@ -7,12 +7,33 @@ import { toast } from 'sonner';
 import { ASSETS } from '../config/assets';
 import { isMobileOrTablet } from '../utils/deviceDetection';
 import { BlurredVideoLoader } from './ui/blurred-video-loader';
+import {
+  loadCachedOrFresh,
+  sanitizeCacheKeyPart,
+} from '../utils/browserCache';
 
 interface SuperAdminDashboardProps {
   onLogout: () => void;
 }
 
 type TabView = 'overview' | 'incidents' | 'admins' | 'analytics';
+
+const SUPER_ADMIN_CACHE_PREFIX = 'smart_connect_super_admin';
+
+interface SuperAdminCacheData {
+  superAdminProfile: any | null;
+  incidents: IncidentReport[];
+  departments: string[];
+  stats: {
+    totalIncidents: number;
+    pendingIncidents: number;
+    inProgressIncidents: number;
+    resolvedIncidents: number;
+    totalAdmins: number;
+    totalUsers: number;
+  };
+  incidentDataNotice: string | null;
+}
 
 interface IncidentReport {
   id: string;
@@ -28,6 +49,7 @@ interface IncidentReport {
   photo_url?: string | null;
   lat?: number | null;
   lng?: number | null;
+  ai_interpretation?: string | null;
 }
 
 const normalizeStatus = (status?: string | null) => (status || 'pending').toLowerCase().replace(/_/g, '-');
@@ -75,6 +97,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
     totalUsers: 0,
   });
   const [departments, setDepartments] = useState<string[]>([]);
+  const [incidentDataNotice, setIncidentDataNotice] = useState<string | null>(null);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [imageZoom, setImageZoom] = useState(1);
   const isMobile = isMobileOrTablet();
@@ -122,17 +145,80 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
     setFilteredIncidents(filtered);
   };
 
-  const loadSuperAdminData = async () => {
-    try {
-      const userStr = localStorage.getItem('currentUser');
-      const user = userStr ? JSON.parse(userStr) : null;
+  const getSuperAdminCacheKeys = (user: any) => {
+    const suffix = sanitizeCacheKeyPart(`${user.role}_${user.id}`);
+    return {
+      cookieKey: `${SUPER_ADMIN_CACHE_PREFIX}_meta_${suffix}`,
+      storageKey: `${SUPER_ADMIN_CACHE_PREFIX}_data_${suffix}`,
+    };
+  };
 
-      if (!user || user.role !== 'super_admin') {
-        toast.error('Unauthorized access');
-        onLogout();
-        return;
-      }
+  const applySuperAdminSnapshot = (snapshot: SuperAdminCacheData) => {
+    setSuperAdminData(snapshot.superAdminProfile);
+    setIncidents(snapshot.incidents);
+    setFilteredIncidents(snapshot.incidents);
+    setDepartments(snapshot.departments);
+    setStats(snapshot.stats);
+    setIncidentDataNotice(snapshot.incidentDataNotice);
+  };
 
+  // Deterministic signature of the whole super-admin dataset so the cheap
+  // "did anything change?" check matches what was actually shown/cached.
+  const buildSuperAdminSignature = (rows: any[], totalAdmins: number, totalUsers: number) =>
+    [
+      `admins:${totalAdmins}`,
+      `users:${totalUsers}`,
+      ...rows.map((report: any) =>
+        [
+          report.report_id,
+          report.status,
+          report.severity,
+          report.timestamp,
+          report.ai_interpretation || '',
+        ].join(':')
+      ),
+    ].join('|');
+
+  // Cheap database call: only asks whether anything changed.
+  const getSuperAdminSignature = async () => {
+    const { data: viewRows, error: viewError } = await supabase
+      .from('incident_reports_view')
+      .select('report_id,status,severity,timestamp,ai_interpretation')
+      .order('timestamp', { ascending: false })
+      .order('report_id', { ascending: false });
+
+    if (viewError) throw viewError;
+
+    // Mirror the full loader's view → table fallback so the signature matches
+    // the incidents actually shown.
+    let rows = viewRows || [];
+    if (rows.length === 0) {
+      const { data: tableRows, error: tableError } = await supabase
+        .from('incident_reports')
+        .select('report_id,status,severity,timestamp,ai_interpretation')
+        .order('timestamp', { ascending: false })
+        .order('report_id', { ascending: false });
+
+      if (tableError) throw tableError;
+      rows = tableRows || [];
+    }
+
+    const { count: adminCount, error: adminError } = await supabase
+      .from('admins')
+      .select('a_id', { count: 'exact', head: true });
+    if (adminError) throw adminError;
+
+    const { count: userCount, error: userError } = await supabase
+      .from('users')
+      .select('u_id', { count: 'exact', head: true });
+    if (userError) throw userError;
+
+    return buildSuperAdminSignature(rows, adminCount || 0, userCount || 0);
+  };
+
+  // Full database call: loads everything, applies it to the component and
+  // returns the snapshot + signature so the caller can store it.
+  const fetchSuperAdminSnapshot = async (user: any) => {
       // Fetch actual super admin data from the database
       const { data: superAdminData, error: superAdminError } = await supabase
         .from('super_admins')
@@ -143,55 +229,122 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
       if (superAdminError) {
         console.error('Error fetching super admin data:', superAdminError);
         toast.error('Failed to load super admin profile');
-        return;
+        return null;
       }
 
       if (!superAdminData) {
         toast.error('Super admin profile not found');
-        return;
+        return null;
       }
 
       setSuperAdminData(superAdminData);
 
+      const { data: adminData, error: adminError } = await supabase
+        .from('admins')
+        .select('a_id, station, department_name');
+
+      if (adminError) throw adminError;
+
+      const adminDepartmentMap = new Map(
+        (adminData || []).map((admin: any) => [
+          admin.a_id,
+          {
+            departmentName: normalizeDepartment(admin.department_name),
+            station: normalizeDepartment(admin.station),
+          },
+        ])
+      );
+
+      const mapIncidents = (rows: any[] | null | undefined, source: 'view' | 'table') =>
+        (rows || []).map((inc: any) => {
+          const adminInfo = adminDepartmentMap.get(inc.a_id);
+          const department = normalizeDepartment(
+            inc.department_name ??
+            adminInfo?.departmentName ??
+            inc.department ??
+            inferDepartmentFromIncidentType(inc.incident_type)
+          );
+
+          return {
+            id: inc.report_id,
+            title: inc.incident_type || 'Unknown Incident',
+            description: inc.incident_description || 'No description provided.',
+            severity: inc.severity || 'low',
+            status: normalizeStatus(inc.status),
+            location:
+              source === 'view'
+                ? inc.location || 'Unknown Location'
+                : adminInfo?.station || 'Location available in admin view only',
+            department,
+            created_at: inc.timestamp || new Date().toISOString(),
+            user_id: inc.user_id,
+            user_name: inc.user_name || 'Anonymous',
+            photo_url: inc.photo_url || null,
+            lat: source === 'view' && typeof inc.lat === 'number' ? inc.lat : null,
+            lng: source === 'view' && typeof inc.lng === 'number' ? inc.lng : null,
+            ai_interpretation: inc.ai_interpretation || null,
+          };
+        });
+
       // Fetch enriched incident rows so we can show routed department, image, and coordinates.
-      const { data: incidentData, error: incidentError } = await supabase
+      const { data: incidentViewData, error: incidentError } = await supabase
         .from('incident_reports_view')
         .select('*')
-        .order('timestamp', { ascending: false });
+        .order('timestamp', { ascending: false })
+        .order('report_id', { ascending: false });
 
       if (incidentError) throw incidentError;
 
-      // Map the data to match the interface
-      const mappedIncidents = incidentData?.map((inc: any) => ({
-        id: inc.report_id,
-        title: inc.incident_type || 'Unknown Incident',
-        description: inc.incident_description || 'No description provided.',
-        severity: inc.severity || 'low',
-        status: normalizeStatus(inc.status),
-        location: inc.location || 'Unknown Location',
-        department: getIncidentDepartment(inc),
-        created_at: inc.timestamp || new Date().toISOString(),
-        user_id: inc.user_id,
-        user_name: inc.user_name || 'Anonymous',
-        photo_url: inc.photo_url || null,
-        lat: typeof inc.lat === 'number' ? inc.lat : null,
-        lng: typeof inc.lng === 'number' ? inc.lng : null,
-        ai_interpretation: inc.ai_interpretation || null,
-      })) || [];
+      let dataSource: 'view' | 'table' = 'view';
+      let rawIncidentRows = incidentViewData || [];
+      let mappedIncidents = mapIncidents(rawIncidentRows, 'view');
+
+      if (mappedIncidents.length === 0) {
+        console.warn('incident_reports_view returned no rows for super admin, trying base incident_reports fallback.');
+
+        const { data: incidentTableData, error: incidentTableError } = await supabase
+          .from('incident_reports')
+          .select('report_id, incident_type, incident_description, severity, status, timestamp, user_id, photo_url, a_id, ai_interpretation')
+          .order('timestamp', { ascending: false })
+          .order('report_id', { ascending: false });
+
+        if (incidentTableError) {
+          console.error('Fallback incident_reports query failed:', incidentTableError);
+        } else {
+          dataSource = 'table';
+          rawIncidentRows = incidentTableData || [];
+          mappedIncidents = mapIncidents(rawIncidentRows, 'table');
+        }
+      }
+
+      const userIds = [...new Set(mappedIncidents.map((incident) => incident.user_id).filter(Boolean))];
+      if (userIds.length > 0) {
+        const { data: usersData, error: usersError } = await supabase
+          .from('users')
+          .select('u_id, u_name')
+          .in('u_id', userIds);
+
+        if (usersError) {
+          console.error('Error fetching user names for super admin incidents:', usersError);
+        } else {
+          const userMap = new Map((usersData || []).map((user: any) => [user.u_id, user.u_name]));
+          mappedIncidents = mappedIncidents.map((incident) => ({
+            ...incident,
+            user_name: userMap.get(incident.user_id) || incident.user_name,
+          }));
+        }
+      }
 
       setIncidents(mappedIncidents);
       setFilteredIncidents(mappedIncidents);
 
-      // Extract unique departments
-      const uniqueDepts = [...new Set(mappedIncidents.map((i: any) => normalizeDepartment(i.department)))];
+      const incidentDepartments = mappedIncidents.map((i: any) => normalizeDepartment(i.department));
+      const adminStations = (adminData || [])
+        .map((admin: any) => normalizeDepartment(admin.department_name))
+        .filter(Boolean);
+
+      const uniqueDepts = [...new Set([...incidentDepartments, ...adminStations])];
       setDepartments(uniqueDepts as string[]);
-
-      // Fetch admin count from admins table
-      const { data: adminData, error: adminError } = await supabase
-        .from('admins')
-        .select('a_id');
-
-      if (adminError) throw adminError;
 
       // Fetch user count from users table
       const { data: userData, error: userError } = await supabase
@@ -208,18 +361,70 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
       const totalAdmins = adminData?.length || 0;
       const totalUsers = userData?.length || 0;
 
-      setStats({
+      let incidentDataNotice: string | null = null;
+      if (mappedIncidents.length === 0) {
+        incidentDataNotice = 'No incidents were returned for the super admin view or the fallback table query. This usually means row-level security is blocking the super admin account, or there are genuinely no reports yet.';
+        console.warn('Super admin incidents query returned no rows.', {
+          superAdminId: user.id,
+          dataSourceTried: dataSource,
+          departmentsAvailable: uniqueDepts,
+        });
+      } else if (dataSource === 'table') {
+        console.warn('Super admin incidents are being shown from fallback incident_reports data because incident_reports_view returned no rows.');
+      }
+      setIncidentDataNotice(incidentDataNotice);
+
+      const stats = {
         totalIncidents,
         pendingIncidents,
         inProgressIncidents,
         resolvedIncidents,
         totalAdmins,
         totalUsers,
+      };
+      setStats(stats);
+
+      return {
+        data: {
+          superAdminProfile: superAdminData,
+          incidents: mappedIncidents,
+          departments: uniqueDepts as string[],
+          stats,
+          incidentDataNotice,
+        } as SuperAdminCacheData,
+        signature: buildSuperAdminSignature(rawIncidentRows, totalAdmins, totalUsers),
+      };
+  };
+
+  const loadSuperAdminData = async () => {
+    try {
+      const userStr = localStorage.getItem('currentUser');
+      const user = userStr ? JSON.parse(userStr) : null;
+
+      if (!user || user.role !== 'super_admin') {
+        toast.error('Unauthorized access');
+        onLogout();
+        return;
+      }
+
+      const { cookieKey, storageKey } = getSuperAdminCacheKeys(user);
+
+      // Policy implemented by loadCachedOrFresh:
+      //  - first visit  → full database load which is then stored in the browser,
+      //  - next visits  → show the stored data instantly and, ONLY if the cookie
+      //    says more than 2 minutes have passed, ask the database whether
+      //    anything changed (reload only if yes).
+      await loadCachedOrFresh<SuperAdminCacheData>({
+        cookieKey,
+        storageKey,
+        fetchSignature: () => getSuperAdminSignature(),
+        fetchFull: () => fetchSuperAdminSnapshot(user),
+        applyData: applySuperAdminSnapshot,
+        onFinishedLoading: () => setLoading(false),
       });
     } catch (error: any) {
       console.error('Error loading super admin data:', error);
       toast.error('Failed to load super admin dashboard');
-    } finally {
       setLoading(false);
     }
   };
@@ -468,6 +673,20 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
 
       {currentTab === 'incidents' && (
         <>
+          {incidentDataNotice && (
+            <div className={`mb-4 rounded-xl border p-4 ${
+              isDark ? 'border-yellow-700 bg-yellow-900/20 text-yellow-100' : 'border-yellow-200 bg-yellow-50 text-yellow-900'
+            }`}>
+              <div className="flex items-start gap-3">
+                <AlertCircle className="mt-0.5 shrink-0" size={18} />
+                <div>
+                  <p className="font-semibold">Incident data needs attention</p>
+                  <p className="mt-1 text-sm">{incidentDataNotice}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Filters */}
           <div className={`${isMobile ? "mb-4 p-3" : "mb-6 p-4"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
             <div className="space-y-3">
@@ -553,8 +772,14 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                 {filteredIncidents.length === 0 ? (
                   <div className={`text-center py-20 md:py-32 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                     <CheckCircle className={`mx-auto mb-3 w-12 h-12 md:w-16 md:h-16 ${isDark ? 'text-green-400 opacity-50' : 'text-green-800'}`} />
-                    <p className="text-base md:text-lg font-medium">No incidents found for this filter</p>
-                    <p className="text-xs md:text-sm mt-1">Try another status or department</p>
+                    <p className="text-base md:text-lg font-medium">
+                      {incidents.length === 0 ? 'No incidents were returned for the dashboard' : 'No incidents found for this filter'}
+                    </p>
+                    <p className="text-xs md:text-sm mt-1">
+                      {incidents.length === 0
+                        ? 'Check the super admin access policies or the incident_reports_view contents.'
+                        : 'Try another status or department'}
+                    </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
