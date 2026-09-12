@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Vite production output and cache
+build/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Environment variables and local secrets
+.env
+.env.*
+!.env.example
+
+# Vercel local project data
+.vercel/
+
+# Logs
+*.log
+logs/
+
+# Editor and operating-system files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

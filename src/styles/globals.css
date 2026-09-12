@@ -1,0 +1,3 @@
+/*! tailwindcss v4.1.3 | MIT License | https://tailwindcss.com */
+
+@custom-variant dark (&:is(.dark *));
