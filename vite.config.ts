@@ -1,11 +1,12 @@
 
   import { defineConfig } from 'vite';
+  import { devApiPlugin } from './dev-api-plugin';
   import react from '@vitejs/plugin-react';
   import tailwindcss from '@tailwindcss/vite';
   import path from 'path';
 
-  export default defineConfig({
-    plugins: [react(), tailwindcss()],
+  export default defineConfig(({ mode }) => ({
+    plugins: [react(), tailwindcss(), devApiPlugin(mode)],
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       alias: {
@@ -58,4 +59,4 @@
       port: 3000,
       open: true,
     },
-  });
+  }));

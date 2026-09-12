@@ -7,6 +7,14 @@ type ModelPrediction = {
   confidence: number;
 };
 
+export type ModelProgress = 'sending' | 'received' | 'processing' | 'completed' | 'failed';
+
+type AnalysisResult = {
+  success: boolean;
+  data?: { ai_interpretation: string; confidence_percent: number; detected_label: string };
+  error?: string;
+};
+
 async function readJsonResponse(response: Response): Promise<{ data?: any; error?: string }> {
   const body = await response.text();
   if (!body.trim()) {
@@ -20,44 +28,108 @@ async function readJsonResponse(response: Response): Promise<{ data?: any; error
   }
 }
 
-/** Sends the image directly to the deployed model. This avoids depending on a
- * serverless relay while a normal user is submitting a report. */
-export async function analyzeIncidentImage(file: File): Promise<{
-  success: boolean;
-  data?: { ai_interpretation: string; confidence_percent: number; detected_label: string };
-  error?: string;
-}> {
-  try {
-    const formData = new FormData();
-    formData.append('file', file, file.name);
-    const response = await fetch(MODEL_API_URL, { method: 'POST', body: formData });
-    const parsed = await readJsonResponse(response);
-    if (!response.ok || parsed.error) {
-      return { success: false, error: parsed.error || 'Model analysis failed.' };
-    }
+function formatAnalysisResult(modelData: any): AnalysisResult {
+  const predictions = modelData?.predictions as ModelPrediction[] | undefined;
+  if (!modelData?.success || !Array.isArray(predictions)) {
+    return { success: false, error: 'The model returned an invalid prediction response.' };
+  }
 
-    const predictions = parsed.data?.predictions as ModelPrediction[] | undefined;
-    if (!parsed.data?.success || !Array.isArray(predictions)) {
-      return { success: false, error: 'The model returned an invalid prediction response.' };
-    }
-
-    const bestPrediction = predictions.reduce<ModelPrediction | undefined>(
+  const bestPrediction = predictions.reduce<ModelPrediction | undefined>(
       (best, prediction) => !best || prediction.confidence > best.confidence ? prediction : best,
       undefined,
-    );
-    const confidencePercent = bestPrediction
-      ? Math.round(Math.max(0, Math.min(1, bestPrediction.confidence)) * 100)
-      : 0;
-    const label = bestPrediction?.label || 'No supported incident detected';
-    const interpretation = bestPrediction
-      ? `Model confidence: ${confidencePercent}% | Detected: ${label}`
-      : 'Model confidence: 0% | No supported incident was detected in the evidence image.';
+  );
+  const confidencePercent = bestPrediction
+    ? Math.round(Math.max(0, Math.min(1, bestPrediction.confidence)) * 100)
+    : 0;
+  const label = bestPrediction?.label || 'No supported incident detected';
+  const interpretation = bestPrediction
+    ? `Model confidence: ${confidencePercent}% | Detected: ${label}`
+    : 'Model confidence: 0% | No supported incident was detected in the evidence image.';
 
-    return {
-      success: true,
-      data: { ai_interpretation: interpretation, confidence_percent: confidencePercent, detected_label: label },
-    };
+  return {
+    success: true,
+    data: { ai_interpretation: interpretation, confidence_percent: confidencePercent, detected_label: label },
+  };
+}
+
+const wait = (milliseconds: number) => new Promise(resolve => window.setTimeout(resolve, milliseconds));
+
+/**
+ * Shows true model progress when the Render deployment includes the job routes.
+ * It falls back to the original endpoint whenever the job routes are missing
+ * from an older deployment or failing (e.g. HTTP 500 on a stale build).
+ */
+export async function analyzeIncidentImage(
+  file: File,
+  onProgress?: (progress: ModelProgress) => void,
+): Promise<AnalysisResult> {
+  try {
+    onProgress?.('sending');
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+    const jobResponse = await fetch(`${MODEL_API_URL}/jobs`, { method: 'POST', body: formData });
+
+    // Older Render deployments do not expose the job endpoint, and a stale
+    // deployment can fail it outright (e.g. HTTP 500). Any job-route failure
+    // must fall back to the original blocking endpoint so analysis still works.
+    if (!jobResponse.ok) {
+      onProgress?.('processing');
+      const response = await fetch(MODEL_API_URL, { method: 'POST', body: formData });
+      const parsed = await readJsonResponse(response);
+      if (!response.ok || parsed.error) {
+        onProgress?.('failed');
+        return { success: false, error: parsed.error || `Model analysis failed (HTTP ${response.status}).` };
+      }
+      onProgress?.('completed');
+      return formatAnalysisResult(parsed.data);
+    }
+
+    const jobParsed = await readJsonResponse(jobResponse);
+    if (jobParsed.error || !jobParsed.data?.job_id) {
+      return { success: false, error: jobParsed.error || 'The model did not accept the image.' };
+    }
+
+    onProgress?.('received');
+    let consecutivePollFailures = 0;
+    for (let attempt = 0; attempt < 120; attempt++) {
+      await wait(1000);
+
+      let statusResponse: Response;
+      try {
+        statusResponse = await fetch(`${MODEL_API_URL}/jobs/${jobParsed.data.job_id}`);
+      } catch {
+        // Free Render instances can restart between polls; tolerate short gaps.
+        consecutivePollFailures += 1;
+        if (consecutivePollFailures >= 10) throw new Error('Lost contact with the model service.');
+        continue;
+      }
+      const statusParsed = await readJsonResponse(statusResponse);
+      if (statusParsed.error || statusParsed.data?.status === 'not_found') {
+        consecutivePollFailures += 1;
+        if (consecutivePollFailures >= 10) {
+          onProgress?.('failed');
+          return { success: false, error: statusParsed.error || 'The model lost this analysis job.' };
+        }
+        continue;
+      }
+      consecutivePollFailures = 0;
+
+      if (statusParsed.data.status === 'received') onProgress?.('received');
+      if (statusParsed.data.status === 'processing') onProgress?.('processing');
+      if (statusParsed.data.status === 'failed') {
+        onProgress?.('failed');
+        return { success: false, error: statusParsed.data.error || 'Model processing failed.' };
+      }
+      if (statusParsed.data.status === 'completed') {
+        onProgress?.('completed');
+        return formatAnalysisResult(statusParsed.data);
+      }
+    }
+
+    onProgress?.('failed');
+    return { success: false, error: 'Model processing timed out. Please try again later.' };
   } catch (error: any) {
+    onProgress?.('failed');
     return { success: false, error: error.message || 'Could not reach the deployed model.' };
   }
 }

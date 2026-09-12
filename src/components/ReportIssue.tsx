@@ -4,7 +4,7 @@ import { canReportIncident } from '../utils/deviceDetection';
 import { useTheme } from '../App';
 import { toast } from 'sonner';
 import { supabase } from './supabaseClient';
-import { analyzeIncidentImage } from '../utils/aiVerification';
+import { analyzeIncidentImage, type ModelProgress } from '../utils/aiVerification';
 import { clearBrowserCache, REPORT_HISTORY_CACHE_PREFIX } from '../utils/browserCache';
 
 interface ReportIssueProps {
@@ -44,6 +44,9 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
   const [locationError, setLocationError] = useState('');
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [aiProgress, setAiProgress] = useState<ModelProgress>('sending');
+  const [aiResult, setAiResult] = useState<{ confidence: number; label: string } | null>(null);
+  const [aiError, setAiError] = useState('');
 
   // ─── Permission State ──────────────────────────────────────
   const [geoPermission, setGeoPermission] =
@@ -273,6 +276,9 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
       console.log('Report saved to Supabase:', data);
       setSuccess(true);
+      setAiProgress('sending');
+      setAiResult(null);
+      setAiError('');
       toast.success('Report submitted successfully.');
 
       // A fresh report was just created - drop the stored browser cache for the
@@ -284,10 +290,10 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       void (async () => {
         try {
           if (!selectedImageFile) throw new Error('The selected evidence image is unavailable for analysis.');
-          const aiResult = await analyzeIncidentImage(selectedImageFile);
-          if (!aiResult.success) throw new Error(aiResult.error || 'AI verification failed');
+          const modelResult = await analyzeIncidentImage(selectedImageFile, setAiProgress);
+          if (!modelResult.success) throw new Error(modelResult.error || 'AI verification failed');
 
-          const interpretation = aiResult.data?.ai_interpretation;
+          const interpretation = modelResult.data?.ai_interpretation;
           if (typeof interpretation !== 'string' || !interpretation) {
             throw new Error('The AI response did not include an interpretation.');
           }
@@ -301,10 +307,17 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
           if (interpretationSaveError) throw interpretationSaveError;
 
           clearBrowserCache([REPORT_HISTORY_CACHE_PREFIX]);
-          console.log('AI interpretation saved:', aiResult.data);
-        } catch (aiError) {
+          setAiResult({
+            confidence: modelResult.data?.confidence_percent || 0,
+            label: modelResult.data?.detected_label || 'No supported incident detected',
+          });
+          setAiProgress('completed');
+          console.log('AI interpretation saved:', modelResult.data);
+        } catch (error: any) {
           // The report remains submitted and the batch analyser can retry this later.
-          console.error('AI verification error:', aiError);
+          console.error('AI verification error:', error);
+          setAiProgress('failed');
+          setAiError(error.message || 'The model could not process this image.');
         }
       })();
 
@@ -322,25 +335,26 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
       // console.log('Report saved to localStorage and database:', localReport);
 
-      // Reset form and keep success visible
-      setTimeout(() => {
-        setIssueType('');
-        setSeverity('');
-        setDescription('');
-        setPhoto('');
-        setPhotoPreview('');
-        setSelectedImageFile(null);
-        setLocationText('');
-        setLat(null);
-        setLng(null);
-        onSuccess();
-      }, 2000);
     } catch (err: any) {
       console.error('Submit error:', err);
       toast.error(err.message || 'Submission failed');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const finishReport = () => {
+    setIssueType('');
+    setSeverity('');
+    setDescription('');
+    setPhoto('');
+    setPhotoPreview('');
+    setSelectedImageFile(null);
+    setLocationText('');
+    setLat(null);
+    setLng(null);
+    setSuccess(false);
+    onSuccess();
   };
   const getSeverityColors = (sev: string) => {
     switch (sev) {
@@ -391,13 +405,37 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
             </svg>
           </div>
           <h2 className={`text-2xl mb-3 text-blue-800`}>Incident Report Submitted</h2>
-          <div className="flex items-center justify-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-3 mb-4">
-            <ShieldCheck className="text-green-700" size={20} />
-            <span className="text-sm text-green-800">AI verification in progress</span>
+          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-left">
+            <p className="mb-3 text-sm font-semibold text-blue-900">AI image analysis status</p>
+            <div className="space-y-2 text-xs text-blue-800">
+              <p className="flex items-center gap-2">
+                {aiProgress === 'sending' ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} className="text-green-700" />}
+                {aiProgress === 'sending' ? 'Sending image to the deployed model…' : 'Image reached the model'}
+              </p>
+              <p className="flex items-center gap-2">
+                {aiProgress === 'received' || aiProgress === 'processing' ? <Loader2 size={15} className="animate-spin" /> : aiProgress === 'sending' ? <span className="h-3.5 w-3.5 rounded-full border border-blue-300" /> : <ShieldCheck size={15} className="text-green-700" />}
+                {aiProgress === 'received' ? 'Model received image and is queued' : aiProgress === 'processing' ? 'Model is analysing the incident…' : aiProgress === 'sending' ? 'Waiting for the model to receive the image' : 'Model processing finished'}
+              </p>
+              <p className="flex items-center gap-2">
+                {aiProgress === 'completed' ? <ShieldCheck size={15} className="text-green-700" /> : aiProgress === 'failed' ? <AlertCircle size={15} className="text-red-600" /> : <span className="h-3.5 w-3.5 rounded-full border border-blue-300" />}
+                {aiProgress === 'completed' ? 'Result saved to this report' : aiProgress === 'failed' ? 'Analysis could not be completed' : 'Waiting for result'}
+              </p>
+            </div>
           </div>
-          <p className={`${isDark ? "text-gray-600" : "text-gray-50" }`}>
-            Local authorities have been notified. You'll receive real-time updates on the resolution progress.
+          {aiResult && (
+            <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+              <strong>{aiResult.confidence}% confidence</strong> — Detected: {aiResult.label}
+            </div>
+          )}
+          {aiError && <p className="mb-4 text-xs text-red-600">{aiError}</p>}
+          <p className={isDark ? 'text-gray-600' : 'text-gray-500'}>
+            Your report is saved. You can view its status in report history.
           </p>
+          {(aiProgress === 'completed' || aiProgress === 'failed') && (
+            <button onClick={finishReport} className="mt-5 w-full rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800">
+              View Report History
+            </button>
+          )}
         </div>
       </div>
     );
