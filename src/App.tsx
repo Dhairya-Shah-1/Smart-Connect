@@ -111,9 +111,12 @@ function AppContent() {
 
   useEffect(() => {
     const redirectPath = getRedirectPath(localStorage.getItem('currentUser'));
-    const isPublicRoute = location.pathname === '/' || location.pathname === '/login' || location.pathname === '/signup';
+    // The landing page is intentionally available to signed-in users. Dashboard
+    // Home buttons navigate here, whereas login and signup still redirect users
+    // who already have a session.
+    const isAuthRoute = location.pathname === '/login' || location.pathname === '/signup';
 
-    if (redirectPath && isPublicRoute) {
+    if (redirectPath && isAuthRoute) {
       navigate(redirectPath, { replace: true });
     }
   }, [authRefreshKey, location.pathname, navigate]);
@@ -337,7 +340,7 @@ function AdminDashboardWrapper() {
     navigate('/login', { replace: true });
   };
   
-  return <AdminDashboard onLogout={handleLogout} />;
+  return <AdminDashboard onLogout={handleLogout} onNavigateHome={() => navigate('/', { replace: true })} />;
 }
 
 function SuperAdminDashboardWrapper() {

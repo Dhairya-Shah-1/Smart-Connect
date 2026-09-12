@@ -21,7 +21,7 @@ function getRequiredServerEnv(...keys: string[]): string {
 
 const supabase = createClient(
   getRequiredServerEnv('SUPABASE_URL', 'VITE_SUPABASE_URL'),
-  getRequiredServerEnv('SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY'),
+  getRequiredServerEnv('SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY'),
 );
 
 interface IncidentData {

@@ -4,7 +4,7 @@ import { canReportIncident } from '../utils/deviceDetection';
 import { useTheme } from '../App';
 import { toast } from 'sonner';
 import { supabase } from './supabaseClient';
-import { verifySingleIncident } from '../utils/aiVerification';
+import { analyzeIncidentImage } from '../utils/aiVerification';
 import { clearBrowserCache, REPORT_HISTORY_CACHE_PREFIX } from '../utils/browserCache';
 
 interface ReportIssueProps {
@@ -37,6 +37,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
   const [description, setDescription] = useState('');
   const [photo, setPhoto] = useState<string>('');
   const [photoPreview, setPhotoPreview] = useState<string>('');
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
 
   // ─── UI State ──────────────────────────────────────────────
   const [success, setSuccess] = useState(false);
@@ -77,46 +78,50 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       if (!file) return;
 
       setUploading(true);
+      setPhoto('');
+      setPhotoPreview('');
+      setSelectedImageFile(file);
 
-      // 1. Create local preview immediately using FileReader
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        setPhotoPreview(result); // Show a local preview while the upload completes.
-      };
-      reader.readAsDataURL(file);
-
-      // 2. Create unique file path with user ID if available
-      const { data: authData } = await supabase.auth.getUser();
-      const userId = authData?.user?.id || 'anonymous';
-      const timestamp = Date.now();
-      const fileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_'); // Sanitize filename
-      const filePath = `reports/${userId}/${timestamp}-${fileName}`;
-
-      // 3. Upload to Supabase Storage with proper error handling
-      const { error } = await supabase.storage
-        .from('incident-images')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
+      try {
+        // 1. Read the image before uploading so preview and upload state cannot
+        // race each other on slower mobile devices.
+        const localImage = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error('The selected image could not be read.'));
+          reader.readAsDataURL(file);
         });
+        setPhotoPreview(localImage);
+        // A mobile report can still be submitted if Storage is temporarily
+        // unavailable. The model API can read this image data directly.
+        setPhoto(localImage);
 
-      if (error) {
-        console.error('Upload failed:', error.message);
-        setPhoto('');
-        toast.error('Evidence upload failed. Please try the photo again.');
+        // 2. Upload through the server route. It validates the user's current
+        // session and uses server-only credentials, so Storage RLS cannot reject
+        // a legitimate normal-user report.
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData.session?.access_token;
+        if (!accessToken) throw new Error('Your login session has expired. Please sign in again.');
+
+        const uploadData = new FormData();
+        uploadData.append('file', file, file.name);
+        const uploadResponse = await fetch('/api/upload-evidence', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}` },
+          body: uploadData,
+        });
+        const uploadResult = await uploadResponse.json() as { publicUrl?: string; error?: string };
+        if (!uploadResponse.ok || !uploadResult.publicUrl) {
+          throw new Error(uploadResult.error || 'Evidence upload failed.');
+        }
+
+        setPhoto(uploadResult.publicUrl);
+        setPhotoPreview(uploadResult.publicUrl);
+      } catch (error: any) {
+        console.error('Evidence upload failed; using the selected image for this report:', error);
+      } finally {
         setUploading(false);
-        return;
       }
-
-      // 4. Get PUBLIC URL and update if upload succeeds
-      const { data } = supabase.storage
-        .from('incident-images')
-        .getPublicUrl(filePath);
-
-      setPhoto(data.publicUrl);
-      setPhotoPreview(data.publicUrl);
-      setUploading(false);
     };
 
   const requestLocation = useCallback(() => {
@@ -278,7 +283,8 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       // temporary model outage must not stop a mobile user from reporting.
       void (async () => {
         try {
-          const aiResult = await verifySingleIncident(data.report_id);
+          if (!selectedImageFile) throw new Error('The selected evidence image is unavailable for analysis.');
+          const aiResult = await analyzeIncidentImage(selectedImageFile);
           if (!aiResult.success) throw new Error(aiResult.error || 'AI verification failed');
 
           const interpretation = aiResult.data?.ai_interpretation;
@@ -323,6 +329,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         setDescription('');
         setPhoto('');
         setPhotoPreview('');
+        setSelectedImageFile(null);
         setLocationText('');
         setLat(null);
         setLng(null);
@@ -650,6 +657,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
                       e.stopPropagation();
                       setPhoto('');
                       setPhotoPreview('');
+                      setSelectedImageFile(null);
                     }}
                     className="absolute top-2 right-2 bg-red-600 text-white p-2 rounded-full shadow-lg hover:bg-red-700"
                   >
@@ -683,6 +691,12 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
                 </>
               )}
             </div>
+            {uploading && (
+              <div className={`mt-3 flex items-center justify-center gap-2 text-xs ${isDark ? 'text-blue-300' : 'text-blue-700'}`}>
+                <Loader2 size={15} className="animate-spin" />
+                Uploading evidence image…
+              </div>
+            )}
           </div>
 
           <button
@@ -701,8 +715,12 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
               ? "Uploading Evidence..."
               : isSubmitting
               ? "Submitting Report..."
-              : !issueType || !photo || lat === null || lng === null
-              ? "Add Type, Photo & Location"
+              : !issueType
+              ? "Select Incident Type"
+              : !photo
+              ? "Select Evidence Photo"
+              : lat === null || lng === null
+              ? "Tap Location to Detect GPS"
               : "Submit Incident Report"}
           </button>
         </form>

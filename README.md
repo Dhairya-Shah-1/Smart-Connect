@@ -12,11 +12,13 @@ VITE_SUPABASE_URL=https://your-project-id.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 SUPABASE_URL=https://your-project-id.supabase.co
 SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 ```
 
 Notes:
 - `VITE_` variables are used by the frontend.
-- `SUPABASE_URL` and `SUPABASE_ANON_KEY` are used by the server/API route. The route uploads the stored evidence image to `https://smartconnect-api.onrender.com/predict` and stores the returned confidence percentage; no Gemini key is required.
+- `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are used only by the server/API routes. Set these values in Vercel (not `VITE_` variables). The service-role key lets the authenticated `/api/upload-evidence` route save normal-user evidence without weakening Storage RLS; it must never be exposed in browser code.
+- The server uploads the stored evidence image to `https://smartconnect-api.onrender.com/predict` and saves the returned confidence percentage; no Gemini key is required.
 - `.env` files are ignored by git, while `.env.example` is safe to commit.
 
 ## Running locally

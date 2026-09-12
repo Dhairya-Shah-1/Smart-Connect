@@ -3,17 +3,18 @@ import { MapView } from './MapView';
 import { CheckReports } from './CheckReports';
 import { Notifications } from './Notifications';
 import { Profile } from './Profile';
-import { Map, CheckCircle, Bell, User, Sun, Moon } from 'lucide-react';
+import { Map, CheckCircle, Bell, User, Sun, Moon, Home } from 'lucide-react';
 import { ASSETS } from '../config/assets';
 import { useTheme } from '../App';
 
 interface AdminDashboardProps {
   onLogout: () => void;
+  onNavigateHome: () => void;
 }
 
 type AdminView = 'map' | 'check-reports' | 'notifications' | 'profile';
 
-export function AdminDashboard({ onLogout }: AdminDashboardProps) {
+export function AdminDashboard({ onLogout, onNavigateHome }: AdminDashboardProps) {
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === 'dark';
   const [currentView, setCurrentView] = useState<AdminView>('check-reports');
@@ -21,7 +22,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const renderView = () => {
     switch (currentView) {
       case 'map':
-        return <MapView />;
+        return <MapView onNavigateHome={onNavigateHome} />;
       case 'check-reports':
         return <CheckReports />;
       case 'notifications':
@@ -51,6 +52,14 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             aria-label="Toggle theme"
           >
             {isDark ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+          <button
+            onClick={onNavigateHome}
+            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${isDark ? 'bg-slate-700 text-gray-200 hover:bg-slate-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+            aria-label="Go to home page"
+          >
+            <Home size={18} />
+            <span>Home</span>
           </button>
           <button
             onClick={() => setCurrentView(currentView === 'profile' ? 'map' : 'profile')}

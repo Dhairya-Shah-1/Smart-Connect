@@ -159,7 +159,11 @@ export const setBrowserCache = <T,>(
   if (typeof window === 'undefined') return;
 
   try {
-    localStorage.setItem(storageKey, JSON.stringify(data));
+    const serializedData = JSON.stringify(data);
+    // localStorage is small (usually 5 MB). Do not cache records containing
+    // embedded camera images; the database remains the source of truth.
+    if (serializedData.length > 1_000_000) return;
+    localStorage.setItem(storageKey, serializedData);
   } catch (err) {
     console.warn('Failed to write browser cache data', err);
     return;

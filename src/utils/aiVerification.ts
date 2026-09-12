@@ -1,5 +1,67 @@
 // Utility functions for incident analysis with the deployed Smart Connect model.
 
+const MODEL_API_URL = 'https://smartconnect-api.onrender.com/predict';
+
+type ModelPrediction = {
+  label: string;
+  confidence: number;
+};
+
+async function readJsonResponse(response: Response): Promise<{ data?: any; error?: string }> {
+  const body = await response.text();
+  if (!body.trim()) {
+    return { error: `The analysis service returned an empty response (HTTP ${response.status}).` };
+  }
+
+  try {
+    return { data: JSON.parse(body) };
+  } catch {
+    return { error: `The analysis service returned an invalid response (HTTP ${response.status}).` };
+  }
+}
+
+/** Sends the image directly to the deployed model. This avoids depending on a
+ * serverless relay while a normal user is submitting a report. */
+export async function analyzeIncidentImage(file: File): Promise<{
+  success: boolean;
+  data?: { ai_interpretation: string; confidence_percent: number; detected_label: string };
+  error?: string;
+}> {
+  try {
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+    const response = await fetch(MODEL_API_URL, { method: 'POST', body: formData });
+    const parsed = await readJsonResponse(response);
+    if (!response.ok || parsed.error) {
+      return { success: false, error: parsed.error || 'Model analysis failed.' };
+    }
+
+    const predictions = parsed.data?.predictions as ModelPrediction[] | undefined;
+    if (!parsed.data?.success || !Array.isArray(predictions)) {
+      return { success: false, error: 'The model returned an invalid prediction response.' };
+    }
+
+    const bestPrediction = predictions.reduce<ModelPrediction | undefined>(
+      (best, prediction) => !best || prediction.confidence > best.confidence ? prediction : best,
+      undefined,
+    );
+    const confidencePercent = bestPrediction
+      ? Math.round(Math.max(0, Math.min(1, bestPrediction.confidence)) * 100)
+      : 0;
+    const label = bestPrediction?.label || 'No supported incident detected';
+    const interpretation = bestPrediction
+      ? `Model confidence: ${confidencePercent}% | Detected: ${label}`
+      : 'Model confidence: 0% | No supported incident was detected in the evidence image.';
+
+    return {
+      success: true,
+      data: { ai_interpretation: interpretation, confidence_percent: confidencePercent, detected_label: label },
+    };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Could not reach the deployed model.' };
+  }
+}
+
 /**
  * Process a single incident with the deployed image-analysis model.
  * @param reportId - The report ID to verify
@@ -20,7 +82,9 @@ export async function verifySingleIncident(reportId: string): Promise<{
       body: JSON.stringify({ reportId }),
     });
 
-    const result = await response.json();
+    const parsed = await readJsonResponse(response);
+    if (parsed.error) return { success: false, error: parsed.error };
+    const result = parsed.data;
 
     if (!response.ok) {
       return { success: false, error: result.error || 'Verification failed' };
@@ -53,7 +117,9 @@ export async function processAllUnprocessedReports(): Promise<{
       body: JSON.stringify({ processAll: true }),
     });
 
-    const result = await response.json();
+    const parsed = await readJsonResponse(response);
+    if (parsed.error) return { success: false, error: parsed.error };
+    const result = parsed.data;
 
     if (!response.ok) {
       return { success: false, error: result.error || 'Batch processing failed' };
