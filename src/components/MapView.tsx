@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { MapPin, Filter, Search, X, ShieldCheck, ZoomIn, ZoomOut } from "lucide-react";
+import { MapPin, Filter, Search, X, ShieldCheck, ZoomIn, ZoomOut, Loader2 } from "lucide-react";
 import { useTheme } from "../App";
 import { OpenLayersMap } from "./OpenLayersMap";
 import { isMobileOrTablet } from "../utils/deviceDetection";
@@ -70,6 +70,11 @@ const setCookieValue = (name: string, value: string) => {
 
 const sanitizeCacheKeyPart = (value: string) => value.replace(/[^a-z0-9_-]/gi, "_");
 
+const getAiConfidence = (interpretation?: string): number | undefined => {
+  const match = interpretation?.match(/Model confidence:\s*(\d{1,3})%/i);
+  return match ? Number(match[1]) : undefined;
+};
+
 export function MapView({
   onNavigateHome,
   urgentCount,
@@ -95,6 +100,8 @@ export function MapView({
   const [showFilters, setShowFilters] = useState(true);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [imageZoom, setImageZoom] = useState(1);
+  const [loadedEvidenceUrl, setLoadedEvidenceUrl] = useState<string | null>(null);
+  const [evidenceLoadFailed, setEvidenceLoadFailed] = useState(false);
   const isMobileTablet = isMobileOrTablet();
   
   // Check if user is admin or super_admin
@@ -107,6 +114,11 @@ export function MapView({
   useEffect(() => {
     setCurrentUser(getStoredCurrentUser());
   }, []);
+
+  useEffect(() => {
+    setLoadedEvidenceUrl(null);
+    setEvidenceLoadFailed(false);
+  }, [selectedIssue?.photo]);
   
   // Handle reject action
   const handleReject = async (reportId: string) => {
@@ -350,7 +362,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
           aiVerified: aiInterpretation
             ? !aiInterpretation.toLowerCase().includes('fake')
             : false,
-          aiConfidence: undefined,
+          aiConfidence: getAiConfidence(aiInterpretation),
           aiReason: aiInterpretation,
           departmentNotified: "Central Control",
         };
@@ -912,11 +924,24 @@ const groupNearbyIssues = (issues: Issue[]) => {
             </button>
             {selectedIssue.photo && (
               <div className="relative group cursor-pointer" onClick={() => openFullscreenImage(selectedIssue.photo!)}>
+                {loadedEvidenceUrl !== selectedIssue.photo && !evidenceLoadFailed && (
+                  <div className={`absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 ${isDark ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-600'}`}>
+                    <Loader2 className="animate-spin" size={24} />
+                    <span className="text-xs font-medium">Loading evidence image…</span>
+                  </div>
+                )}
                 <img
                   src={selectedIssue.photo}
                   alt="Incident"
-                  className="w-full h-48 md:h-52 object-contain bg-gray-100 bg-slate-200 dark:bg-slate-700 transition-transform"
+                  onLoad={() => setLoadedEvidenceUrl(selectedIssue.photo || null)}
+                  onError={() => setEvidenceLoadFailed(true)}
+                  className={`w-full h-48 md:h-52 object-contain bg-gray-100 bg-slate-200 dark:bg-slate-700 transition-opacity ${loadedEvidenceUrl === selectedIssue.photo ? 'opacity-100' : 'opacity-0'}`}
                 />
+                {evidenceLoadFailed && (
+                  <div className={`absolute inset-0 flex items-center justify-center text-xs ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                    Evidence image could not be loaded.
+                  </div>
+                )}
                 <div className={`absolute inset-0 flex flex-col items-center justify-center ${isMobileTablet ? "bg-slate-700/50" : "opacity-0 group-hover:opacity-100 transition-opacity bg-slate-500 duration-300"}`}>
                   <ZoomIn className="text-white mb-2" size={32} />
                   <p className="text-white text-sm font-medium">Click to view image</p>
@@ -947,33 +972,26 @@ const groupNearbyIssues = (issues: Issue[]) => {
                 {selectedIssue.description}
               </p>
               
-              {/* AI Interpretation Display */}
+              {/* AI image-analysis result */}
               {selectedIssue.aiReason && (
-                <div className={`mb-3 p-2 rounded-lg text-xs ${
-                  selectedIssue.aiReason.includes('Potentially Real')
-                    ? 'bg-green-50 border border-green-200'
-                    : selectedIssue.aiReason.includes('Potentially Fake')
-                    ? 'bg-red-50 border border-red-200'
-                    : 'bg-yellow-50 border border-yellow-200'
-                }`}>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className={`font-semibold ${
-                      selectedIssue.aiReason.includes('Potentially Real') ? 'text-green-700'
-                      : selectedIssue.aiReason.includes('Potentially Fake') ? 'text-red-700'
-                      : 'text-yellow-700'
-                    }`}>
-                      {selectedIssue.aiReason.includes('Potentially Real') && '✓ Potentially Real'}
-                      {selectedIssue.aiReason.includes('Potentially Fake') && '✗ Potentially Fake'}
-                      {!selectedIssue.aiReason.includes('Potentially Real') && !selectedIssue.aiReason.includes('Potentially Fake') && '🤖 AI Interpretation'}
-                    </span>
+                <div className={`mb-3 rounded-lg border p-3 text-xs ${isDark ? 'border-indigo-700 bg-indigo-950/40' : 'border-indigo-200 bg-indigo-50'}`}>
+                  <div className="mb-1.5 flex items-center justify-between gap-3">
+                    <span className={`${isDark ? 'text-indigo-200' : 'text-indigo-800'} font-semibold`}>AI image analysis</span>
+                    {selectedIssue.aiConfidence !== undefined && (
+                      <span className={`rounded-full px-2 py-0.5 font-bold ${isDark ? 'bg-indigo-800 text-indigo-100' : 'bg-indigo-200 text-indigo-900'}`}>
+                        {selectedIssue.aiConfidence}% confidence
+                      </span>
+                    )}
                   </div>
-                  <p className={`text-xs ${
-                    selectedIssue.aiReason.includes('Potentially Real') ? 'text-green-600'
-                    : selectedIssue.aiReason.includes('Potentially Fake') ? 'text-red-600'
-                    : 'text-yellow-600'
-                  }`}>
+                  <p className={isDark ? 'text-indigo-100' : 'text-indigo-800'}>
                     {selectedIssue.aiReason}
                   </p>
+                </div>
+              )}
+              {!selectedIssue.aiReason && (
+                <div className={`mb-3 flex items-center gap-2 rounded-lg border p-3 text-xs ${isDark ? 'border-slate-600 bg-slate-700 text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+                  <Loader2 className="animate-spin" size={15} />
+                  AI image analysis is in progress…
                 </div>
               )}
               

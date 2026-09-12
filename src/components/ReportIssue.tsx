@@ -282,6 +282,23 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
           throw new Error(aiResult.error || 'AI verification failed');
         }
 
+        const interpretation = aiResult.data?.ai_interpretation;
+        if (typeof interpretation !== 'string' || !interpretation) {
+          throw new Error('The AI response did not include an interpretation.');
+        }
+
+        // The API persists this too; writing the returned value here keeps this
+        // newly submitted report in sync with its model result immediately.
+        const { error: interpretationSaveError } = await supabase
+          .from('incident_reports')
+          .update({ ai_interpretation: interpretation })
+          .eq('report_id', data.report_id);
+
+        if (interpretationSaveError) {
+          throw new Error(`Could not save AI interpretation: ${interpretationSaveError.message}`);
+        }
+
+        clearBrowserCache([REPORT_HISTORY_CACHE_PREFIX]);
         console.log('AI Verification Result:', aiResult.data);
         toast.success('AI verification completed.');
       } catch (aiError: any) {
