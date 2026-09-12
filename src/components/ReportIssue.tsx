@@ -36,6 +36,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
   const [lng, setLng] = useState<number | null>(null);
   const [description, setDescription] = useState('');
   const [photo, setPhoto] = useState<string>('');
+  const [photoPreview, setPhotoPreview] = useState<string>('');
 
   // ─── UI State ──────────────────────────────────────────────
   const [success, setSuccess] = useState(false);
@@ -81,7 +82,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       const reader = new FileReader();
       reader.onload = (event) => {
         const result = event.target?.result as string;
-        setPhoto(result); // Show preview immediately
+        setPhotoPreview(result); // Show a local preview while the upload completes.
       };
       reader.readAsDataURL(file);
 
@@ -102,7 +103,8 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
       if (error) {
         console.error('Upload failed:', error.message);
-        toast.error('Upload failed. Preview saved locally.');
+        setPhoto('');
+        toast.error('Evidence upload failed. Please try the photo again.');
         setUploading(false);
         return;
       }
@@ -112,7 +114,8 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         .from('incident-images')
         .getPublicUrl(filePath);
 
-      setPhoto(data.publicUrl); // Replace with Supabase URL
+      setPhoto(data.publicUrl);
+      setPhotoPreview(data.publicUrl);
       setUploading(false);
     };
 
@@ -205,7 +208,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       toast.error('Please select an incident type.');
       return;
     }
-    if (!lat || !lng) {
+    if (lat === null || lng === null) {
       toast.error('Location is required. Please enable GPS.');
       if (!(await ensureLocation())) return;
     }
@@ -271,40 +274,33 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       // History tab so the next visit loads the updated list immediately.
       clearBrowserCache([REPORT_HISTORY_CACHE_PREFIX]);
 
-      // Trigger AI verification using the saved report id so the API can
-      // fetch the canonical incident record, analyze it, and persist the result.
-      try {
-        toast.info('Verifying incident with AI...');
+      // AI analysis runs after the report is safely submitted. A slow model or a
+      // temporary model outage must not stop a mobile user from reporting.
+      void (async () => {
+        try {
+          const aiResult = await verifySingleIncident(data.report_id);
+          if (!aiResult.success) throw new Error(aiResult.error || 'AI verification failed');
 
-        const aiResult = await verifySingleIncident(data.report_id);
+          const interpretation = aiResult.data?.ai_interpretation;
+          if (typeof interpretation !== 'string' || !interpretation) {
+            throw new Error('The AI response did not include an interpretation.');
+          }
 
-        if (!aiResult.success) {
-          throw new Error(aiResult.error || 'AI verification failed');
+          // Persist the value returned by the deployed model for this report.
+          const { error: interpretationSaveError } = await supabase
+            .from('incident_reports')
+            .update({ ai_interpretation: interpretation })
+            .eq('report_id', data.report_id);
+
+          if (interpretationSaveError) throw interpretationSaveError;
+
+          clearBrowserCache([REPORT_HISTORY_CACHE_PREFIX]);
+          console.log('AI interpretation saved:', aiResult.data);
+        } catch (aiError) {
+          // The report remains submitted and the batch analyser can retry this later.
+          console.error('AI verification error:', aiError);
         }
-
-        const interpretation = aiResult.data?.ai_interpretation;
-        if (typeof interpretation !== 'string' || !interpretation) {
-          throw new Error('The AI response did not include an interpretation.');
-        }
-
-        // The API persists this too; writing the returned value here keeps this
-        // newly submitted report in sync with its model result immediately.
-        const { error: interpretationSaveError } = await supabase
-          .from('incident_reports')
-          .update({ ai_interpretation: interpretation })
-          .eq('report_id', data.report_id);
-
-        if (interpretationSaveError) {
-          throw new Error(`Could not save AI interpretation: ${interpretationSaveError.message}`);
-        }
-
-        clearBrowserCache([REPORT_HISTORY_CACHE_PREFIX]);
-        console.log('AI Verification Result:', aiResult.data);
-        toast.success('AI verification completed.');
-      } catch (aiError: any) {
-        console.error('AI verification error:', aiError);
-        toast.error(aiError.message || 'AI verification could not be completed right now.');
-      }
+      })();
 
       // Dispatch events to update ReportHistory
       // window.dispatchEvent(new StorageEvent('storage', {
@@ -326,6 +322,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         setSeverity('');
         setDescription('');
         setPhoto('');
+        setPhotoPreview('');
         setLocationText('');
         setLat(null);
         setLng(null);
@@ -640,10 +637,10 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
                     : "border-gray-300 hover:bg-gray-50"
               }`}
             >
-              {photo ? (
+              {photoPreview ? (
                 <div className="relative h-48 w-full group">
                   <img
-                    src={photo}
+                    src={photoPreview}
                     alt="Preview"
                     className="w-full h-full object-contain rounded-lg"
                   />
@@ -652,6 +649,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
                     onClick={(e) => {
                       e.stopPropagation();
                       setPhoto('');
+                      setPhotoPreview('');
                     }}
                     className="absolute top-2 right-2 bg-red-600 text-white p-2 rounded-full shadow-lg hover:bg-red-700"
                   >
@@ -689,9 +687,9 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
           <button
             type="submit"
-            disabled={isLoadingLocation || !issueType || !photo || isSubmitting}
+            disabled={isLoadingLocation || uploading || !issueType || !photo || lat === null || lng === null || isSubmitting}
             className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all flex items-center justify-center gap-2 ${
-              isLoadingLocation || !issueType || !photo || isSubmitting
+              isLoadingLocation || uploading || !issueType || !photo || lat === null || lng === null || isSubmitting
                 ? "bg-gray-400 cursor-not-allowed text-gray-200"
                 : "bg-blue-600 hover:bg-blue-700 text-white hover:shadow-blue-500/25 active:scale-[0.98]"
             }`}
@@ -699,10 +697,12 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
             {isSubmitting && <Loader2 size={20} className="animate-spin" />}
             {isLoadingLocation
               ? "Detecting Location..."
+              : uploading
+              ? "Uploading Evidence..."
               : isSubmitting
               ? "Submitting Report..."
-              : !issueType || !photo
-              ? "Select Type & Photo"
+              : !issueType || !photo || lat === null || lng === null
+              ? "Add Type, Photo & Location"
               : "Submit Incident Report"}
           </button>
         </form>
