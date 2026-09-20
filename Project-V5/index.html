@@ -3,8 +3,43 @@
   <html lang="en">
     <head>
       <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+      <meta name="theme-color" content="#1e293b" />
+      <meta name="format-detection" content="telephone=no" />
       <title>Smart Connect</title>
+      <style>
+        /* Prevent iOS bounce and overscroll */
+        html, body {
+          overscroll-behavior: none;
+          touch-action: pan-y;
+          -webkit-touch-callout: none;
+          -webkit-user-select: none;
+          user-select: none;
+        }
+        
+        /* Prevent any zooming on dashboard elements */
+        .dashboard-container,
+        .dashboard-header,
+        .mobile-bottom-panel {
+          touch-action: manipulation;
+          -webkit-touch-callout: none;
+        }
+        
+        /* Prevent pull-to-zoom on mobile */
+        @media (max-width: 768px), (hover: none) and (pointer: coarse) {
+          html, body {
+            position: fixed;
+            width: 100%;
+            overflow: hidden;
+          }
+          
+          #root {
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+          }
+        }
+      </style>
     </head>
 
     <body>

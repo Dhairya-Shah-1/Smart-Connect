@@ -34,9 +34,9 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   };
 
   return (
-    <div className={`h-screen flex flex-col ${isDark ? 'bg-slate-900' : 'bg-white'}`}>
+    <div className={`h-screen flex flex-col dashboard-container ${isDark ? 'bg-slate-900' : 'bg-white'}`}>
       {/* Header */}
-      <header className={`flex items-center justify-between px-6 py-4 border-b ${isDark ? 'border-slate-700 bg-slate-800' : 'border-gray-200 bg-white'} shadow-sm`}>
+      <header className={`flex items-center justify-between px-6 py-4 border-b dashboard-header ${isDark ? 'border-slate-700 bg-slate-800' : 'border-gray-200 bg-white'} shadow-sm`}>
         <div className="flex items-center gap-3">
           <img src={ASSETS.Shield} alt="Shield Icon" className="inline-flex w-10" />
           <div>

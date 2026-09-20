@@ -482,9 +482,9 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
   }
 
   return (
-  <div className={`min-h-screen ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
+  <div className={`min-h-screen dashboard-container ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
     {/* Header */}
-    <header className={`sticky top-0 z-50 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200 shadow-lg'} border-b`}>
+    <header className={`sticky top-0 z-50 dashboard-header ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200 shadow-lg'} border-b`}>
       <div className={`${isMobile ? "px-3 py-3 w-full" : "max-w-7xl item-center justify-center mx-auto px-4 py-4"}`}>
         <div className="flex items-center justify-between">
           <div className={`flex items-center ${isMobile ? "gap-2" : "gap-3"}`}>

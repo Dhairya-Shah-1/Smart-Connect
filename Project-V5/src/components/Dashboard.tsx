@@ -162,9 +162,9 @@ export function Dashboard({ onLogout, onNavigateHome }: DashboardProps) {
   };
 
   return (
-    <div className={`h-screen flex flex-col ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
+    <div className={`h-screen flex flex-col dashboard-container ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
       {/* Header */}
-      <header className={`shadow-sm border-b relative z-10 ${
+      <header className={`shadow-sm border-b relative z-10 dashboard-header ${
         isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-gray-200'}`}>
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
