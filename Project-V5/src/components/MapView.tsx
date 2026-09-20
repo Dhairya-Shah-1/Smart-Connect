@@ -92,7 +92,7 @@ export function MapView({
   const [filterType, setFilterType] = useState<string>("all");
   const [filterSeverity, setFilterSeverity] =  useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [showFilters, setShowFilters] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [imageZoom, setImageZoom] = useState(1);
   const isMobileTablet = isMobileOrTablet();
@@ -854,21 +854,10 @@ const groupNearbyIssues = (issues: Issue[]) => {
         )}
 
         {/* Filter Toggle */}
-        {!showFilters && urgentCount > 0 && (
+        {!showFilters && (
           <button
             onClick={() => setShowFilters(true)}
-            className={`absolute top-4 left-28 z-10 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 transition-colors 
-            ${isDark ? "bg-slate-800 hover:bg-slate-700 text-gray-200" : "bg-white hover:bg-gray-50 text-gray-700"}
-          `}
-          >
-            <Filter size={18} />
-            <span className="text-sm">Filters</span>
-          </button>
-        )}
-        {!showFilters && urgentCount == 0 && (
-          <button
-            onClick={() => setShowFilters(true)}
-            className={`absolute top-4 left-4 z-10 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 transition-colors 
+            className={`absolute ${isAdmin ? "top-16 left-4" : urgentCount && urgentCount > 0 ? "top-4 left-28" : "top-4 left-4"} z-10 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 transition-colors 
             ${isDark ? "bg-slate-800 hover:bg-slate-700 text-gray-200" : "bg-white hover:bg-gray-50 text-gray-700"}
           `}
           >
