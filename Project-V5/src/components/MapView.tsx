@@ -790,7 +790,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
 
         {/* Admin Filter Buttons - Only show for admins */}
         {isAdmin ? (
-          <div className="absolute top-4 left-4 z-10 flex gap-2">
+          <div className="absolute top-4 left-4 right-4 z-10 flex flex-wrap gap-2 sm:right-auto">
             <button
               onClick={() => setAdminFilter('pending')}
               className={`px-3 py-2 rounded-lg border flex items-center gap-2 ${
@@ -857,7 +857,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
         {!showFilters && (
           <button
             onClick={() => setShowFilters(true)}
-            className={`absolute ${isAdmin ? "top-16 left-4" : urgentCount && urgentCount > 0 ? "top-4 left-28" : "top-4 left-4"} z-10 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 transition-colors 
+            className={`absolute ${isAdmin ? "top-28 sm:top-16 left-4" : urgentCount && urgentCount > 0 ? "top-4 left-28" : "top-4 left-4"} z-10 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 transition-colors 
             ${isDark ? "bg-slate-800 hover:bg-slate-700 text-gray-200" : "bg-white hover:bg-gray-50 text-gray-700"}
           `}
           >
@@ -869,7 +869,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
         {/* Stats - Hide on mobile/tablet when filters panel is open */}
         {!(isMobileTablet && showFilters) && (
           <div
-            className={`absolute top-4 right-4 rounded-lg shadow-lg p-3 z-10 ${
+            className={`absolute ${isAdmin ? "top-28 sm:top-4" : "top-4"} right-4 rounded-lg shadow-lg p-3 z-10 ${
               isDark ? "bg-slate-800" : "bg-white"
             }`}
           >

@@ -566,7 +566,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
               className={`flex items-center ${isMobile ? "gap-1 px-2 py-1.5 whitespace-nowrap text-xs flex-shrink-0 min-w-max" : "gap-2 px-4 py-3 flex-1 justify-center"} rounded-lg font-medium transition-colors ${
                 currentTab === tab.id
                   ? isDark
-                    ? 'bg-purple-600 text-white'
+                    ? 'bg-cyan-600 text-cyan-50 ring-1 ring-cyan-300 shadow-lg shadow-cyan-950/40'
                     : 'bg-purple-600 text-white'
                   : isDark
                   ? 'text-gray-300 hover:bg-slate-700'

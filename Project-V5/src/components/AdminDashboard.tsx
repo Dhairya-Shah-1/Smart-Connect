@@ -82,7 +82,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
           onClick={() => setCurrentView('map')}
           className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all ${
             currentView === 'map'
-              ? isDark ? 'text-indigo-400 bg-indigo-900/30' : 'text-blue-800 bg-blue-50'
+              ? isDark ? 'text-cyan-200 bg-slate-600 border border-cyan-300 shadow-lg shadow-cyan-950/40' : 'text-blue-800 bg-blue-100'
               : isDark ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'
           }`}
         >
@@ -94,7 +94,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
           onClick={() => setCurrentView('check-reports')}
           className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all ${
             currentView === 'check-reports'
-              ? isDark ? 'text-indigo-400 bg-indigo-900/30' : 'text-blue-800 bg-blue-50'
+              ? isDark ? 'text-cyan-200 bg-slate-600 border border-cyan-300 shadow-lg shadow-cyan-950/40' : 'text-blue-800 bg-blue-100'
               : isDark ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'
           }`}
         >
@@ -106,7 +106,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
           onClick={() => setCurrentView('notifications')}
           className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all ${
             currentView === 'notifications'
-              ? isDark ? 'text-indigo-400 bg-indigo-900/30' : 'text-blue-800 bg-blue-50'
+              ? isDark ? 'text-cyan-200 bg-slate-600 border border-cyan-300 shadow-lg shadow-cyan-950/40' : 'text-blue-800 bg-blue-100'
               : isDark ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'
           }`}
         >
@@ -118,7 +118,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
           onClick={() => setCurrentView('profile')}
           className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all ${
             currentView === 'profile'
-              ? isDark ? 'text-indigo-400 bg-indigo-900/30' : 'text-blue-800 bg-blue-50'
+              ? isDark ? 'text-cyan-200 bg-slate-600 border border-cyan-300 shadow-lg shadow-cyan-950/40' : 'text-blue-800 bg-blue-100'
               : isDark ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'
           }`}
         >

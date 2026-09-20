@@ -10,6 +10,7 @@ import VectorSource from "ol/source/Vector";
 import Feature from "ol/Feature";
 import Point from "ol/geom/Point";
 import { Icon, Style } from "ol/style";
+import { defaults as defaultInteractions } from "ol/interaction/defaults";
 
 // Define the shape of an Issue based on your project
 interface Issue {
@@ -56,6 +57,11 @@ export function OpenLayersMap({
       view: new View({
         center: fromLonLat([72.8777, 19.076]), // Default Center (Mumbai)
         zoom: 12,
+      }),
+      interactions: defaultInteractions({
+        doubleClickZoom: false,
+        mouseWheelZoom: false,
+        pinchZoom: false,
       }),
       controls: [], // Hides default controls to keep your UI clean
     });
