@@ -72,12 +72,12 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1 overflow-hidden mobile-bottom-content">
         {renderView()}
       </main>
 
       {/* Bottom Navigation */}
-      <nav className={`flex justify-around items-center border-t ${isDark ? 'border-slate-700 bg-slate-800' : 'border-gray-200 bg-white'} py-3 px-4 shadow-lg`}>
+      <nav className={`mobile-bottom-panel flex justify-around items-center border-t ${isDark ? 'border-slate-700 bg-slate-800' : 'border-gray-200 bg-white'} py-3 px-4 shadow-lg`}>
         <button
           onClick={() => setCurrentView('map')}
           className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all ${

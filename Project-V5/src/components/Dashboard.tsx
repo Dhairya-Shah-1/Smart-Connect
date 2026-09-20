@@ -214,14 +214,14 @@ export function Dashboard({ onLogout, onNavigateHome }: DashboardProps) {
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto relative">
+      <div className="flex-1 overflow-y-auto relative mobile-bottom-content">
         {renderView()}
         
         {/* Floating Action Button - Only on Map and History views */}
         {(currentView === 'map' || currentView === 'history') && canReport && (
           <button
             onClick={() => setCurrentView('report')}
-            className={`fixed bottom-24 right-6 w-16 h-16 sm:w-16 sm:h-16 active:scale-95 rounded-full shadow-2xl transition-all hover:scale-110 flex items-center justify-center z-40 ${
+            className={`fixed mobile-fab-offset right-6 w-16 h-16 sm:w-16 sm:h-16 active:scale-95 rounded-full shadow-2xl transition-all hover:scale-110 flex items-center justify-center z-40 ${
               isDark ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-800 hover:bg-blue-900'
             } text-white`}
             aria-label="Report New Incident"
@@ -232,7 +232,7 @@ export function Dashboard({ onLogout, onNavigateHome }: DashboardProps) {
       </div>
 
       {/* Bottom Navigation */}
-      <nav className={`border-t shadow-lg ${
+      <nav className={`mobile-bottom-panel border-t shadow-lg ${
         isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-gray-200'
       }`}>
         <div className="flex items-center justify-around px-4 py-2.5">

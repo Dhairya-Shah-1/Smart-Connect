@@ -520,7 +520,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
       </div>
     </header>
 
-    <div className={`w-full ${isMobile ? "px-3 py-4" : "max-w-7xl item-center justify-center mx-auto px-4 py-6"}`}>
+    <div className={`w-full ${isMobile ? "px-3 py-4 mobile-bottom-content" : "max-w-7xl item-center justify-center mx-auto px-4 py-6"}`}>
       {/* Super Admin Info Card */}
       <div className={`${isMobile ? "mb-4 p-4" : "mb-6 p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
         <div className={`flex items-center ${isMobile ? "gap-3" : "gap-4"}`}>
@@ -552,7 +552,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
       </div>
 
       {/* Tabs */}
-      <div className={` ${isMobile ? "md\:pl-pr-3 mb-4 p-1.5" : "mb-6 p-2"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+      <div className={` ${isMobile ? "mobile-bottom-panel p-1.5" : "mb-6 p-2"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
         <div className={`flex rounded-xl ${isMobile ? "gap-1 overflow-x-auto items-center justify-between hide-scrollbar pb-1 md\:text-2xl" : "gap-2"}`}>
           {[
             { id: 'overview', label: 'Overview', icon: TrendingUp },

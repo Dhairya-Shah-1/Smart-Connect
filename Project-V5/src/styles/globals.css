@@ -1,3 +1,30 @@
 /*! tailwindcss v4.1.3 | MIT License | https://tailwindcss.com */
 
 @custom-variant dark (&:is(.dark *));
+
+:root {
+  --mobile-bottom-panel-offset: 0px;
+  --mobile-bottom-panel-height: 5rem;
+}
+
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  :root {
+    --mobile-bottom-panel-offset: max(env(safe-area-inset-bottom, 0px), 10mm);
+  }
+}
+
+.mobile-bottom-panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--mobile-bottom-panel-offset);
+  z-index: 45;
+}
+
+.mobile-bottom-content {
+  padding-bottom: calc(var(--mobile-bottom-panel-height) + var(--mobile-bottom-panel-offset));
+}
+
+.mobile-fab-offset {
+  bottom: calc(var(--mobile-bottom-panel-height) + var(--mobile-bottom-panel-offset) + 1rem);
+}

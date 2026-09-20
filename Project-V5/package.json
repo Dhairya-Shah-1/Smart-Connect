@@ -59,7 +59,8 @@
     "vite": "^6.4.2"
   },
   "scripts": {
-    "dev": "vite",
+    
+    "dev": "vite --host --port 3000",
     "build": "vite build",
     "start": "vite preview"
   }
