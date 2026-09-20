@@ -495,7 +495,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
     <div className="h-full flex">
       {/* FILTER PANEL */}
       <div
-        className={`${showFilters ? "w-80" : "w-0"} transition-all duration-300 overflow-hidden flex-shrink-0 border-r ${
+        className={`${showFilters ? "w-64" : "w-0"} transition-all duration-300 overflow-hidden flex-shrink-0 border-r ${
           isDark
             ? "bg-slate-800 border-slate-700"
             : "bg-slate-50 border-gray-200"
