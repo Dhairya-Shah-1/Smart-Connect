@@ -553,7 +553,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
 
       {/* Tabs */}
       <div className={` ${isMobile ? "mb-4 p-1.5" : "mb-6 p-2"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-        <div className={`flex rounded-xl ${isMobile ? "gap-1 overflow-x-auto items-center justify-between hide-scrollbar pb-1 md\:text-2xl" : "gap-2"}`}>
+        <div className={`flex rounded-xl hide-scrollbar ${isMobile ? "gap-1 overflow-x-auto items-center justify-between md\:text-2xl" : "gap-2"}`}>
           {[
             { id: 'overview', label: 'Overview', icon: TrendingUp },
             { id: 'incidents', label: 'All Incidents', icon: AlertTriangle },
