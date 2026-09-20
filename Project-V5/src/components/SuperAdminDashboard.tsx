@@ -520,31 +520,31 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
       </div>
     </header>
 
-    <div className={`w-full ${isMobile ? "px-3 py-4 mobile-bottom-content" : "max-w-7xl item-center justify-center mx-auto px-4 py-6"}`}>
+    <div className={`w-full ${isMobile ? "px-3 py-4 overflow-x-hidden" : "max-w-7xl item-center justify-center mx-auto px-4 py-6"}`}>
       {/* Super Admin Info Card */}
       <div className={`${isMobile ? "mb-4 p-4" : "mb-6 p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
-        <div className={`flex items-center ${isMobile ? "gap-3" : "gap-4"}`}>
-          <div className={`${isMobile ? "w-12 h-12 text-xl" : "w-16 h-16 text-2xl"} rounded-full flex items-center justify-center font-bold ${
+        <div className={`flex items-start ${isMobile ? "gap-3" : "gap-4"}`}>
+          <div className={`${isMobile ? "w-12 h-12 text-xl" : "w-16 h-16 text-2xl"} shrink-0 rounded-full flex items-center justify-center font-bold ${
             isDark ? 'bg-purple-900 text-purple-200' : 'bg-purple-100 text-purple-700'
           }`}>
             {superAdminData?.sa_name?.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className={`${isMobile ? "text-lg" : "text-xl"} font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            <h2 className={`${isMobile ? "text-lg truncate" : "text-xl"} font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
               {superAdminData?.sa_name}
             </h2>
-            <div className={`flex flex-row ${isMobile ? "gap-3 mt-1 text-xs" : "items-center gap-4 mt-2 text-sm"} ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              <span className="flex items-center gap-1 sm:truncate">
-                <Mail size={14} />
-                {superAdminData?.sa_email}
+            <div className={`flex min-w-0 ${isMobile ? "flex-col gap-1.5 mt-2 text-xs" : "flex-row items-center gap-4 mt-2 text-sm"} ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              <span className="flex min-w-0 items-center gap-1">
+                <Mail size={14} className="shrink-0" />
+                <span className="min-w-0 truncate">{superAdminData?.sa_email}</span>
               </span>
-              <span className="flex items-center gap-1">
-                <Building2 size={14} />
-                {superAdminData?.station}
+              <span className="flex min-w-0 items-center gap-1">
+                <Building2 size={14} className="shrink-0" />
+                <span className="min-w-0 truncate">{superAdminData?.station}</span>
               </span>
-              <span className="flex items-center gap-1">
-                <MapPin size={14} />
-                {superAdminData?.district}
+              <span className="flex min-w-0 items-center gap-1">
+                <MapPin size={14} className="shrink-0" />
+                <span className="min-w-0 truncate">{superAdminData?.district}</span>
               </span>
             </div>
           </div>
@@ -552,7 +552,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
       </div>
 
       {/* Tabs */}
-      <div className={` ${isMobile ? "mobile-bottom-panel p-1.5" : "mb-6 p-2"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+      <div className={` ${isMobile ? "mb-4 p-1.5" : "mb-6 p-2"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
         <div className={`flex rounded-xl ${isMobile ? "gap-1 overflow-x-auto items-center justify-between hide-scrollbar pb-1 md\:text-2xl" : "gap-2"}`}>
           {[
             { id: 'overview', label: 'Overview', icon: TrendingUp },
