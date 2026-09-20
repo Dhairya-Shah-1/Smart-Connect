@@ -9,7 +9,15 @@
 
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
   :root {
-    --mobile-bottom-panel-offset: max(env(safe-area-inset-bottom, 0px), 10mm);
+    --mobile-bottom-panel-offset: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 768px), (hover: none) and (pointer: coarse) {
+    :root {
+      --mobile-bottom-panel-offset: max(env(safe-area-inset-bottom, 0px), 10mm);
+    }
   }
 }
 
