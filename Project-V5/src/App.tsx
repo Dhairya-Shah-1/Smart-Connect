@@ -111,9 +111,9 @@ function AppContent() {
 
   useEffect(() => {
     const redirectPath = getRedirectPath(localStorage.getItem('currentUser'));
-    const isPublicRoute = location.pathname === '/' || location.pathname === '/login' || location.pathname === '/signup';
+    const isAuthRoute = location.pathname === '/login' || location.pathname === '/signup';
 
-    if (redirectPath && isPublicRoute) {
+    if (redirectPath && isAuthRoute) {
       navigate(redirectPath, { replace: true });
     }
   }, [authRefreshKey, location.pathname, navigate]);
