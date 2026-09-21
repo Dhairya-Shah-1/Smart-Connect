@@ -19,11 +19,11 @@ interface SuperAdminDashboardProps {
 type TabView = 'overview' | 'incidents' | 'admins' | 'analytics';
 
 const SUPER_ADMIN_CACHE_PREFIX = 'smart_connect_super_admin';
+const INCIDENT_PAGE_SIZE = 3;
+const INCIDENT_CACHE_PREFIX = 'smart_connect_incident_reports';
 
 interface SuperAdminCacheData {
   superAdminProfile: any | null;
-  incidents: IncidentReport[];
-  departments: string[];
   stats: {
     totalIncidents: number;
     pendingIncidents: number;
@@ -32,7 +32,6 @@ interface SuperAdminCacheData {
     totalAdmins: number;
     totalUsers: number;
   };
-  incidentDataNotice: string | null;
 }
 
 interface IncidentReport {
@@ -86,6 +85,10 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
   const [filteredIncidents, setFilteredIncidents] = useState<IncidentReport[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterDepartment, setFilterDepartment] = useState<string>('all');
+  const [incidentSortOrder, setIncidentSortOrder] = useState<'oldest' | 'newest'>('oldest');
+  const [incidentDataLoaded, setIncidentDataLoaded] = useState(false);
+  const [incidentLoading, setIncidentLoading] = useState(false);
+  const [hasMoreIncidents, setHasMoreIncidents] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tabLoading, setTabLoading] = useState(false);
   const [stats, setStats] = useState({
@@ -116,6 +119,16 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
   useEffect(() => {
     filterIncidents();
   }, [filterStatus, filterDepartment, incidents]);
+
+  // Only load incidents when the user explicitly clicks the "All Incidents" tab.
+  // On initial mount we show the Overview tab, so incidents must NOT be fetched here.
+  useEffect(() => {
+    if (currentTab === 'incidents') {
+      if (!incidentDataLoaded && !incidentLoading) {
+        loadIncidentReports({ reset: true });
+      }
+    }
+  }, [currentTab]);
 
   useEffect(() => {
     if (loading) return;
@@ -155,32 +168,64 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
 
   const applySuperAdminSnapshot = (snapshot: SuperAdminCacheData) => {
     setSuperAdminData(snapshot.superAdminProfile);
-    setIncidents(snapshot.incidents);
-    setFilteredIncidents(snapshot.incidents);
-    setDepartments(snapshot.departments);
     setStats(snapshot.stats);
-    setIncidentDataNotice(snapshot.incidentDataNotice);
   };
 
   // Deterministic signature of the whole super-admin dataset so the cheap
   // "did anything change?" check matches what was actually shown/cached.
-  const buildSuperAdminSignature = (rows: any[], totalAdmins: number, totalUsers: number) =>
+  const buildSuperAdminSignature = (overviewStats: SuperAdminCacheData['stats']) =>
     [
-      `admins:${totalAdmins}`,
-      `users:${totalUsers}`,
-      ...rows.map((report: any) =>
-        [
-          report.report_id,
-          report.status,
-          report.severity,
-          report.timestamp,
-          report.ai_interpretation || '',
-        ].join(':')
-      ),
+      `admins:${overviewStats.totalAdmins}`,
+      `users:${overviewStats.totalUsers}`,
+      `incidents:${overviewStats.totalIncidents}`,
+      `pending:${overviewStats.pendingIncidents}`,
+      `in-progress:${overviewStats.inProgressIncidents}`,
+      `resolved:${overviewStats.resolvedIncidents}`,
     ].join('|');
+
+
+  // Builds a deterministic signature of the current incident query parameters
+  // so we can detect whether the data has changed in the database.
+  const buildIncidentSignature = (sortOrder: 'oldest' | 'newest', status: string, department: string) =>
+    [sortOrder, status, department].join('|');
+
+  const fetchOverviewStats = async () => {
+    const { count: adminCount, error: adminError } = await supabase
+      .from('admins')
+      .select('a_id', { count: 'exact', head: true });
+    if (adminError) throw adminError;
+
+    const { count: userCount, error: userError } = await supabase
+      .from('users')
+      .select('u_id', { count: 'exact', head: true });
+    if (userError) throw userError;
+
+    const [totalResult, pendingResult, inProgressResult, resolvedResult] = await Promise.all([
+      supabase.from('incident_reports').select('report_id', { count: 'exact', head: true }),
+      supabase.from('incident_reports').select('report_id', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase.from('incident_reports').select('report_id', { count: 'exact', head: true }).eq('status', 'in-progress'),
+      supabase.from('incident_reports').select('report_id', { count: 'exact', head: true }).eq('status', 'resolved'),
+    ]);
+
+    if (totalResult.error) throw totalResult.error;
+    if (pendingResult.error) throw pendingResult.error;
+    if (inProgressResult.error) throw inProgressResult.error;
+    if (resolvedResult.error) throw resolvedResult.error;
+
+    return {
+      totalIncidents: totalResult.count || 0,
+      pendingIncidents: pendingResult.count || 0,
+      inProgressIncidents: inProgressResult.count || 0,
+      resolvedIncidents: resolvedResult.count || 0,
+      totalAdmins: adminCount || 0,
+      totalUsers: userCount || 0,
+    };
+  };
 
   // Cheap database call: only asks whether anything changed.
   const getSuperAdminSignature = async () => {
+    return buildSuperAdminSignature(await fetchOverviewStats());
+
     const { data: viewRows, error: viewError } = await supabase
       .from('incident_reports_view')
       .select('report_id,status,severity,timestamp,ai_interpretation')
@@ -213,39 +258,64 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
       .select('u_id', { count: 'exact', head: true });
     if (userError) throw userError;
 
-    return buildSuperAdminSignature(rows, adminCount || 0, userCount || 0);
+    return buildSuperAdminSignature({
+      totalIncidents: rows.length,
+      pendingIncidents: rows.filter((row: any) => normalizeStatus(row.status) === 'pending').length,
+      inProgressIncidents: rows.filter((row: any) => normalizeStatus(row.status) === 'in-progress').length,
+      resolvedIncidents: rows.filter((row: any) => normalizeStatus(row.status) === 'resolved').length,
+      totalAdmins: adminCount || 0,
+      totalUsers: userCount || 0,
+    });
   };
 
-  // Full database call: loads everything, applies it to the component and
-  // returns the snapshot + signature so the caller can store it.
+  // Full database call: loads super admin profile and overview stats only.
+  // Incidents are NOT loaded here - they are loaded on demand when the user
+  // clicks the "All Incidents" tab via loadIncidentReports().
   const fetchSuperAdminSnapshot = async (user: any) => {
-      // Fetch actual super admin data from the database
-      const { data: superAdminData, error: superAdminError } = await supabase
-        .from('super_admins')
-        .select('*')
-        .eq('sa_id', user.id)
-        .single();
+    // Fetch actual super admin data from the database
+    const { data: superAdminData, error: superAdminError } = await supabase
+      .from('super_admins')
+      .select('*')
+      .eq('sa_id', user.id)
+      .single();
 
-      if (superAdminError) {
-        console.error('Error fetching super admin data:', superAdminError);
-        toast.error('Failed to load super admin profile');
-        return null;
-      }
+    if (superAdminError) {
+      console.error('Error fetching super admin data:', superAdminError);
+      toast.error('Failed to load super admin profile');
+      return null;
+    }
 
-      if (!superAdminData) {
-        toast.error('Super admin profile not found');
-        return null;
-      }
+    if (!superAdminData) {
+      toast.error('Super admin profile not found');
+      return null;
+    }
 
-      setSuperAdminData(superAdminData);
+    setSuperAdminData(superAdminData);
 
+    const overviewStats = await fetchOverviewStats();
+    setStats(overviewStats);
+
+    return {
+      data: {
+        superAdminProfile: superAdminData,
+        stats: overviewStats,
+      } as SuperAdminCacheData,
+      signature: buildSuperAdminSignature(overviewStats),
+    };
+  };
+
+  const mapIncidentRows = async (rows: any[] | null | undefined, source: 'view' | 'table') => {
+    const adminIds = [...new Set((rows || []).map((inc: any) => inc.a_id).filter(Boolean))];
+    let adminDepartmentMap = new Map();
+
+    if (adminIds.length > 0) {
       const { data: adminData, error: adminError } = await supabase
         .from('admins')
-        .select('a_id, station, department_name');
+        .select('a_id, station, department_name')
+        .in('a_id', adminIds);
 
       if (adminError) throw adminError;
-
-      const adminDepartmentMap = new Map(
+      adminDepartmentMap = new Map(
         (adminData || []).map((admin: any) => [
           admin.a_id,
           {
@@ -254,146 +324,257 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
           },
         ])
       );
+    }
 
-      const mapIncidents = (rows: any[] | null | undefined, source: 'view' | 'table') =>
-        (rows || []).map((inc: any) => {
-          const adminInfo = adminDepartmentMap.get(inc.a_id);
-          const department = normalizeDepartment(
-            inc.department_name ??
-            adminInfo?.departmentName ??
-            inc.department ??
-            inferDepartmentFromIncidentType(inc.incident_type)
-          );
+    let mappedIncidents = (rows || []).map((inc: any) => {
+      const adminInfo = adminDepartmentMap.get(inc.a_id);
+      const department = normalizeDepartment(
+        inc.department_name ??
+        adminInfo?.departmentName ??
+        inc.department ??
+        inferDepartmentFromIncidentType(inc.incident_type)
+      );
 
-          return {
-            id: inc.report_id,
-            title: inc.incident_type || 'Unknown Incident',
-            description: inc.incident_description || 'No description provided.',
-            severity: inc.severity || 'low',
-            status: normalizeStatus(inc.status),
-            location:
-              source === 'view'
-                ? inc.location || 'Unknown Location'
-                : adminInfo?.station || 'Location available in admin view only',
-            department,
-            created_at: inc.timestamp || new Date().toISOString(),
-            user_id: inc.user_id,
-            user_name: inc.user_name || 'Anonymous',
-            photo_url: inc.photo_url || null,
-            lat: source === 'view' && typeof inc.lat === 'number' ? inc.lat : null,
-            lng: source === 'view' && typeof inc.lng === 'number' ? inc.lng : null,
-            ai_interpretation: inc.ai_interpretation || null,
-          };
-        });
+      return {
+        id: inc.report_id,
+        title: inc.incident_type || 'Unknown Incident',
+        description: inc.incident_description || 'No description provided.',
+        severity: inc.severity || 'low',
+        status: normalizeStatus(inc.status),
+        location:
+          source === 'view'
+            ? inc.location || 'Unknown Location'
+            : adminInfo?.station || 'Location available in admin view only',
+        department,
+        created_at: inc.timestamp || new Date().toISOString(),
+        user_id: inc.user_id,
+        user_name: inc.user_name || 'Anonymous',
+        photo_url: inc.photo_url || null,
+        lat: source === 'view' && typeof inc.lat === 'number' ? inc.lat : null,
+        lng: source === 'view' && typeof inc.lng === 'number' ? inc.lng : null,
+        ai_interpretation: inc.ai_interpretation || null,
+      };
+    });
 
-      // Fetch enriched incident rows so we can show routed department, image, and coordinates.
-      const { data: incidentViewData, error: incidentError } = await supabase
+    const userIds = [...new Set(mappedIncidents.map((incident) => incident.user_id).filter(Boolean))];
+    if (userIds.length > 0) {
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('u_id, u_name')
+        .in('u_id', userIds);
+
+      if (usersError) {
+        console.error('Error fetching user names for super admin incidents:', usersError);
+      } else {
+        const userMap = new Map((usersData || []).map((user: any) => [user.u_id, user.u_name]));
+        mappedIncidents = mappedIncidents.map((incident) => ({
+          ...incident,
+          user_name: userMap.get(incident.user_id) || incident.user_name,
+        }));
+      }
+    }
+
+    return mappedIncidents;
+  };
+
+  const loadIncidentReports = async ({ reset = false, sortOrder = incidentSortOrder } = {}) => {
+    // If resetting, clear the cache and load fresh data
+    if (reset) {
+      const cookieKey = `${INCIDENT_CACHE_PREFIX}_${sanitizeCacheKeyPart(user?.id || 'unknown')}`;
+      const storageKey = `${cookieKey}_${sortOrder}_${filterStatus}_${filterDepartment}`;
+      
+      // Clear existing cache for this query combination
+      try {
+        const { clearBrowserCache } = await import('../utils/browserCache');
+        clearBrowserCache([cookieKey]);
+      } catch (clearError) {
+        console.warn('Failed to clear incident cache:', clearError);
+      }
+      
+      // Load fresh data from database
+      await loadIncidentReportsFromDb({ sortOrder, storageKey, cookieKey });
+      return;
+    }
+    
+    // Try to load from cache first
+    const cookieKey = `${INCIDENT_CACHE_PREFIX}_${sanitizeCacheKeyPart(user?.id || 'unknown')}`;
+    const storageKey = `${cookieKey}_${sortOrder}_${filterStatus}_${filterDepartment}`;
+    
+    await loadIncidentReportsFromDb({ sortOrder, storageKey, cookieKey });
+    try {
+      setIncidentLoading(true);
+      setIncidentDataNotice(null);
+
+      const from = reset ? 0 : incidents.length;
+      const to = from + INCIDENT_PAGE_SIZE - 1;
+      const ascending = sortOrder === 'oldest';
+
+      const { data: viewData, error: viewError, count: viewCount } = await supabase
         .from('incident_reports_view')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .order('report_id', { ascending: false });
+        .select('*', { count: 'exact' })
+        .order('timestamp', { ascending })
+        .order('report_id', { ascending })
+        .range(from, to);
 
-      if (incidentError) throw incidentError;
+      if (viewError) throw viewError;
 
       let dataSource: 'view' | 'table' = 'view';
-      let rawIncidentRows = incidentViewData || [];
-      let mappedIncidents = mapIncidents(rawIncidentRows, 'view');
+      let rawRows = viewData || [];
+      let totalRows = viewCount || 0;
 
-      if (mappedIncidents.length === 0) {
+      if (totalRows === 0) {
         console.warn('incident_reports_view returned no rows for super admin, trying base incident_reports fallback.');
-
-        const { data: incidentTableData, error: incidentTableError } = await supabase
+        const { data: tableData, error: tableError, count: tableCount } = await supabase
           .from('incident_reports')
-          .select('report_id, incident_type, incident_description, severity, status, timestamp, user_id, photo_url, a_id, ai_interpretation')
-          .order('timestamp', { ascending: false })
-          .order('report_id', { ascending: false });
+          .select('report_id, incident_type, incident_description, severity, status, timestamp, user_id, photo_url, a_id, ai_interpretation', { count: 'exact' })
+          .order('timestamp', { ascending })
+          .order('report_id', { ascending })
+          .range(from, to);
 
-        if (incidentTableError) {
-          console.error('Fallback incident_reports query failed:', incidentTableError);
-        } else {
-          dataSource = 'table';
-          rawIncidentRows = incidentTableData || [];
-          mappedIncidents = mapIncidents(rawIncidentRows, 'table');
-        }
+        if (tableError) throw tableError;
+        dataSource = 'table';
+        rawRows = tableData || [];
+        totalRows = tableCount || 0;
       }
 
-      const userIds = [...new Set(mappedIncidents.map((incident) => incident.user_id).filter(Boolean))];
-      if (userIds.length > 0) {
-        const { data: usersData, error: usersError } = await supabase
-          .from('users')
-          .select('u_id, u_name')
-          .in('u_id', userIds);
+      const mappedIncidents = await mapIncidentRows(rawRows, dataSource);
+      const nextIncidents = reset ? mappedIncidents : [...incidents, ...mappedIncidents];
 
-        if (usersError) {
-          console.error('Error fetching user names for super admin incidents:', usersError);
-        } else {
-          const userMap = new Map((usersData || []).map((user: any) => [user.u_id, user.u_name]));
-          mappedIncidents = mappedIncidents.map((incident) => ({
-            ...incident,
-            user_name: userMap.get(incident.user_id) || incident.user_name,
-          }));
-        }
-      }
+      setIncidents(nextIncidents);
+      setFilteredIncidents(nextIncidents);
+      setDepartments([...new Set(nextIncidents.map((incident) => normalizeDepartment(incident.department)))]);
+      setHasMoreIncidents(nextIncidents.length < totalRows);
+      setIncidentDataLoaded(true);
 
-      setIncidents(mappedIncidents);
-      setFilteredIncidents(mappedIncidents);
-
-      const incidentDepartments = mappedIncidents.map((i: any) => normalizeDepartment(i.department));
-      const adminStations = (adminData || [])
-        .map((admin: any) => normalizeDepartment(admin.department_name))
-        .filter(Boolean);
-
-      const uniqueDepts = [...new Set([...incidentDepartments, ...adminStations])];
-      setDepartments(uniqueDepts as string[]);
-
-      // Fetch user count from users table
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('u_id');
-
-      if (userError) throw userError;
-
-      // Calculate stats from incident_reports table
-      const totalIncidents = mappedIncidents.length;
-      const pendingIncidents = mappedIncidents.filter((i: any) => normalizeStatus(i.status) === 'pending').length;
-      const inProgressIncidents = mappedIncidents.filter((i: any) => normalizeStatus(i.status) === 'in-progress').length;
-      const resolvedIncidents = mappedIncidents.filter((i: any) => normalizeStatus(i.status) === 'resolved').length;
-      const totalAdmins = adminData?.length || 0;
-      const totalUsers = userData?.length || 0;
-
-      let incidentDataNotice: string | null = null;
-      if (mappedIncidents.length === 0) {
-        incidentDataNotice = 'No incidents were returned for the super admin view or the fallback table query. This usually means row-level security is blocking the super admin account, or there are genuinely no reports yet.';
-        console.warn('Super admin incidents query returned no rows.', {
-          superAdminId: user.id,
-          dataSourceTried: dataSource,
-          departmentsAvailable: uniqueDepts,
-        });
+      if (totalRows === 0) {
+        setIncidentDataNotice('No incidents were returned for the super admin view or the fallback table query. This usually means row-level security is blocking the super admin account, or there are genuinely no reports yet.');
       } else if (dataSource === 'table') {
         console.warn('Super admin incidents are being shown from fallback incident_reports data because incident_reports_view returned no rows.');
       }
-      setIncidentDataNotice(incidentDataNotice);
+    } catch (error: any) {
+      console.error('Error loading incident reports:', error);
+      toast.error('Failed to load incident reports');
+    } finally {
+      setIncidentLoading(false);
+    }
+  };
 
-      const stats = {
-        totalIncidents,
-        pendingIncidents,
-        inProgressIncidents,
-        resolvedIncidents,
-        totalAdmins,
-        totalUsers,
-      };
-      setStats(stats);
+  // Loads incident reports from the database with caching support
+  const loadIncidentReportsFromDb = async ({ sortOrder, storageKey, cookieKey }: { sortOrder: 'oldest' | 'newest', storageKey: string, cookieKey: string }) => {
+    try {
+      setIncidentLoading(true);
 
-      return {
-        data: {
-          superAdminProfile: superAdminData,
-          incidents: mappedIncidents,
-          departments: uniqueDepts as string[],
-          stats,
-          incidentDataNotice,
-        } as SuperAdminCacheData,
-        signature: buildSuperAdminSignature(rawIncidentRows, totalAdmins, totalUsers),
-      };
+      // Use loadCachedOrFresh to handle caching
+      await loadCachedOrFresh({
+        cookieKey,
+        storageKey,
+        fetchSignature: async () => {
+          // Build signature based on current filters and sort order
+          const sig = buildIncidentSignature(sortOrder, filterStatus, filterDepartment);
+          
+          // Count total incidents to include in signature
+          const { count, error: countError } = await supabase
+            .from('incident_reports_view')
+            .select('*', { count: 'exact', head: true })
+            .eq('a_id', user?.id)
+            .eq('status', filterStatus === 'all' ? null : filterStatus)
+            .eq('department', filterDepartment === 'all' ? null : filterDepartment);
+          
+          if (countError) {
+            console.error('Error counting incidents:', countError);
+            return sig;
+          }
+          
+          return `${sig}_total:${count || 0}`;
+        },
+        fetchFull: async () => {
+          // Calculate pagination range
+          const from = 0;
+          const to = from + INCIDENT_PAGE_SIZE - 1;
+          const ascending = sortOrder === 'oldest';
+
+          const { data: viewData, error: viewError, count: viewCount } = await supabase
+            .from('incident_reports_view')
+            .select('*', { count: 'exact' })
+            .eq('a_id', user?.id)
+            .order('timestamp', { ascending })
+            .order('report_id', { ascending })
+            .range(from, to);
+
+          if (viewError) throw viewError;
+
+          let dataSource: 'view' | 'table' = 'view';
+          let rawRows = viewData || [];
+          let totalRows = viewCount || 0;
+
+          if (totalRows === 0) {
+            console.warn('incident_reports_view returned no rows for super admin, trying base incident_reports fallback.');
+            const { data: tableData, error: tableError, count: tableCount } = await supabase
+              .from('incident_reports')
+              .select('report_id, incident_type, incident_description, severity, status, timestamp, user_id, photo_url, a_id, ai_interpretation', { count: 'exact' })
+              .order('timestamp', { ascending })
+              .order('report_id', { ascending })
+              .range(from, to);
+
+            if (tableError) throw tableError;
+            dataSource = 'table';
+            rawRows = tableData || [];
+            totalRows = tableCount || 0;
+          }
+
+          const mappedIncidents = await mapIncidentRows(rawRows, dataSource);
+          const departments = [...new Set(mappedIncidents.map((incident) => normalizeDepartment(incident.department)))];
+          
+          // Check if there are more incidents to load
+          const hasMore = mappedIncidents.length >= INCIDENT_PAGE_SIZE && (!totalRows || totalRows > INCIDENT_PAGE_SIZE);
+
+          return {
+            data: {
+              incidents: mappedIncidents,
+              departments,
+              hasMoreIncidents: hasMore,
+              filterStatus,
+              filterDepartment,
+              sortOrder,
+            },
+            signature: buildIncidentSignature(sortOrder, filterStatus, filterDepartment),
+          };
+        },
+        applyData: (data) => {
+          const { incidents, departments, hasMoreIncidents } = data;
+          
+          // For initial load (reset), just set the incidents directly
+          // For subsequent loads, append to existing incidents
+          const newIncidents = reset ? incidents : [...incidents, ...incidents];
+          
+          setIncidents(newIncidents);
+          setFilteredIncidents(newIncidents);
+          setDepartments(departments);
+          setHasMoreIncidents(hasMoreIncidents);
+          setIncidentDataLoaded(true);
+        },
+        onFinishedLoading: () => {
+          setIncidentLoading(false);
+        },
+        logLabel: 'SuperAdminIncidents',
+      });
+    } catch (error: any) {
+      console.error('Error loading incident reports:', error);
+      toast.error('Failed to load incident reports');
+    } finally {
+      setIncidentLoading(false);
+    }
+  };
+
+  const toggleIncidentSortOrder = () => {
+    const nextSortOrder = incidentSortOrder === 'oldest' ? 'newest' : 'oldest';
+    setIncidentSortOrder(nextSortOrder);
+    setIncidents([]);
+    setFilteredIncidents([]);
+    setDepartments([]);
+    setHasMoreIncidents(false);
+    setIncidentDataLoaded(false);
+    loadIncidentReports({ reset: true, sortOrder: nextSortOrder });
   };
 
   const loadSuperAdminData = async () => {
@@ -524,9 +705,9 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
       {/* Super Admin Info Card */}
       <div className={`${isMobile ? "mb-4 p-4" : "mb-6 p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
         <div className={`flex items-start ${isMobile ? "gap-3" : "gap-4"}`}>
-          <div className={`${isMobile ? "w-12 h-12 text-xl" : "w-16 h-16 text-2xl"} shrink-0 rounded-full flex items-center justify-center font-bold ${
-            isDark ? 'bg-purple-900 text-purple-200' : 'bg-purple-100 text-purple-700'
-          }`}>
+          <div className={`${isMobile ? "w-12 h-12 text-xl" : "w-16 h-16 text-3xl"} shrink-0 rounded-full flex items-center justify-center font-bold font-["Mileast"] ${
+            isDark ? 'bg-purple-600 text-purple-200' : 'bg-purple-200 text-purple-700'
+          }`} style={{ fontFamily: '"Mileast", sans-serif' }}>
             {superAdminData?.sa_name?.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
@@ -761,16 +942,41 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
           <div className={`h-full flex flex-col ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
             <div className="max-w-7xl mx-auto w-full h-full flex flex-col">
               <div className="mb-4 md:mb-6">
-                <h2 className={`text-xl md:text-2xl font-bold ${isDark ? 'text-indigo-300' : 'text-indigo-900'}`}>
-                  All System Incidents
-                </h2>
-                <p className={`text-xs md:text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                  {filteredIncidents.length} reports matching the selected filters
-                </p>
+                <div className={`flex ${isMobile ? "flex-col gap-3" : "items-start justify-between gap-4"}`}>
+                  <div>
+                    <h2 className={`text-xl md:text-2xl font-bold ${isDark ? 'text-indigo-300' : 'text-indigo-900'}`}>
+                      All System Incidents
+                    </h2>
+                    <p className={`text-xs md:text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                      {filteredIncidents.length} loaded reports matching the selected filters
+                    </p>
+                  </div>
+                  <button
+                    onClick={toggleIncidentSortOrder}
+                    disabled={incidentLoading}
+                    className={`${isMobile ? "w-full justify-center px-3 py-2 text-xs" : "px-4 py-2 text-sm"} flex items-center gap-2 rounded-lg font-semibold transition-colors disabled:opacity-60 ${
+                      isDark
+                        ? 'bg-slate-700 text-gray-100 hover:bg-slate-600'
+                        : 'bg-white text-indigo-900 border border-indigo-200 hover:bg-indigo-50'
+                    }`}
+                  >
+                    <Clock size={16} />
+                    Sorted as: {incidentSortOrder === 'oldest' ? 'Oldest first' : 'Newest first'}
+                  </button>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto pb-20 md:pb-6 hide-scrollbar">
-                {filteredIncidents.length === 0 ? (
+                {incidentLoading && incidents.length === 0 ? (
+                  <div className={`rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
+                    <BlurredVideoLoader
+                      label="Loading incident reports..."
+                      containerClassName="flex min-h-[260px] items-center justify-center rounded-xl p-8"
+                      cardClassName="flex flex-col items-center gap-3"
+                      textClassName={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}
+                    />
+                  </div>
+                ) : filteredIncidents.length === 0 ? (
                   <div className={`text-center py-20 md:py-32 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                     <CheckCircle className={`mx-auto mb-3 w-12 h-12 md:w-16 md:h-16 ${isDark ? 'text-green-400 opacity-50' : 'text-green-800'}`} />
                     <p className="text-base md:text-lg font-medium">
@@ -783,8 +989,9 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
-                    {filteredIncidents.map((incident) => (
+                  <>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
+                      {filteredIncidents.map((incident) => (
                       <div
                         key={incident.id}
                         className={`p-4 md:p-5 rounded-xl border transition-all hover:shadow-xl ${
@@ -884,8 +1091,24 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                    {hasMoreIncidents && (
+                      <div className="mt-6 flex justify-center">
+                        <button
+                          onClick={() => loadIncidentReports()}
+                          disabled={incidentLoading}
+                          className={`${isMobile ? "w-full px-4 py-3" : "px-6 py-3"} rounded-lg font-semibold transition-colors disabled:opacity-60 ${
+                            isDark
+                              ? 'bg-purple-700 text-white hover:bg-purple-600'
+                              : 'bg-purple-700 text-white hover:bg-purple-800'
+                          }`}
+                        >
+                          {incidentLoading ? 'Loading...' : 'Click to Load More..'}
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
