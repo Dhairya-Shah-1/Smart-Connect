@@ -566,11 +566,11 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
               className={`flex items-center ${isMobile ? "gap-1 px-2 py-1.5 whitespace-nowrap text-xs flex-shrink-0 min-w-max" : "gap-2 px-4 py-3 flex-1 justify-center"} rounded-lg font-medium transition-colors ${
                 currentTab === tab.id
                   ? isDark
-                    ? 'bg-cyan-600 text-cyan-50 ring-1 ring-cyan-300 shadow-lg shadow-cyan-950/40'
-                    : 'bg-purple-600 text-white'
+                    ? 'bg-purple-700 text-white shadow-lg shadow-purple-950/40'
+                    : 'bg-purple-700 text-white shadow-md'
                   : isDark
-                  ? 'text-gray-300 hover:bg-slate-700'
-                  : 'text-gray-700 hover:bg-gray-100'
+                  ? 'bg-slate-700 text-gray-300 hover:bg-slate-600'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
               <tab.icon size={16} />

@@ -41,7 +41,7 @@ export function getDeviceType(): DeviceType {
     return 'tablet';
   }
   
-  return 'mobile';// return 'desktop';
+  return 'desktop';
 }
 
 /**
