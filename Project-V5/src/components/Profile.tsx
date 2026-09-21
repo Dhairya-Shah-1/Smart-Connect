@@ -222,7 +222,7 @@ export function Profile({ onLogout }: ProfileProps) {
             {/* MOBILE */}
             <div className="md:hidden">
               <div className="flex flex-col items-center -mt-12">
-                <div className={`w-24 h-24 rounded-full border-4 flex items-center justify-center shadow-xl ${
+                <div className={`First_Chars w-24 h-24 rounded-full border-4 flex items-center justify-center shadow-xl ${
                   isDark
                     ? 'bg-blue-600 border-slate-800 text-white'
                     : 'bg-blue-600 border-white text-white'

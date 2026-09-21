@@ -705,9 +705,9 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
       {/* Super Admin Info Card */}
       <div className={`${isMobile ? "mb-4 p-4" : "mb-6 p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
         <div className={`flex items-start ${isMobile ? "gap-3" : "gap-4"}`}>
-          <div className={`${isMobile ? "w-12 h-12 text-xl" : "w-16 h-16 text-3xl"} shrink-0 rounded-full flex items-center justify-center font-bold font-["Mileast"] ${
+          <div className={`${isMobile ? "w-12 h-12 text-xl" : "w-16 h-16 text-3xl"} shrink-0 rounded-full flex items-center justify-center font-bold ${
             isDark ? 'bg-purple-600 text-purple-200' : 'bg-purple-200 text-purple-700'
-          }`} style={{ fontFamily: '"Mileast", sans-serif' }}>
+          }`} style={{ fontFamily: 'Mileast, Arial, Helvetica, sans-serif' }}>
             {superAdminData?.sa_name?.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">

@@ -85,23 +85,6 @@ button, a, input, select, textarea {
   }
 }
 
-/* Mileast Font */
-@font-face {
-  font-family: 'Mileast';
-  font-style: normal;
-  font-weight: normal;
-  font-display: swap;
-  /* Update the src URLs to point to your actual font files */
-  src: url('/fonts/Mileast-Regular.woff2') format('woff2'),
-       url('/fonts/Mileast-Regular.woff') format('woff');
+.First_Chars{
+  font-family: 'Mileast', sans-serif;                                                
 }
-
-/* Alternative: If using local system font */
-/*
-@font-face {
-  font-family: 'Mileast';
-  font-style: normal;
-  font-weight: normal;
-  src: local('Mileast'), local('Mileast-Regular');
-}
-*/
