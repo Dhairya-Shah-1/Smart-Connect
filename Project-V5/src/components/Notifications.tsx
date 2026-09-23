@@ -249,26 +249,34 @@ export function Notifications() {
   const getIconColor = (type: string) => {
     switch (type) {
       case 'success':
-        return 'text-green-600';
+        return isDark ? 'text-green-400' : 'text-green-600';
       case 'warning':
-        return 'text-yellow-600';
+        return isDark ? 'text-yellow-400' : 'text-yellow-600';
       case 'urgent':
-        return 'text-red-600';
+        return isDark ? 'text-red-400' : 'text-red-600';
       default:
-        return 'text-blue-600';
+        return isDark ? 'text-blue-400' : 'text-blue-600';
     }
   };
 
   const getBgColor = (type: string) => {
     switch (type) {
       case 'success':
-        return 'bg-green-50 border-green-200';
+        return isDark
+          ? 'bg-green-900/30 border-green-700'
+          : 'bg-green-50 border-green-200';
       case 'warning':
-        return 'bg-yellow-50 border-yellow-200';
+        return isDark
+          ? 'bg-yellow-900/30 border-yellow-700'
+          : 'bg-yellow-50 border-yellow-200';
       case 'urgent':
-        return 'bg-red-50 border-red-300';
+        return isDark
+          ? 'bg-red-900/30 border-red-700'
+          : 'bg-red-50 border-red-300';
       default:
-        return 'bg-blue-50 border-blue-200';
+        return isDark
+          ? 'bg-blue-900/30 border-blue-700'
+          : 'bg-blue-50 border-blue-200';
     }
   };
 
@@ -280,24 +288,22 @@ export function Notifications() {
     return (
       <BlurredVideoLoader
         label="Loading alerts..."
-        containerClassName={`h-full flex items-center justify-center ${
-          isDark ? 'bg-slate-900' : 'bg-slate-50'
-        }`}
+        containerClassName="absolute inset-0 z-30 flex items-center justify-center bg-slate-900"
         cardClassName="flex flex-col items-center gap-3"
-        textClassName={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}
+        textClassName="text-sm font-medium text-gray-300"
       />
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50">
+    <div className={`hide-scrollbar absolute inset-0 overflow-y-auto ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
       <div className="max-w-4xl mx-auto p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl text-gray-900 mb-1">Alert Center</h2>
+            <h2 className={`text-2xl mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>Alert Center</h2>
             <div className="flex items-center gap-3">
               {unreadCount > 0 && (
-                <span className="bg-blue-800 text-white px-3 py-1 rounded-full text-xs">
+                <span className={`text-white px-3 py-1 rounded-full text-xs ${isDark ? 'bg-blue-600' : 'bg-blue-800'}`}>
                   {unreadCount} new
                 </span>
               )}
@@ -312,7 +318,7 @@ export function Notifications() {
           {unreadCount > 0 && (
             <button
               onClick={markAllAsRead}
-              className="text-blue-800 hover:underline text-sm"
+              className={`hover:underline text-sm ${isDark ? 'text-blue-400' : 'text-blue-800'}`}
             >
               Mark all as read
             </button>
@@ -322,8 +328,8 @@ export function Notifications() {
         {/* Urgent Alerts Section */}
         {urgentCount > 0 && (
           <div className="mb-6">
-            <h3 className="text-sm text-gray-700 mb-3 flex items-center gap-2">
-              <AlertTriangle size={16} className="text-red-600" />
+            <h3 className={`text-sm mb-3 flex items-center gap-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+              <AlertTriangle size={16} className={isDark ? 'text-red-400' : 'text-red-600'} />
               Urgent Alerts
             </h3>
             <div className="space-y-3">
@@ -346,20 +352,20 @@ export function Notifications() {
                         </div>
                         <div className="flex-1">
                           <div className="flex items-start justify-between mb-1">
-                            <h3 className="text-sm text-gray-900">{notification.title}</h3>
+                            <h3 className={`text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>{notification.title}</h3>
                             <span className="w-2 h-2 bg-red-600 rounded-full flex-shrink-0 animate-pulse"></span>
                           </div>
-                          <p className="text-sm text-gray-700 mb-1">{notification.message}</p>
+                          <p className={`text-sm mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{notification.message}</p>
                           {notification.lat && notification.lng && (
                             <p 
-                              className="text-sm text-gray-500 flex items-center gap-1 cursor-pointer hover:underline"
+                              className={`text-sm flex items-center gap-1 cursor-pointer hover:underline ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
                               onClick={() => notification.lat && notification.lng && window.open(`https://www.google.com/maps/place/${notification.lat},${notification.lng}/@${notification.lat},${notification.lng},208m/data=!3m1!1e3`, "_blank")}
                             >
                               <MapPin size={13} />
                               {notification.lat}, {notification.lng}
                             </p>
                           )}
-                          <p className="text-sm text-gray-500">
+                          <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                             {new Date(notification.timestamp).toLocaleDateString('en-GB')} at{" "}
                             {new Date(notification.timestamp).toLocaleTimeString()}
                           </p>
@@ -373,13 +379,13 @@ export function Notifications() {
         )}
 
         {/* All Notifications */}
-        <h3 className="text-sm text-gray-700 mb-3">All Notifications</h3>
+        <h3 className={`text-sm mb-3 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>All Notifications</h3>
         
         {notifications.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm p-8 text-center border border-gray-200">
-            <Bell className="mx-auto mb-4 text-gray-300" size={48} />
-            <p className="text-gray-500">No notifications yet</p>
-            <p className="text-sm text-gray-400 mt-2">
+          <div className={`rounded-xl shadow-sm p-8 text-center border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
+            <Bell className={`mx-auto mb-4 ${isDark ? 'text-slate-600' : 'text-gray-300'}`} size={48} />
+            <p className={isDark ? 'text-gray-400' : 'text-gray-500'}>No notifications yet</p>
+            <p className={`text-sm mt-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
               You'll receive real-time updates about your incident reports here
             </p>
           </div>
@@ -393,8 +399,16 @@ export function Notifications() {
               return (
                 <div
                   key={notification.id}
-                  className={`bg-white rounded-lg shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow border ${
-                    !notification.read ? `border-l-4 ${notification.type === 'urgent' ? 'border-l-red-600' : 'border-l-blue-800'}` : 'border-gray-200'
+                  className={`rounded-lg shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow border ${
+                    isDark ? 'bg-slate-800' : 'bg-white'
+                  } ${
+                    !notification.read
+                      ? `border-l-4 ${
+                          notification.type === 'urgent'
+                            ? 'border-l-red-600'
+                            : isDark ? 'border-l-blue-500' : 'border-l-blue-800'
+                        }`
+                      : isDark ? 'border-slate-700' : 'border-gray-200'
                   }`}
                   onClick={() => markAsRead(notification.id)}
                 >
@@ -404,24 +418,28 @@ export function Notifications() {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-start justify-between mb-1">
-                        <h3 className={`text-sm ${!notification.read ? 'text-gray-900' : 'text-gray-600'}`}>
+                        <h3 className={`text-sm ${
+                          !notification.read
+                            ? isDark ? 'text-white' : 'text-gray-900'
+                            : isDark ? 'text-gray-400' : 'text-gray-600'
+                        }`}>
                           {notification.title}
                         </h3>
                         {!notification.read && (
-                          <span className={`w-2 h-2 ${notification.type === 'urgent' ? 'bg-red-600' : 'bg-blue-800'} rounded-full flex-shrink-0`}></span>
+                          <span className={`w-2 h-2 ${notification.type === 'urgent' ? 'bg-red-600' : isDark ? 'bg-blue-500' : 'bg-blue-800'} rounded-full flex-shrink-0`}></span>
                         )}
                       </div>
-                      <p className="text-sm text-gray-600 mb-1">{notification.message}</p>
+                      <p className={`text-sm mb-1 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{notification.message}</p>
                       {notification.lat && notification.lng && (
                         <p 
-                          className="text-sm mb-1 text-gray-500 flex items-center gap-1 cursor-pointer hover:underline"
+                          className={`text-sm mb-1 flex items-center gap-1 cursor-pointer hover:underline ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
                           onClick={() => notification.lat && notification.lng && window.open(`https://www.google.com/maps/place/${notification.lat},${notification.lng}/@${notification.lat},${notification.lng},208m/data=!3m1!1e3`, "_blank")}
                         >
                           <MapPin size={13} />
                           {notification.lat}, {notification.lng}
                         </p>
                       )}
-                      <p className="text-xs text-gray-400">
+                      <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                         {new Date(notification.timestamp).toLocaleDateString()} at{' '}
                         {new Date(notification.timestamp).toLocaleTimeString()}
                       </p>

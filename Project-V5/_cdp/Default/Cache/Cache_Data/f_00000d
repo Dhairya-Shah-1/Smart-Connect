@@ -1,0 +1,302 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/components/AdminDashboard.tsx");import __vite__cjsImport0_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=e5ec2d09"; const jsxDEV = __vite__cjsImport0_react_jsxDevRuntime["jsxDEV"];
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope;
+let prevRefreshReg;
+let prevRefreshSig;
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+  prevRefreshReg = window.$RefreshReg$;
+  prevRefreshSig = window.$RefreshSig$;
+  window.$RefreshReg$ = RefreshRuntime.getRefreshReg("D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx");
+  window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;
+}
+var _s = $RefreshSig$();
+import __vite__cjsImport3_react from "/node_modules/.vite/deps/react.js?v=e5ec2d09"; const useState = __vite__cjsImport3_react["useState"];
+import { MapView } from "/src/components/MapView.tsx";
+import { CheckReports } from "/src/components/CheckReports.tsx";
+import { Notifications } from "/src/components/Notifications.tsx";
+import { Profile } from "/src/components/Profile.tsx";
+import { Map, CheckCircle, Bell, User, Sun, Moon } from "/node_modules/.vite/deps/lucide-react.js?v=e5ec2d09";
+import { ASSETS } from "/src/config/assets.ts";
+import { useTheme } from "/src/App.tsx";
+export function AdminDashboard({ onLogout }) {
+  _s();
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === "dark";
+  const [currentView, setCurrentView] = useState("check-reports");
+  const renderView = () => {
+    switch (currentView) {
+      case "map":
+        return /* @__PURE__ */ jsxDEV(MapView, {}, void 0, false, {
+          fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+          lineNumber: 43,
+          columnNumber: 16
+        }, this);
+      case "check-reports":
+        return /* @__PURE__ */ jsxDEV(CheckReports, {}, void 0, false, {
+          fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+          lineNumber: 45,
+          columnNumber: 16
+        }, this);
+      case "notifications":
+        return /* @__PURE__ */ jsxDEV(Notifications, {}, void 0, false, {
+          fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+          lineNumber: 47,
+          columnNumber: 16
+        }, this);
+      case "profile":
+        return /* @__PURE__ */ jsxDEV(Profile, { onLogout }, void 0, false, {
+          fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+          lineNumber: 49,
+          columnNumber: 16
+        }, this);
+      default:
+        return /* @__PURE__ */ jsxDEV(CheckReports, {}, void 0, false, {
+          fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+          lineNumber: 51,
+          columnNumber: 16
+        }, this);
+    }
+  };
+  return /* @__PURE__ */ jsxDEV("div", { className: `h-screen flex flex-col dashboard-container ${isDark ? "bg-slate-900" : "bg-white"}`, children: [
+    /* @__PURE__ */ jsxDEV("header", { className: `flex items-center justify-between px-6 py-4 border-b dashboard-header ${isDark ? "border-slate-700 bg-slate-800" : "border-gray-200 bg-white"} shadow-sm`, children: [
+      /* @__PURE__ */ jsxDEV("div", { className: "flex items-center gap-3", children: [
+        /* @__PURE__ */ jsxDEV("img", { src: ASSETS.Shield, alt: "Shield Icon", className: "inline-flex w-10" }, void 0, false, {
+          fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+          lineNumber: 60,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV("div", { children: [
+          /* @__PURE__ */ jsxDEV("h1", { className: `text-xl ${isDark ? "text-white" : "text-gray-900"}`, children: "Smart Connect" }, void 0, false, {
+            fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+            lineNumber: 62,
+            columnNumber: 13
+          }, this),
+          /* @__PURE__ */ jsxDEV("p", { className: `text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`, children: "Admin Dashboard" }, void 0, false, {
+            fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+            lineNumber: 63,
+            columnNumber: 13
+          }, this)
+        ] }, void 0, true, {
+          fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+          lineNumber: 61,
+          columnNumber: 11
+        }, this)
+      ] }, void 0, true, {
+        fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+        lineNumber: 59,
+        columnNumber: 9
+      }, this),
+      /* @__PURE__ */ jsxDEV("div", { className: "flex items-center gap-3", children: [
+        /* @__PURE__ */ jsxDEV(
+          "button",
+          {
+            onClick: toggleTheme,
+            className: `p-2 rounded-lg transition-colors ${isDark ? "bg-slate-700 text-yellow-400 hover:bg-slate-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`,
+            "aria-label": "Toggle theme",
+            children: isDark ? /* @__PURE__ */ jsxDEV(Sun, { size: 20 }, void 0, false, {
+              fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+              lineNumber: 72,
+              columnNumber: 23
+            }, this) : /* @__PURE__ */ jsxDEV(Moon, { size: 20 }, void 0, false, {
+              fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+              lineNumber: 72,
+              columnNumber: 43
+            }, this)
+          },
+          void 0,
+          false,
+          {
+            fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+            lineNumber: 67,
+            columnNumber: 11
+          },
+          this
+        ),
+        /* @__PURE__ */ jsxDEV(
+          "button",
+          {
+            onClick: () => setCurrentView(currentView === "profile" ? "map" : "profile"),
+            className: `p-2 rounded-lg transition-colors ${currentView === "profile" ? isDark ? "bg-slate-700 text-blue-300 hover:bg-slate-600" : "bg-gray-100 text-blue-700 hover:bg-gray-200" : isDark ? "bg-slate-700 text-gray-200 hover:bg-slate-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`,
+            "aria-label": currentView === "profile" ? "Go to map" : "Go to profile",
+            title: currentView === "profile" ? "Map" : "Profile",
+            children: currentView === "profile" ? /* @__PURE__ */ jsxDEV(Map, { size: 20 }, void 0, false, {
+              fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+              lineNumber: 88,
+              columnNumber: 42
+            }, this) : /* @__PURE__ */ jsxDEV(User, { size: 20 }, void 0, false, {
+              fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+              lineNumber: 88,
+              columnNumber: 62
+            }, this)
+          },
+          void 0,
+          false,
+          {
+            fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+            lineNumber: 74,
+            columnNumber: 11
+          },
+          this
+        )
+      ] }, void 0, true, {
+        fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+        lineNumber: 66,
+        columnNumber: 9
+      }, this)
+    ] }, void 0, true, {
+      fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+      lineNumber: 58,
+      columnNumber: 7
+    }, this),
+    /* @__PURE__ */ jsxDEV("main", { className: "flex-1 overflow-hidden mobile-bottom-content", children: renderView() }, void 0, false, {
+      fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+      lineNumber: 94,
+      columnNumber: 7
+    }, this),
+    /* @__PURE__ */ jsxDEV("nav", { className: `mobile-bottom-panel flex justify-around items-center border-t ${isDark ? "border-slate-700 bg-slate-800" : "border-gray-200 bg-white"} py-3 px-4 shadow-lg`, children: [
+      /* @__PURE__ */ jsxDEV(
+        "button",
+        {
+          onClick: () => setCurrentView("map"),
+          className: `flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all ${currentView === "map" ? isDark ? "text-cyan-200 bg-slate-600 border border-cyan-300 shadow-lg shadow-cyan-950/40" : "text-blue-800 bg-blue-100" : isDark ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"}`,
+          children: [
+            /* @__PURE__ */ jsxDEV(Map, { size: 24 }, void 0, false, {
+              fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+              lineNumber: 108,
+              columnNumber: 11
+            }, this),
+            /* @__PURE__ */ jsxDEV("span", { className: "text-xs", children: "Map" }, void 0, false, {
+              fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+              lineNumber: 109,
+              columnNumber: 11
+            }, this)
+          ]
+        },
+        void 0,
+        true,
+        {
+          fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+          lineNumber: 100,
+          columnNumber: 9
+        },
+        this
+      ),
+      /* @__PURE__ */ jsxDEV(
+        "button",
+        {
+          onClick: () => setCurrentView("check-reports"),
+          className: `flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all ${currentView === "check-reports" ? isDark ? "text-cyan-200 bg-slate-600 border border-cyan-300 shadow-lg shadow-cyan-950/40" : "text-blue-800 bg-blue-100" : isDark ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"}`,
+          children: [
+            /* @__PURE__ */ jsxDEV(CheckCircle, { size: 24 }, void 0, false, {
+              fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+              lineNumber: 120,
+              columnNumber: 11
+            }, this),
+            /* @__PURE__ */ jsxDEV("span", { className: "text-xs", children: "Verified" }, void 0, false, {
+              fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+              lineNumber: 121,
+              columnNumber: 11
+            }, this)
+          ]
+        },
+        void 0,
+        true,
+        {
+          fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+          lineNumber: 112,
+          columnNumber: 9
+        },
+        this
+      ),
+      /* @__PURE__ */ jsxDEV(
+        "button",
+        {
+          onClick: () => setCurrentView("notifications"),
+          className: `flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all ${currentView === "notifications" ? isDark ? "text-cyan-200 bg-slate-600 border border-cyan-300 shadow-lg shadow-cyan-950/40" : "text-blue-800 bg-blue-100" : isDark ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"}`,
+          children: [
+            /* @__PURE__ */ jsxDEV(Bell, { size: 24 }, void 0, false, {
+              fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+              lineNumber: 132,
+              columnNumber: 11
+            }, this),
+            /* @__PURE__ */ jsxDEV("span", { className: "text-xs", children: "Alerts" }, void 0, false, {
+              fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+              lineNumber: 133,
+              columnNumber: 11
+            }, this)
+          ]
+        },
+        void 0,
+        true,
+        {
+          fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+          lineNumber: 124,
+          columnNumber: 9
+        },
+        this
+      ),
+      /* @__PURE__ */ jsxDEV(
+        "button",
+        {
+          onClick: () => setCurrentView("profile"),
+          className: `flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all ${currentView === "profile" ? isDark ? "text-cyan-200 bg-slate-600 border border-cyan-300 shadow-lg shadow-cyan-950/40" : "text-blue-800 bg-blue-100" : isDark ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"}`,
+          children: [
+            /* @__PURE__ */ jsxDEV(User, { size: 24 }, void 0, false, {
+              fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+              lineNumber: 144,
+              columnNumber: 11
+            }, this),
+            /* @__PURE__ */ jsxDEV("span", { className: "text-xs", children: "Profile" }, void 0, false, {
+              fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+              lineNumber: 145,
+              columnNumber: 11
+            }, this)
+          ]
+        },
+        void 0,
+        true,
+        {
+          fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+          lineNumber: 136,
+          columnNumber: 9
+        },
+        this
+      )
+    ] }, void 0, true, {
+      fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+      lineNumber: 99,
+      columnNumber: 7
+    }, this)
+  ] }, void 0, true, {
+    fileName: "D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx",
+    lineNumber: 56,
+    columnNumber: 5
+  }, this);
+}
+_s(AdminDashboard, "aD5lun76OSEIxio2pC3Ig57lX74=", false, function() {
+  return [useTheme];
+});
+_c = AdminDashboard;
+var _c;
+$RefreshReg$(_c, "AdminDashboard");
+if (import.meta.hot && !inWebWorker) {
+  window.$RefreshReg$ = prevRefreshReg;
+  window.$RefreshSig$ = prevRefreshSig;
+}
+if (import.meta.hot && !inWebWorker) {
+  RefreshRuntime.__hmr_import(import.meta.url).then((currentExports) => {
+    RefreshRuntime.registerExportsForReactRefresh("D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("D:/L e a r n/My All Sem/Final Year Project/github/Smart-Connect/Project-V5/src/components/AdminDashboard.tsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+
+//# sourceMappingURL=data:application/json;base64,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bWVzIjpbInVzZVN0YXRlIiwiTWFwVmlldyIsIkNoZWNrUmVwb3J0cyIsIk5vdGlmaWNhdGlvbnMiLCJQcm9maWxlIiwiTWFwIiwiQ2hlY2tDaXJjbGUiLCJCZWxsIiwiVXNlciIsIlN1biIsIk1vb24iLCJBU1NFVFMiLCJ1c2VUaGVtZSIsIkFkbWluRGFzaGJvYXJkIiwib25Mb2dvdXQiLCJfcyIsInRoZW1lIiwidG9nZ2xlVGhlbWUiLCJpc0RhcmsiLCJjdXJyZW50VmlldyIsInNldEN1cnJlbnRWaWV3IiwicmVuZGVyVmlldyIsIlNoaWVsZCIsIl9jIl0sImlnbm9yZUxpc3QiOltdLCJzb3VyY2VzIjpbIkFkbWluRGFzaGJvYXJkLnRzeCJdLCJzb3VyY2VzQ29udGVudCI6WyJpbXBvcnQgeyB1c2VTdGF0ZSB9IGZyb20gJ3JlYWN0JztcbmltcG9ydCB7IE1hcFZpZXcgfSBmcm9tICcuL01hcFZpZXcnO1xuaW1wb3J0IHsgQ2hlY2tSZXBvcnRzIH0gZnJvbSAnLi9DaGVja1JlcG9ydHMnO1xuaW1wb3J0IHsgTm90aWZpY2F0aW9ucyB9IGZyb20gJy4vTm90aWZpY2F0aW9ucyc7XG5pbXBvcnQgeyBQcm9maWxlIH0gZnJvbSAnLi9Qcm9maWxlJztcbmltcG9ydCB7IE1hcCwgQ2hlY2tDaXJjbGUsIEJlbGwsIFVzZXIsIFN1biwgTW9vbiB9IGZyb20gJ2x1Y2lkZS1yZWFjdCc7XG5pbXBvcnQgeyBBU1NFVFMgfSBmcm9tICcuLi9jb25maWcvYXNzZXRzJztcbmltcG9ydCB7IHVzZVRoZW1lIH0gZnJvbSAnLi4vQXBwJztcblxuaW50ZXJmYWNlIEFkbWluRGFzaGJvYXJkUHJvcHMge1xuICBvbkxvZ291dDogKCkgPT4gdm9pZDtcbn1cblxudHlwZSBBZG1pblZpZXcgPSAnbWFwJyB8ICdjaGVjay1yZXBvcnRzJyB8ICdub3RpZmljYXRpb25zJyB8ICdwcm9maWxlJztcblxuZXhwb3J0IGZ1bmN0aW9uIEFkbWluRGFzaGJvYXJkKHsgb25Mb2dvdXQgfTogQWRtaW5EYXNoYm9hcmRQcm9wcykge1xuICBjb25zdCB7IHRoZW1lLCB0b2dnbGVUaGVtZSB9ID0gdXNlVGhlbWUoKTtcbiAgY29uc3QgaXNEYXJrID0gdGhlbWUgPT09ICdkYXJrJztcbiAgY29uc3QgW2N1cnJlbnRWaWV3LCBzZXRDdXJyZW50Vmlld10gPSB1c2VTdGF0ZTxBZG1pblZpZXc+KCdjaGVjay1yZXBvcnRzJyk7XG5cbiAgY29uc3QgcmVuZGVyVmlldyA9ICgpID0+IHtcbiAgICBzd2l0Y2ggKGN1cnJlbnRWaWV3KSB7XG4gICAgICBjYXNlICdtYXAnOlxuICAgICAgICByZXR1cm4gPE1hcFZpZXcgLz47XG4gICAgICBjYXNlICdjaGVjay1yZXBvcnRzJzpcbiAgICAgICAgcmV0dXJuIDxDaGVja1JlcG9ydHMgLz47XG4gICAgICBjYXNlICdub3RpZmljYXRpb25zJzpcbiAgICAgICAgcmV0dXJuIDxOb3RpZmljYXRpb25zIC8+O1xuICAgICAgY2FzZSAncHJvZmlsZSc6XG4gICAgICAgIHJldHVybiA8UHJvZmlsZSBvbkxvZ291dD17b25Mb2dvdXR9IC8+O1xuICAgICAgZGVmYXVsdDpcbiAgICAgICAgcmV0dXJuIDxDaGVja1JlcG9ydHMgLz47XG4gICAgfVxuICB9O1xuXG4gIHJldHVybiAoXG4gICAgPGRpdiBjbGFzc05hbWU9e2BoLXNjcmVlbiBmbGV4IGZsZXgtY29sIGRhc2hib2FyZC1jb250YWluZXIgJHtpc0RhcmsgPyAnYmctc2xhdGUtOTAwJyA6ICdiZy13aGl0ZSd9YH0+XG4gICAgICB7LyogSGVhZGVyICovfVxuICAgICAgPGhlYWRlciBjbGFzc05hbWU9e2BmbGV4IGl0ZW1zLWNlbnRlciBqdXN0aWZ5LWJldHdlZW4gcHgtNiBweS00IGJvcmRlci1iIGRhc2hib2FyZC1oZWFkZXIgJHtpc0RhcmsgPyAnYm9yZGVyLXNsYXRlLTcwMCBiZy1zbGF0ZS04MDAnIDogJ2JvcmRlci1ncmF5LTIwMCBiZy13aGl0ZSd9IHNoYWRvdy1zbWB9PlxuICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cImZsZXggaXRlbXMtY2VudGVyIGdhcC0zXCI+XG4gICAgICAgICAgPGltZyBzcmM9e0FTU0VUUy5TaGllbGR9IGFsdD1cIlNoaWVsZCBJY29uXCIgY2xhc3NOYW1lPVwiaW5saW5lLWZsZXggdy0xMFwiIC8+XG4gICAgICAgICAgPGRpdj5cbiAgICAgICAgICAgIDxoMSBjbGFzc05hbWU9e2B0ZXh0LXhsICR7aXNEYXJrID8gJ3RleHQtd2hpdGUnIDogJ3RleHQtZ3JheS05MDAnfWB9PlNtYXJ0IENvbm5lY3Q8L2gxPlxuICAgICAgICAgICAgPHAgY2xhc3NOYW1lPXtgdGV4dC14cyAke2lzRGFyayA/ICd0ZXh0LWdyYXktNDAwJyA6ICd0ZXh0LWdyYXktNTAwJ31gfT5BZG1pbiBEYXNoYm9hcmQ8L3A+XG4gICAgICAgICAgPC9kaXY+XG4gICAgICAgIDwvZGl2PlxuICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cImZsZXggaXRlbXMtY2VudGVyIGdhcC0zXCI+XG4gICAgICAgICAgPGJ1dHRvblxuICAgICAgICAgICAgb25DbGljaz17dG9nZ2xlVGhlbWV9XG4gICAgICAgICAgICBjbGFzc05hbWU9e2BwLTIgcm91bmRlZC1sZyB0cmFuc2l0aW9uLWNvbG9ycyAke2lzRGFyayA/ICdiZy1zbGF0ZS03MDAgdGV4dC15ZWxsb3ctNDAwIGhvdmVyOmJnLXNsYXRlLTYwMCcgOiAnYmctZ3JheS0xMDAgdGV4dC1ncmF5LTcwMCBob3ZlcjpiZy1ncmF5LTIwMCd9YH1cbiAgICAgICAgICAgIGFyaWEtbGFiZWw9XCJUb2dnbGUgdGhlbWVcIlxuICAgICAgICAgID5cbiAgICAgICAgICAgIHtpc0RhcmsgPyA8U3VuIHNpemU9ezIwfSAvPiA6IDxNb29uIHNpemU9ezIwfSAvPn1cbiAgICAgICAgICA8L2J1dHRvbj5cbiAgICAgICAgICA8YnV0dG9uXG4gICAgICAgICAgICBvbkNsaWNrPXsoKSA9PiBzZXRDdXJyZW50VmlldyhjdXJyZW50VmlldyA9PT0gJ3Byb2ZpbGUnID8gJ21hcCcgOiAncHJvZmlsZScpfVxuICAgICAgICAgICAgY2xhc3NOYW1lPXtgcC0yIHJvdW5kZWQtbGcgdHJhbnNpdGlvbi1jb2xvcnMgJHtcbiAgICAgICAgICAgICAgY3VycmVudFZpZXcgPT09ICdwcm9maWxlJ1xuICAgICAgICAgICAgICAgID8gaXNEYXJrXG4gICAgICAgICAgICAgICAgICA/ICdiZy1zbGF0ZS03MDAgdGV4dC1ibHVlLTMwMCBob3ZlcjpiZy1zbGF0ZS02MDAnXG4gICAgICAgICAgICAgICAgICA6ICdiZy1ncmF5LTEwMCB0ZXh0LWJsdWUtNzAwIGhvdmVyOmJnLWdyYXktMjAwJ1xuICAgICAgICAgICAgICAgIDogaXNEYXJrXG4gICAgICAgICAgICAgICAgICA/ICdiZy1zbGF0ZS03MDAgdGV4dC1ncmF5LTIwMCBob3ZlcjpiZy1zbGF0ZS02MDAnXG4gICAgICAgICAgICAgICAgICA6ICdiZy1ncmF5LTEwMCB0ZXh0LWdyYXktNzAwIGhvdmVyOmJnLWdyYXktMjAwJ1xuICAgICAgICAgICAgfWB9XG4gICAgICAgICAgICBhcmlhLWxhYmVsPXtjdXJyZW50VmlldyA9PT0gJ3Byb2ZpbGUnID8gJ0dvIHRvIG1hcCcgOiAnR28gdG8gcHJvZmlsZSd9XG4gICAgICAgICAgICB0aXRsZT17Y3VycmVudFZpZXcgPT09ICdwcm9maWxlJyA/ICdNYXAnIDogJ1Byb2ZpbGUnfVxuICAgICAgICAgID5cbiAgICAgICAgICAgIHtjdXJyZW50VmlldyA9PT0gJ3Byb2ZpbGUnID8gPE1hcCBzaXplPXsyMH0gLz4gOiA8VXNlciBzaXplPXsyMH0gLz59XG4gICAgICAgICAgPC9idXR0b24+XG4gICAgICAgIDwvZGl2PlxuICAgICAgPC9oZWFkZXI+XG5cbiAgICAgIHsvKiBNYWluIENvbnRlbnQgKi99XG4gICAgICA8bWFpbiBjbGFzc05hbWU9XCJmbGV4LTEgb3ZlcmZsb3ctaGlkZGVuIG1vYmlsZS1ib3R0b20tY29udGVudFwiPlxuICAgICAgICB7cmVuZGVyVmlldygpfVxuICAgICAgPC9tYWluPlxuXG4gICAgICB7LyogQm90dG9tIE5hdmlnYXRpb24gKi99XG4gICAgICA8bmF2IGNsYXNzTmFtZT17YG1vYmlsZS1ib3R0b20tcGFuZWwgZmxleCBqdXN0aWZ5LWFyb3VuZCBpdGVtcy1jZW50ZXIgYm9yZGVyLXQgJHtpc0RhcmsgPyAnYm9yZGVyLXNsYXRlLTcwMCBiZy1zbGF0ZS04MDAnIDogJ2JvcmRlci1ncmF5LTIwMCBiZy13aGl0ZSd9IHB5LTMgcHgtNCBzaGFkb3ctbGdgfT5cbiAgICAgICAgPGJ1dHRvblxuICAgICAgICAgIG9uQ2xpY2s9eygpID0+IHNldEN1cnJlbnRWaWV3KCdtYXAnKX1cbiAgICAgICAgICBjbGFzc05hbWU9e2BmbGV4IGZsZXgtY29sIGl0ZW1zLWNlbnRlciBnYXAtMSBweC00IHB5LTIgcm91bmRlZC1sZyB0cmFuc2l0aW9uLWFsbCAke1xuICAgICAgICAgICAgY3VycmVudFZpZXcgPT09ICdtYXAnXG4gICAgICAgICAgICAgID8gaXNEYXJrID8gJ3RleHQtY3lhbi0yMDAgYmctc2xhdGUtNjAwIGJvcmRlciBib3JkZXItY3lhbi0zMDAgc2hhZG93LWxnIHNoYWRvdy1jeWFuLTk1MC80MCcgOiAndGV4dC1ibHVlLTgwMCBiZy1ibHVlLTEwMCdcbiAgICAgICAgICAgICAgOiBpc0RhcmsgPyAndGV4dC1ncmF5LTQwMCBob3Zlcjp0ZXh0LWdyYXktMzAwJyA6ICd0ZXh0LWdyYXktNTAwIGhvdmVyOnRleHQtZ3JheS03MDAnXG4gICAgICAgICAgfWB9XG4gICAgICAgID5cbiAgICAgICAgICA8TWFwIHNpemU9ezI0fSAvPlxuICAgICAgICAgIDxzcGFuIGNsYXNzTmFtZT1cInRleHQteHNcIj5NYXA8L3NwYW4+XG4gICAgICAgIDwvYnV0dG9uPlxuXG4gICAgICAgIDxidXR0b25cbiAgICAgICAgICBvbkNsaWNrPXsoKSA9PiBzZXRDdXJyZW50VmlldygnY2hlY2stcmVwb3J0cycpfVxuICAgICAgICAgIGNsYXNzTmFtZT17YGZsZXggZmxleC1jb2wgaXRlbXMtY2VudGVyIGdhcC0xIHB4LTQgcHktMiByb3VuZGVkLWxnIHRyYW5zaXRpb24tYWxsICR7XG4gICAgICAgICAgICBjdXJyZW50VmlldyA9PT0gJ2NoZWNrLXJlcG9ydHMnXG4gICAgICAgICAgICAgID8gaXNEYXJrID8gJ3RleHQtY3lhbi0yMDAgYmctc2xhdGUtNjAwIGJvcmRlciBib3JkZXItY3lhbi0zMDAgc2hhZG93LWxnIHNoYWRvdy1jeWFuLTk1MC80MCcgOiAndGV4dC1ibHVlLTgwMCBiZy1ibHVlLTEwMCdcbiAgICAgICAgICAgICAgOiBpc0RhcmsgPyAndGV4dC1ncmF5LTQwMCBob3Zlcjp0ZXh0LWdyYXktMzAwJyA6ICd0ZXh0LWdyYXktNTAwIGhvdmVyOnRleHQtZ3JheS03MDAnXG4gICAgICAgICAgfWB9XG4gICAgICAgID5cbiAgICAgICAgICA8Q2hlY2tDaXJjbGUgc2l6ZT17MjR9IC8+XG4gICAgICAgICAgPHNwYW4gY2xhc3NOYW1lPVwidGV4dC14c1wiPlZlcmlmaWVkPC9zcGFuPlxuICAgICAgICA8L2J1dHRvbj5cblxuICAgICAgICA8YnV0dG9uXG4gICAgICAgICAgb25DbGljaz17KCkgPT4gc2V0Q3VycmVudFZpZXcoJ25vdGlmaWNhdGlvbnMnKX1cbiAgICAgICAgICBjbGFzc05hbWU9e2BmbGV4IGZsZXgtY29sIGl0ZW1zLWNlbnRlciBnYXAtMSBweC00IHB5LTIgcm91bmRlZC1sZyB0cmFuc2l0aW9uLWFsbCAke1xuICAgICAgICAgICAgY3VycmVudFZpZXcgPT09ICdub3RpZmljYXRpb25zJ1xuICAgICAgICAgICAgICA/IGlzRGFyayA/ICd0ZXh0LWN5YW4tMjAwIGJnLXNsYXRlLTYwMCBib3JkZXIgYm9yZGVyLWN5YW4tMzAwIHNoYWRvdy1sZyBzaGFkb3ctY3lhbi05NTAvNDAnIDogJ3RleHQtYmx1ZS04MDAgYmctYmx1ZS0xMDAnXG4gICAgICAgICAgICAgIDogaXNEYXJrID8gJ3RleHQtZ3JheS00MDAgaG92ZXI6dGV4dC1ncmF5LTMwMCcgOiAndGV4dC1ncmF5LTUwMCBob3Zlcjp0ZXh0LWdyYXktNzAwJ1xuICAgICAgICAgIH1gfVxuICAgICAgICA+XG4gICAgICAgICAgPEJlbGwgc2l6ZT17MjR9IC8+XG4gICAgICAgICAgPHNwYW4gY2xhc3NOYW1lPVwidGV4dC14c1wiPkFsZXJ0czwvc3Bhbj5cbiAgICAgICAgPC9idXR0b24+XG5cbiAgICAgICAgPGJ1dHRvblxuICAgICAgICAgIG9uQ2xpY2s9eygpID0+IHNldEN1cnJlbnRWaWV3KCdwcm9maWxlJyl9XG4gICAgICAgICAgY2xhc3NOYW1lPXtgZmxleCBmbGV4LWNvbCBpdGVtcy1jZW50ZXIgZ2FwLTEgcHgtNCBweS0yIHJvdW5kZWQtbGcgdHJhbnNpdGlvbi1hbGwgJHtcbiAgICAgICAgICAgIGN1cnJlbnRWaWV3ID09PSAncHJvZmlsZSdcbiAgICAgICAgICAgICAgPyBpc0RhcmsgPyAndGV4dC1jeWFuLTIwMCBiZy1zbGF0ZS02MDAgYm9yZGVyIGJvcmRlci1jeWFuLTMwMCBzaGFkb3ctbGcgc2hhZG93LWN5YW4tOTUwLzQwJyA6ICd0ZXh0LWJsdWUtODAwIGJnLWJsdWUtMTAwJ1xuICAgICAgICAgICAgICA6IGlzRGFyayA/ICd0ZXh0LWdyYXktNDAwIGhvdmVyOnRleHQtZ3JheS0zMDAnIDogJ3RleHQtZ3JheS01MDAgaG92ZXI6dGV4dC1ncmF5LTcwMCdcbiAgICAgICAgICB9YH1cbiAgICAgICAgPlxuICAgICAgICAgIDxVc2VyIHNpemU9ezI0fSAvPlxuICAgICAgICAgIDxzcGFuIGNsYXNzTmFtZT1cInRleHQteHNcIj5Qcm9maWxlPC9zcGFuPlxuICAgICAgICA8L2J1dHRvbj5cbiAgICAgIDwvbmF2PlxuICAgIDwvZGl2PlxuICApO1xufVxuIl0sImZpbGUiOiJEOi9MIGUgYSByIG4vTXkgQWxsIFNlbS9GaW5hbCBZZWFyIFByb2plY3QvZ2l0aHViL1NtYXJ0LUNvbm5lY3QvUHJvamVjdC1WNS9zcmMvY29tcG9uZW50cy9BZG1pbkRhc2hib2FyZC50c3gifQ==

@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { supabase } from './supabaseClient';
 import { verifySingleIncident } from '../utils/aiVerification';
 import { clearBrowserCache, REPORT_HISTORY_CACHE_PREFIX } from '../utils/browserCache';
+import { BlurredVideoLoader } from './ui/blurred-video-loader';
 
 interface ReportIssueProps {
   onSuccess: () => void;
@@ -353,6 +354,18 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
 
     if (success) {
+    // While AI verification is still running, show the centered loader video
+    if (isSubmitting) {
+      return (
+        <BlurredVideoLoader
+          label="Verifying report with AI..."
+          containerClassName="absolute inset-0 z-30 flex items-center justify-center bg-slate-900"
+          cardClassName="flex flex-col items-center gap-3"
+          textClassName="text-sm font-medium text-gray-300"
+        />
+      );
+    }
+
     return (
       <div className={`h-full flex items-center justify-center rounded-2xl ${isDark ? "bg-blue-200" : "bg-gray-50" }`}>
         <div className="text-center w-full max-w-sm bg-white rounded-2xl px-6 py-8 shadow-2xl">
@@ -385,10 +398,10 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
   if (!canReport) {
     return (
       <div
-        className={`h-full flex items-center justify-center p-6 ${isDark ? "bg-slate-900" : "bg-gray-50"}`}
+        className={`absolute inset-0 flex items-center justify-center p-6 ${isDark ? "bg-slate-900" : "bg-gray-50"}`}
       >
         <div
-          className={`max-w-md rounded-2xl shadow-lg border p-8 text-center ${
+          className={`w-full max-w-md rounded-2xl shadow-lg border p-8 text-center ${
             isDark
               ? "bg-slate-800 border-slate-700"
               : "bg-white border-gray-200"
@@ -424,8 +437,18 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
   return (
     <div
-      className={`hide-scrollbar h-full overflow-y-auto p-6 ${isDark ? "bg-slate-900" : "bg-gray-50"}`}
+      className={`hide-scrollbar relative h-full overflow-y-auto p-6 ${isDark ? "bg-slate-900" : "bg-gray-50"}`}
     >
+      {/* LOADER OVERLAY - centered over the Report tab while submitting */}
+      {isSubmitting && (
+        <BlurredVideoLoader
+          label="Submitting report..."
+          containerClassName="absolute inset-0 z-40 flex items-center justify-center bg-slate-900"
+          cardClassName="flex flex-col items-center gap-3"
+          textClassName="text-sm font-medium text-gray-300"
+        />
+      )}
+
       <div
         className={`max-w-2xl mx-auto rounded-2xl shadow-sm border p-8 ${
           isDark

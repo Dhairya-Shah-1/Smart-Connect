@@ -492,7 +492,17 @@ const groupNearbyIssues = (issues: Issue[]) => {
   */
 
   return (
-    <div className="h-full flex">
+    <div className="absolute inset-0 flex overflow-hidden">
+      {/* LOADER OVERLAY - centered over the whole Live Map tab */}
+      {loading && (
+        <BlurredVideoLoader
+          label="Loading incidents..."
+          containerClassName="absolute inset-0 z-40 flex items-center justify-center bg-slate-900"
+          cardClassName="flex flex-col items-center gap-3"
+          textClassName="z-50 text-sm font-medium text-blue-200"
+        />
+      )}
+
       {/* FILTER PANEL */}
       <div
         className={`${showFilters ? "w-64" : "w-0"} transition-all duration-300 overflow-hidden flex-shrink-0 border-r ${
@@ -517,7 +527,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
           </div>
 
           {/* Search */}
-          <div className="mb-4">
+          {/* <div className="mb-4">
             <div className="relative">
               <Search
                 className={`absolute left-3 top-2.5 ${isDark ? "text-gray-500" : "text-gray-400"}`}
@@ -535,7 +545,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
                 }`}
               />
             </div>
-          </div>
+          </div> */}
 
           {/* Severity Filter with Colors */}
           <div className="mb-4">
@@ -736,16 +746,8 @@ const groupNearbyIssues = (issues: Issue[]) => {
 
       {/* MAP AREA */}
       <div
-        className={`flex-1 relative ${isDark ? "bg-gradient-to-br from-slate-700 to-slate-900" : "bg-gradient-to-br from-slate-100 to-blue-50"}`}
+        className={`flex-1 relative overflow-hidden ${isDark ? "bg-gradient-to-br from-slate-700 to-slate-900" : "bg-gradient-to-br from-slate-100 to-blue-50"}`}
       >
-        {loading && (
-          <BlurredVideoLoader
-            label="Loading incidents..."
-            containerClassName="absolute inset-0 z-40 flex items-center justify-center bg-slate-50/30 backdrop-blur-sm"
-            cardClassName="flex flex-col items-center gap-3"
-            textClassName="z-50 text-sm font-medium text-blue-800"
-          />
-          )}
         <div className="absolute inset-0 z-0">
           <OpenLayersMap
             issues={filteredIssues}
@@ -869,7 +871,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
         {/* Stats - Hide on mobile/tablet when filters panel is open */}
         {!(isMobileTablet && showFilters) && (
           <div
-            className={`absolute ${isAdmin ? "top-28 sm:top-4" : "top-4"} right-4 rounded-lg shadow-lg p-3 z-10 ${
+            className={`absolute ${isAdmin ? "top-28 sm:top-4" : "top-4"} right-14 rounded-lg shadow-lg p-3 z-10 ${
               isDark ? "bg-slate-800" : "bg-white"
             }`}
           >

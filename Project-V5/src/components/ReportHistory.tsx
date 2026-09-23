@@ -300,11 +300,9 @@ export function ReportHistory() {
     return (
       <BlurredVideoLoader
         label="Loading reports..."
-        containerClassName={`h-full flex items-center justify-center ${
-          isDark ? 'bg-slate-900' : 'bg-slate-500'
-        }`}
+        containerClassName="absolute inset-0 z-30 flex items-center justify-center bg-slate-900"
         cardClassName="flex flex-col items-center gap-3"
-        textClassName={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}
+        textClassName="text-sm font-medium text-gray-300"
       />
     );
   }

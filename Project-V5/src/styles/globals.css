@@ -40,6 +40,15 @@
   bottom: calc(var(--mobile-bottom-panel-height) + var(--mobile-bottom-panel-offset) + 1rem);
 }
 
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Dashboard-specific styles to prevent zooming */
 .dashboard-container {
   position: relative;
@@ -47,6 +56,8 @@
   height: 100%;
   overflow: hidden;
   touch-action: manipulation;
+  /* Ensure background fills entire container */
+  min-height: 100vh;
 }
 
 .dashboard-header {
@@ -57,6 +68,8 @@
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
+  /* Ensure header background covers full width */
+  width: 100%;
 }
 
 /* Prevent zoom on buttons and interactive elements */
@@ -82,6 +95,67 @@ button, a, input, select, textarea {
   /* Disable double-tap to zoom */
   html {
     touch-action: manipulation;
+  }
+}
+
+/* Prevent background color gaps when resizing */
+.mobile-bottom-panel {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Ensure the main content background matches container */
+.dashboard-container > div.flex-1 {
+  background-color: inherit;
+}
+
+/* 
+ * Fix for bottom panel gap issue when screen is minimized:
+ * On smaller screens, make the bottom panel part of the flex flow
+ * instead of fixed positioning, so the main content doesn't leave a gap.
+ * The bottom panel should always be attached to the bottom of the container.
+ */
+@media (max-width: 768px) {
+  .mobile-bottom-panel {
+    position: static !important;
+    /* When in flex column layout, this keeps it at the bottom naturally */
+  }
+
+  /*
+   * The bottom panel now sits in the normal flex flow, so there is no fixed
+   * panel to reserve space for. Keeping the 5rem reserve here showed up as a
+   * coloured band between the tab content and the bottom panel.
+   */
+  .mobile-bottom-content {
+    padding-bottom: 0;
+  }
+  
+  /* Ensure main content fills remaining space properly */
+  .dashboard-container {
+    flex-direction: column;
+  }
+  
+  /* Main content should fill all available space between header and bottom panel */
+  .dashboard-container > div.flex-1 {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+}
+
+/* For larger screens, keep the bottom panel fixed but ensure no gap */
+@media (min-width: 769px) {
+  .mobile-bottom-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+  }
+  
+  /* On desktop, ensure the container doesn't leave gaps */
+  .dashboard-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
   }
 }
 

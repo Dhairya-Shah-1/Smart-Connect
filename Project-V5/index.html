@@ -22,12 +22,13 @@
         /* Prevent any zooming on dashboard elements */
         .dashboard-container,
         .dashboard-header,
-        .mobile-bottom-panel {
+        .mobile-bottom-panel,
+        html, body {
           touch-action: manipulation;
           -webkit-touch-callout: none;
         }
         
-        /* Prevent pull-to-zoom on mobile */
+        /* Prevent pull-to-zoom on mobile and desktop */
         @media (max-width: 768px), (hover: none) and (pointer: coarse) {
           html, body {
             position: fixed;
@@ -39,6 +40,21 @@
             height: 100vh;
             height: 100dvh;
             overflow: hidden;
+          }
+        }
+        
+        /* Prevent zoom on desktop browsers */
+        @media (min-width: 769px) {
+          html, body {
+            overflow: hidden;
+            touch-action: manipulation;
+          }
+          
+          /* Lock scale on desktop - prevent Ctrl+scroll zoom */
+          .dashboard-container {
+            transform-origin: top left;
+            max-width: 100vw;
+            max-height: 100vh;
           }
         }
       </style>

@@ -176,11 +176,9 @@ export function Profile({ onLogout }: ProfileProps) {
     return (
       <BlurredVideoLoader
         label="Loading profile..."
-        containerClassName={`h-full flex items-center justify-center ${
-          isDark ? 'bg-slate-900' : 'bg-slate-50'
-        }`}
+        containerClassName="absolute inset-0 z-30 flex items-center justify-center bg-slate-900"
         cardClassName="flex flex-col items-center gap-3"
-        textClassName={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}
+        textClassName="text-sm font-medium text-gray-300"
       />
     );
   }
@@ -204,7 +202,7 @@ export function Profile({ onLogout }: ProfileProps) {
   };
 
   return (
-    <div className={`hide-scrollbar h-full overflow-y-auto ${isDark ? 'bg-slate-900' : 'bg-slate-50'} p-4 md:p-6`}>
+    <div className={`hide-scrollbar absolute inset-0 overflow-y-auto ${isDark ? 'bg-slate-900' : 'bg-slate-50'} p-4 pb-24 md:p-6 md:pb-28`}>
       <div className="max-w-2xl mx-auto space-y-6">
 
         {/* PROFILE CARD — ORIGINAL STRUCTURE PRESERVED */}
@@ -259,7 +257,7 @@ export function Profile({ onLogout }: ProfileProps) {
             {/* DESKTOP */}
             <div className="hidden md:flex items-start justify-between">
               <div className="flex items-start gap-4 -mt-16">
-                <div className={`w-32 h-32 rounded-full border-4 flex items-center justify-center shadow-xl ${
+                <div className={`First_Chars w-32 h-32 rounded-full border-4 flex items-center justify-center shadow-xl ${
                   isDark
                     ? 'bg-blue-600 border-slate-800 text-white'
                     : 'bg-blue-600 border-white text-white'

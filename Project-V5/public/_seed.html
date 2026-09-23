@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+  <head><meta charset="utf-8" /><title>seed</title></head>
+  <body>
+    <script>
+      // Seed the localStorage auth gate (App.tsx ProtectedRoute reads currentUser)
+      // and force dark theme so the dashboard renders in dark mode.
+      localStorage.setItem('theme', 'dark');
+      localStorage.setItem('currentUser', JSON.stringify({
+        id: 'probe-user',
+        role: 'user',
+        name: 'Probe User',
+        email: 'probe@example.com'
+      }));
+      location.replace('/dashboard');
+    </script>
+  </body>
+</html>

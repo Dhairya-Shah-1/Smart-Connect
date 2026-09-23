@@ -214,7 +214,7 @@ export function Dashboard({ onLogout, onNavigateHome }: DashboardProps) {
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto relative mobile-bottom-content">
+      <div className={`flex-1 min-h-0 relative mobile-bottom-content ${currentView === 'map' || currentView === 'profile' || currentView === 'notifications' ? 'overflow-hidden' : 'overflow-y-auto'} ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
         {renderView()}
         
         {/* Floating Action Button - Only on Map and History views */}
@@ -232,16 +232,16 @@ export function Dashboard({ onLogout, onNavigateHome }: DashboardProps) {
       </div>
 
       {/* Bottom Navigation */}
-      <nav className={`mobile-bottom-panel border-t shadow-lg ${
+      <nav className={` mobile-bottom-panel border-t shadow-lg ${
         isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-gray-200'
       }`}>
         <div className="flex items-center justify-around px-4 py-2.5">
-          <button
+            <button 
             onClick={() => setCurrentView('map')}
             className={`flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg transition-colors border-2 ${
               currentView === 'map' 
                 ? isDark 
-                  ? 'text-blue-400 bg-slate-700 border-blue-500' 
+                  ? 'text-blue-400 bg-slate-700 border-blue-500'
                   : 'text-blue-800 bg-blue-50 border-blue-600'
                 : isDark
                   ? 'text-gray-400 hover:text-blue-400 border-transparent'
@@ -250,7 +250,7 @@ export function Dashboard({ onLogout, onNavigateHome }: DashboardProps) {
           >
             <Map size={22} strokeWidth={2} />
             <span className="text-xs whitespace-nowrap">Live Map</span>
-          </button>         
+          </button>
           
           <button
             onClick={() => setCurrentView('report')}

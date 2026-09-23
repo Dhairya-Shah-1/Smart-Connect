@@ -1,11 +1,36 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ASSETS } from '../config/assets';
-import { ArrowLeft, Mail, CheckCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Mail, CheckCircle, Loader2, Moon, Sun } from 'lucide-react';
 import { supabase } from './supabaseClient';
-import { notifyCurrentUserChanged } from '../App';
+import { notifyCurrentUserChanged, useTheme } from '../App';
 
 type LoginView = 'login' | 'forgot-password' | 'email-sent' | 'update-password';
+
+const authPageClass = 'relative min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900 flex items-center justify-center px-4';
+const authCardClass = 'bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-8 border border-gray-200 dark:border-slate-700';
+const authTitleClass = 'text-gray-900 dark:text-gray-100';
+const authMutedClass = 'text-gray-600 dark:text-gray-400';
+const authLabelClass = 'block text-sm mb-2 text-gray-700 dark:text-gray-100';
+const authInputClass = 'w-full px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-2xl bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-800 dark:focus:ring-blue-600';
+const authBackClass = 'flex items-center gap-2 text-gray-600 dark:text-gray-300 hover:text-blue-800 dark:hover:text-blue-300 mb-8 transition-colors';
+const authSecondaryButtonClass = 'w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-200 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors';
+const authErrorClass = 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-300 px-4 py-3 rounded-lg text-sm border border-red-200 dark:border-red-800';
+
+function AuthThemeToggle() {
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === 'dark';
+
+  return (
+    <button
+      onClick={toggleTheme}
+      className="absolute right-4 top-4 z-10 p-2 rounded-lg transition-colors bg-white text-gray-700 hover:bg-gray-100 dark:bg-slate-800 dark:text-yellow-400 dark:hover:bg-slate-700"
+      aria-label="Toggle theme"
+    >
+      {isDark ? <Sun size={18} /> : <Moon size={18} />}
+    </button>
+  );
+}
 
 // Separate component for password update (shown when user clicks email link)
 function UpdatePasswordView() {
@@ -56,13 +81,14 @@ function UpdatePasswordView() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 border border-gray-200 text-center">
-          <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="text-green-600" size={40} />
+      <div className={authPageClass}>
+        <AuthThemeToggle />
+        <div className={`max-w-md w-full text-center ${authCardClass}`}>
+          <div className="w-20 h-20 bg-green-50 dark:bg-green-950/50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="text-green-600 dark:text-green-400" size={40} />
           </div>
-          <h2 className="text-2xl text-gray-900 mb-3">Password Updated!</h2>
-          <p className="text-gray-600 mb-6">
+          <h2 className={`text-2xl mb-3 ${authTitleClass}`}>Password Updated!</h2>
+          <p className={`${authMutedClass} mb-6`}>
             Your password has been successfully updated. Redirecting to login...
           </p>
         </div>
@@ -71,30 +97,31 @@ function UpdatePasswordView() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center px-4">
+    <div className={authPageClass}>
+      <AuthThemeToggle />
       <div className="max-w-md w-full">
         <button
           onClick={() => navigate('/login')}
-          className="flex items-center gap-2 text-gray-600 hover:text-blue-800 mb-8 transition-colors"
+          className={authBackClass}
         >
           <ArrowLeft size={20} />
           Back to Login
         </button>
 
-        <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
+        <div className={authCardClass}>
           <div className="flex items-center justify-center gap-3 mb-8">
             <img src={ASSETS.Shield} alt="Shield Icon" className="inline-flex w-12" />
             <div className="text-center">
-              <span className="text-2xl text-gray-900">Smart Connect</span>
-              <p className="text-xs text-gray-600">Reset Password</p>
+              <span className={`text-2xl ${authTitleClass}`}>Smart Connect</span>
+              <p className={`text-xs ${authMutedClass}`}>Reset Password</p>
             </div>
           </div>
 
-          <h2 className="text-2xl text-center mb-8 text-gray-900">Create New Password</h2>
+          <h2 className={`text-2xl text-center mb-8 ${authTitleClass}`}>Create New Password</h2>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="password" className="block text-sm mb-2 text-gray-700">
+              <label htmlFor="password" className={authLabelClass}>
                 New Password
               </label>
               <input
@@ -102,14 +129,14 @@ function UpdatePasswordView() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800"
+                className={authInputClass}
                 placeholder="••••••••"
                 required
               />
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm mb-2 text-gray-700">
+              <label htmlFor="confirmPassword" className={authLabelClass}>
                 Confirm Password
               </label>
               <input
@@ -117,14 +144,14 @@ function UpdatePasswordView() {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800"
+                className={authInputClass}
                 placeholder="••••••••"
                 required
               />
             </div>
 
             {error && (
-              <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm border border-red-200">
+              <div className={authErrorClass}>
                 {error}
               </div>
             )}
@@ -392,29 +419,30 @@ export function LoginPage() {
     switch (view) {
       case 'email-sent':
         return (
-          <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center px-4">
+          <div className={authPageClass}>
+            <AuthThemeToggle />
             <div className="max-w-md w-full">
               <button
                 onClick={() => navigate('/')}
-                className="flex items-center gap-2 text-gray-600 hover:text-blue-800 mb-8 transition-colors"
+                className={authBackClass}
               >
                 <ArrowLeft size={20} />
                 Back to Home
               </button>
 
-              <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-200 text-center">
-                <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Mail className="text-blue-600" size={40} />
+              <div className={`text-center ${authCardClass}`}>
+                <div className="w-20 h-20 bg-blue-50 dark:bg-blue-950/50 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Mail className="text-blue-600 dark:text-blue-400" size={40} />
                 </div>
 
-                <h2 className="text-2xl text-gray-900 mb-3">Check your inbox</h2>
+                <h2 className={`text-2xl mb-3 ${authTitleClass}`}>Check your inbox</h2>
 
-                <p className="text-gray-600 mb-6">
+                <p className={`${authMutedClass} mb-6`}>
                   We sent a password reset link to <br />
-                  <span className="font-semibold text-gray-900">{resetEmail}</span>
+                  <span className={`font-semibold ${authTitleClass}`}>{resetEmail}</span>
                 </p>
 
-                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-sm text-blue-800 mb-8 text-left flex gap-3">
+                <div className="bg-blue-50 dark:bg-blue-950/40 p-4 rounded-xl border border-blue-100 dark:border-blue-800 text-sm text-blue-800 dark:text-blue-200 mb-8 text-left flex gap-3">
                   <CheckCircle size={18} className="flex-shrink-0 mt-0.5" />
                   <p>
                     Click the link in the email to reset your password.
@@ -423,7 +451,7 @@ export function LoginPage() {
 
                 <button
                   onClick={() => setView('login')}
-                  className="w-full bg-white border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 transition-colors"
+                  className={authSecondaryButtonClass}
                 >
                   Back to Login
                 </button>
@@ -434,33 +462,34 @@ export function LoginPage() {
 
       case 'forgot-password':
         return (
-          <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center px-4">
+          <div className={authPageClass}>
+            <AuthThemeToggle />
             <div className="max-w-md w-full">
               <button
                 onClick={() => setView('login')}
-                className="flex items-center gap-2 text-gray-600 hover:text-blue-800 mb-8 transition-colors"
+                className={authBackClass}
               >
                 <ArrowLeft size={20} />
                 Back to Login
               </button>
 
-              <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
+              <div className={authCardClass}>
                 <div className="flex items-center justify-center gap-3 mb-8">
                   <img src={ASSETS.Shield} alt="Shield Icon" className="inline-flex w-12" />
                   <div className="text-center">
-                    <span className="text-2xl text-gray-900">Smart Connect</span>
-                    <p className="text-xs text-gray-600">Reset Password</p>
+                    <span className={`text-2xl ${authTitleClass}`}>Smart Connect</span>
+                    <p className={`text-xs ${authMutedClass}`}>Reset Password</p>
                   </div>
                 </div>
 
-                <h2 className="text-2xl text-center mb-2 text-gray-900">Forgot Password?</h2>
-                <p className="text-gray-600 text-center mb-6">
+                <h2 className={`text-2xl text-center mb-2 ${authTitleClass}`}>Forgot Password?</h2>
+                <p className={`${authMutedClass} text-center mb-6`}>
                   Enter your email and we'll send you a link to reset your password.
                 </p>
 
                 <form onSubmit={handleForgotPassword} className="space-y-6">
                   <div>
-                    <label htmlFor="resetEmail" className="block text-sm mb-2 text-gray-700">
+                    <label htmlFor="resetEmail" className={authLabelClass}>
                       Email Address
                     </label>
                     <input
@@ -468,14 +497,14 @@ export function LoginPage() {
                       type="email"
                       value={resetEmail}
                       onChange={(e) => setResetEmail(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800"
+                      className={authInputClass}
                       placeholder="your@email.com"
                       required
                     />
                   </div>
 
                   {error && (
-                    <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm border border-red-200">
+                    <div className={authErrorClass}>
                       {error}
                     </div>
                   )}
@@ -503,30 +532,31 @@ export function LoginPage() {
       case 'login':
       default:
         return (
-          <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center px-4">
+          <div className={authPageClass}>
+            <AuthThemeToggle />
             <div className="max-w-md w-full">
               <button
                 onClick={() => navigate('/')}
-                className="flex items-center gap-2 text-gray-600 hover:text-blue-800 mb-8 transition-colors"
+                className={authBackClass}
               >
                 <ArrowLeft size={20} />
                 Back to Home
               </button>
 
-              <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
-                <div className="flex items-center justify-center gap-3 mb-8">
+              <div className={authCardClass}>
+                <div className="flex items-center justify-center gap-3 mb-6">
                   <img src={ASSETS.Shield} alt="Shield Icon" className="inline-flex w-12" />
                   <div className="text-center">
-                    <span className="text-2xl text-gray-900">Smart Connect</span>
-                    <p className="text-xs text-gray-600">Secure Login</p>
+                    <span className={`text-2xl ${authTitleClass}`}>Smart Connect</span>
+                    <p className={`text-sm ${authMutedClass}`}>Secure Login</p>
                   </div>
                 </div>
 
-                <h2 className="text-3xl text-center mb-8 text-gray-900">Welcome Back</h2>
+                <h2 className={`text-xl text-center mb-8 ${authTitleClass}`}>Welcome Back..!</h2>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div>
-                    <label htmlFor="email" className="block text-sm mb-2 text-gray-700">
+                    <label htmlFor="email" className={authLabelClass}>
                       Email Address
                     </label>
                     <input
@@ -534,14 +564,14 @@ export function LoginPage() {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800"
+                      className={authInputClass}
                       placeholder="your@email.com"
                       required
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="password" className="block text-sm mb-2 text-gray-700">
+                    <label htmlFor="password" className={authLabelClass}>
                       Password
                     </label>
                     <input
@@ -549,14 +579,14 @@ export function LoginPage() {
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800"
+                      className={authInputClass}
                       placeholder="••••••••"
                       required
                     />
                   </div>
 
                   {error && (
-                    <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm border border-red-200">
+                    <div className={authErrorClass}>
                       {error}
                     </div>
                   )}
@@ -564,7 +594,7 @@ export function LoginPage() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-blue-800 text-white py-3 rounded-lg hover:bg-blue-900 transition-colors shadow-md flex justify-center items-center"
+                    className="w-full bg-blue-800 text-white py-3 rounded-2xl hover:bg-blue-900 transition-colors shadow-md flex justify-center items-center"
                   >
                     {loading ? (
                       <Loader2
@@ -583,7 +613,7 @@ export function LoginPage() {
                   type="button"
                   onClick={handleGoogleSignIn}
                   disabled={googleLoading}
-                  className="w-full bg-white border border-gray-300 text-gray-700 py-2 rounded-lg mt-6 hover:bg-gray-50 transition-colors shadow-sm flex justify-center items-center gap-2"
+                  className="w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-200 py-2 rounded-2xl mt-6 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors shadow-sm flex justify-center items-center gap-2"
                 >
                   {googleLoading ? (
                     <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
@@ -602,17 +632,17 @@ export function LoginPage() {
                 <div className="mt-4 text-center">
                   <button
                     onClick={() => setView('forgot-password')}
-                    className="text-sm text-blue-800 hover:underline"
+                    className="text-sm text-blue-800 dark:text-blue-300 hover:underline"
                   >
                     Forgot Password?
                   </button>
                 </div>
 
-                <p className="text-center mt-1 text-gray-600">
+                <p className={`text-center mt-1 ${authMutedClass}`}>
                   Don't have an account?{' '}
                   <button
                     onClick={() => navigate('/signup')}
-                    className="text-blue-800 hover:underline"
+                    className="text-blue-800 dark:text-blue-300 hover:underline"
                   >
                     Sign up
                   </button>

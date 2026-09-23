@@ -1,8 +1,34 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ASSETS } from '../config/assets';
-import { ArrowLeft, Loader2, Mail, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, Mail, CheckCircle, Moon, Sun } from 'lucide-react';
 import { supabase } from './supabaseClient';
+import { useTheme } from '../App';
+
+const authPageClass = 'hide-scrollbar relative min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900 flex items-center justify-center px-4 py-8';
+const authCardClass = 'bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-8 border border-gray-200 dark:border-slate-700';
+const authTitleClass = 'text-gray-900 dark:text-gray-100';
+const authMutedClass = 'text-gray-600 dark:text-gray-400';
+const authLabelClass = 'block text-sm mb-2 text-gray-700 dark:text-gray-300';
+const authInputClass = 'w-full px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-800 dark:focus:ring-blue-500';
+const authBackClass = 'flex items-center gap-2 text-gray-600 dark:text-gray-300 hover:text-blue-800 dark:hover:text-blue-300 mb-8 transition-colors';
+const authSecondaryButtonClass = 'w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-200 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors';
+const authErrorClass = 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-300 px-4 py-3 rounded-lg text-sm border border-red-200 dark:border-red-800';
+
+function AuthThemeToggle() {
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === 'dark';
+
+  return (
+    <button
+      onClick={toggleTheme}
+      className="absolute right-4 top-4 z-10 p-2 rounded-lg transition-colors bg-white text-gray-700 hover:bg-gray-100 dark:bg-slate-800 dark:text-yellow-400 dark:hover:bg-slate-700"
+      aria-label="Toggle theme"
+    >
+      {isDark ? <Sun size={18} /> : <Moon size={18} />}
+    </button>
+  );
+}
 
 export function SignUpPage() {
   const navigate = useNavigate();
@@ -91,20 +117,21 @@ export function SignUpPage() {
 
   if (emailSent) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center px-4 py-8">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 border border-gray-200 text-center">
-          <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Mail className="text-blue-600" size={40} />
+      <div className={authPageClass}>
+        <AuthThemeToggle />
+        <div className={`max-w-md w-full text-center ${authCardClass}`}>
+          <div className="w-20 h-20 bg-blue-50 dark:bg-blue-950/50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Mail className="text-blue-600 dark:text-blue-400" size={40} />
           </div>
 
-          <h2 className="text-2xl text-gray-900 mb-3">Check your inbox</h2>
+          <h2 className={`text-2xl mb-3 ${authTitleClass}`}>Check your inbox</h2>
 
-          <p className="text-gray-600 mb-6">
+          <p className={`${authMutedClass} mb-6`}>
             We sent a verification link to <br />
-            <span className="font-semibold text-gray-900">{email}</span>
+            <span className={`font-semibold ${authTitleClass}`}>{email}</span>
           </p>
 
-          <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-sm text-blue-800 mb-8 text-left flex gap-3">
+          <div className="bg-blue-50 dark:bg-blue-950/40 p-4 rounded-xl border border-blue-100 dark:border-blue-800 text-sm text-blue-800 dark:text-blue-200 mb-8 text-left flex gap-3">
             <CheckCircle size={18} className="flex-shrink-0 mt-0.5" />
             <p>
               Click the link in the email to activate your account. You'll be able to log in after
@@ -114,45 +141,46 @@ export function SignUpPage() {
 
           <button
             onClick={() => navigate('/login')}
-            className="w-full bg-white border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 transition-colors"
+            className={authSecondaryButtonClass}
           >
             Back to Login
           </button>
 
-          <p className="text-xs text-gray-400 mt-4">Didn't receive the email? Check your spam folder.</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-4">Didn't receive the email? Check your spam folder.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="hide-scrollbar min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center px-4 py-8">
+    <div className={authPageClass}>
+      <AuthThemeToggle />
       <div className="max-w-md w-full">
         <button
           onClick={() => navigate('/')}
-          className="flex items-center gap-2 text-gray-600 hover:text-blue-800 mb-8 transition-colors"
+          className={authBackClass}
         >
           <ArrowLeft size={20} />
           Back to Home
         </button>
 
-        <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
+        <div className={authCardClass}>
           <div className="flex items-center justify-center gap-3 mb-8">
             <img src={ASSETS.Shield} alt="Shield Icon" className="inline-flex w-12" />
             <div className="text-center">
-              <span className="text-2xl text-gray-900">Smart Connect</span>
-              <p className="text-xs text-gray-600">Create Account</p>
+              <span className={`text-2xl ${authTitleClass}`}>Smart Connect</span>
+              <p className={`text-xs ${authMutedClass}`}>Create Account</p>
             </div>
           </div>
 
-          <h2 className="text-3xl text-center mb-8 text-gray-900">Join the Platform</h2>
+          <h2 className={`text-3xl text-center mb-8 ${authTitleClass}`}>Join the Platform</h2>
 
           <div className="space-y-3">
             <button
               type="button"
               onClick={handleGoogleSignUp}
               disabled={googleLoading}
-              className="w-full bg-white border border-gray-300 text-gray-700 py-1.5 rounded-lg hover:bg-gray-50 transition-colors shadow-sm flex justify-center items-center gap-2"
+              className="w-full bg-white dark:bg-slate-900 border border-gray-400 dark:border-slate-600 text-gray-700 dark:text-gray-200 py-1.5 rounded-full hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors shadow-sm flex justify-center items-center gap-2"
             >
               {googleLoading ? (
                 <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
@@ -170,7 +198,7 @@ export function SignUpPage() {
                 setError('');
                 setSignupMethod('manual');
               }}
-              className="w-full bg-blue-800 text-white py-3 rounded-lg hover:bg-blue-900 transition-colors shadow-md"
+              className="w-full bg-blue-800 text-white py-3 rounded-full hover:bg-blue-900 transition-colors shadow-md"
             >
               Enter details manually
             </button>
@@ -179,55 +207,55 @@ export function SignUpPage() {
           {signupMethod === 'manual' && (
             <form onSubmit={handleSubmit} className="space-y-6 mt-6">
               <div>
-                <label className="block text-sm mb-2 text-gray-700">Full Name</label>
+                <label className={authLabelClass}>Full Name</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800"
+                  className={authInputClass}
                   placeholder="John Doe"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm mb-2 text-gray-700">Email Address</label>
+                <label className={authLabelClass}>Email Address</label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800"
+                  className={authInputClass}
                   placeholder="your@email.com"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm mb-2 text-gray-700">Password</label>
+                <label className={authLabelClass}>Password</label>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800"
+                  className={authInputClass}
                   placeholder="........"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm mb-2 text-gray-700">Confirm Password</label>
+                <label className={authLabelClass}>Confirm Password</label>
                 <input
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800"
+                  className={authInputClass}
                   placeholder="........"
                   required
                 />
               </div>
 
               {error && (
-                <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm border border-red-200">
+                <div className={authErrorClass}>
                   {error}
                 </div>
               )}
@@ -243,14 +271,14 @@ export function SignUpPage() {
           )}
 
           {signupMethod !== 'manual' && error && (
-            <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm border border-red-200 mt-6">
+            <div className={`${authErrorClass} mt-6`}>
               {error}
             </div>
           )}
 
-          <p className="text-center mt-6 text-gray-600">
+          <p className={`text-center mt-6 ${authMutedClass}`}>
             Already have an account?{' '}
-            <button onClick={() => navigate('/login')} className="text-blue-800 hover:underline">
+            <button onClick={() => navigate('/login')} className="text-blue-800 dark:text-blue-300 hover:underline">
               Log in
             </button>
           </p>

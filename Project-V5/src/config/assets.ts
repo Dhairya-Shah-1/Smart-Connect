@@ -22,7 +22,7 @@ export const ASSETS = {
 
   Map_Image : `${appAssetBaseUrl}/Map_Image.png`,
 
-  GoogleIcon : `${appAssetBaseUrl}/google-icon.jpg`,
+  GoogleIcon : `${appAssetBaseUrl}/google-icon.png`,
 
   Shield_img_without_bg : `${appAssetBaseUrl}/shield-img-for-titlebar-without-bg.png`,
 
