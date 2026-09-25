@@ -4,6 +4,7 @@ import { ASSETS } from '../config/assets';
 import { ArrowLeft, Mail, CheckCircle, Loader2, Moon, Sun } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { notifyCurrentUserChanged, useTheme } from '../App';
+import { recordLoginTime } from '../utils/authLifetime';
 
 type LoginView = 'login' | 'forgot-password' | 'email-sent' | 'update-password';
 
@@ -307,6 +308,7 @@ export function LoginPage() {
     };
 
     localStorage.setItem('currentUser', JSON.stringify(currentUser));
+    recordLoginTime();
     notifyCurrentUserChanged();
 
     if (role === 'super_admin') {

@@ -5,6 +5,7 @@ import { useTheme } from '../App';
 import { toast } from 'sonner';
 import { supabase } from './supabaseClient';
 import { verifySingleIncident } from '../utils/aiVerification';
+import { getAuthenticatedUser } from '../utils/authSession';
 import { clearBrowserCache, REPORT_HISTORY_CACHE_PREFIX } from '../utils/browserCache';
 import { BlurredVideoLoader } from './ui/blurred-video-loader';
 
@@ -37,6 +38,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
   const [lng, setLng] = useState<number | null>(null);
   const [description, setDescription] = useState('');
   const [photo, setPhoto] = useState<string>('');
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   // ─── UI State ──────────────────────────────────────────────
   const [success, setSuccess] = useState(false);
@@ -77,44 +79,64 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       if (!file) return;
 
       setUploading(true);
+      setPhotoUrl(null);
 
-      // 1. Create local preview immediately using FileReader
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        setPhoto(result); // Show preview immediately
-      };
-      reader.readAsDataURL(file);
+      try {
+        // 1. Create local preview immediately using FileReader
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const result = event.target?.result as string;
+          setPhoto(result); // Show preview immediately
+        };
+        reader.readAsDataURL(file);
 
-      // 2. Create unique file path with user ID if available
-      const { data: authData } = await supabase.auth.getUser();
-      const userId = authData?.user?.id || 'anonymous';
-      const timestamp = Date.now();
-      const fileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_'); // Sanitize filename
-      const filePath = `reports/${userId}/${timestamp}-${fileName}`;
+        // 2. Storage writes are evaluated by RLS using the REAL Supabase
+        //    session. `currentUser` in localStorage is not enough: without a
+        //    session the request runs as the `anon` role and the bucket rejects
+        //    the insert with "new row violates row-level security policy".
+        //    That is why we never fall back to a placeholder folder (the old
+        //    `|| 'anonymous'` path) and instead ask Supabase first - refreshing
+        //    an expired token if needed.
+        const { userId, state, errorMessage } = await getAuthenticatedUser();
 
-      // 3. Upload to Supabase Storage with proper error handling
-      const { error } = await supabase.storage
-        .from('incident-images')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
+        if (!userId) {
+          console.warn('Photo not uploaded - no usable Supabase session.', state, errorMessage);
+          toast.info('Photo kept on this page only. Sign in again to upload it - you can still submit the report.');
+          return;
+        }
 
-      if (error) {
-        console.error('Upload failed:', error.message);
-        toast.error('Upload failed. Preview saved locally.');
+        const timestamp = Date.now();
+        const fileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_'); // Sanitize filename
+        const filePath = `reports/${userId}/${timestamp}-${fileName}`;
+
+        // 3. Upload to Supabase Storage with proper error handling
+        const { error } = await supabase.storage
+          .from('incident-images')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (error) {
+          console.warn('Photo upload failed:', error.message);
+          toast.error('Photo upload failed. You can still submit the report without the photo.');
+          return;
+        }
+
+        // 4. Get PUBLIC URL and update if upload succeeds
+        const { data } = supabase.storage
+          .from('incident-images')
+          .getPublicUrl(filePath);
+
+        setPhotoUrl(data.publicUrl);
+      } catch (err: any) {
+        console.error('Photo upload error:', err);
+        toast.error('Photo upload failed. You can still submit the report without the photo.');
+      } finally {
+        // Never leave the form stuck on "Uploading Photo..." with a disabled
+        // submit button when something throws.
         setUploading(false);
-        return;
       }
-
-      // 4. Get PUBLIC URL and update if upload succeeds
-      const { data } = supabase.storage
-        .from('incident-images')
-        .getPublicUrl(filePath);
-
-      setPhoto(data.publicUrl); // Replace with Supabase URL
-      setUploading(false);
     };
 
   const requestLocation = useCallback(() => {
@@ -222,18 +244,19 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
     setIsSubmitting(true);
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
+      // The insert is protected by RLS, so it must run with a real Supabase
+      // session. `getAuthenticatedUser` refreshes an expired token before giving
+      // up and tells the user *why* the report could not be submitted instead of
+      // letting the database reject it with a row level security error.
+      const { userId, state, errorMessage } = await getAuthenticatedUser();
 
-      if (authError || !authData?.user) {
-        toast.error('Please log in to submit a report.');
-        setIsSubmitting(false);
-        return;
-      }
-
-      const userId = authData.user.id;
-      
       if (!userId) {
-        toast.error('Please log in to submit a report.');
+        console.error('Report not submitted - no usable Supabase session.', state, errorMessage);
+        toast.error(
+          state === 'error'
+            ? 'Could not verify your session. Check your connection and try again.'
+            : 'Your session has expired. Please sign in again to submit the report.'
+        );
         setIsSubmitting(false);
         return;
       }
@@ -251,18 +274,13 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
           severity,
           status: reportStatus,
           location: `POINT(${lng} ${lat})`,
-          photo_url: photo,
+          photo_url: photoUrl,
           // timestamp: new Date().toISOString(),
         })
         .select()
         .single();
 
-      if (!data) {
-        console.error('Supabase insert error:', error);
-        toast.error('Report could not be saved. Please try again.');
-        setIsSubmitting(false);
-        return;
-      }
+      if (error) throw error;
 
       console.log('Report saved to Supabase:', data);
       setSuccess(true);
@@ -276,6 +294,10 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       // fetch the canonical incident record, analyze it, and persist the result.
       try {
         toast.info('Verifying incident with AI...');
+
+        if (!data?.report_id) {
+          throw new Error('The report was saved, but its ID could not be returned for AI verification.');
+        }
 
         const aiResult = await verifySingleIncident(data.report_id);
 
@@ -310,6 +332,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         setSeverity('');
         setDescription('');
         setPhoto('');
+        setPhotoUrl(null);
         setLocationText('');
         setLat(null);
         setLng(null);
@@ -437,7 +460,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
   return (
     <div
-      className={`hide-scrollbar relative h-full overflow-y-auto p-6 ${isDark ? "bg-slate-900" : "bg-gray-50"}`}
+      className={`mobile-scroll-content hide-scrollbar relative h-full p-6 ${isDark ? "bg-slate-900" : "bg-gray-50"}`}
     >
       {/* LOADER OVERLAY - centered over the Report tab while submitting */}
       {isSubmitting && (
@@ -658,6 +681,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
                     onClick={(e) => {
                       e.stopPropagation();
                       setPhoto('');
+                      setPhotoUrl(null);
                     }}
                     className="absolute top-2 right-2 bg-red-600 text-white p-2 rounded-full shadow-lg hover:bg-red-700"
                   >
@@ -695,9 +719,9 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
 
           <button
             type="submit"
-            disabled={isLoadingLocation || !issueType || !photo || isSubmitting}
+            disabled={isLoadingLocation || uploading || !issueType || !photo || isSubmitting}
             className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all flex items-center justify-center gap-2 ${
-              isLoadingLocation || !issueType || !photo || isSubmitting
+              isLoadingLocation || uploading || !issueType || !photo || isSubmitting
                 ? "bg-gray-400 cursor-not-allowed text-gray-200"
                 : "bg-blue-600 hover:bg-blue-700 text-white hover:shadow-blue-500/25 active:scale-[0.98]"
             }`}
@@ -705,6 +729,8 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
             {isSubmitting && <Loader2 size={20} className="animate-spin" />}
             {isLoadingLocation
               ? "Detecting Location..."
+              : uploading
+              ? "Uploading Photo..."
               : isSubmitting
               ? "Submitting Report..."
               : !issueType || !photo

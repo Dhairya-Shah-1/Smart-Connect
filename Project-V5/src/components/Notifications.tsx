@@ -296,7 +296,7 @@ export function Notifications() {
   }
 
   return (
-    <div className={`hide-scrollbar absolute inset-0 overflow-y-auto ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
+    <div className={`mobile-scroll-content hide-scrollbar absolute inset-0 ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
       <div className="max-w-4xl mx-auto p-6">
         <div className="flex items-center justify-between mb-6">
           <div>

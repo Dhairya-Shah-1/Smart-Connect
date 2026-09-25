@@ -214,7 +214,7 @@ export function Dashboard({ onLogout, onNavigateHome }: DashboardProps) {
       </header>
 
       {/* Main Content */}
-      <div className={`flex-1 min-h-0 relative mobile-bottom-content ${currentView === 'map' || currentView === 'profile' || currentView === 'notifications' ? 'overflow-hidden' : 'overflow-y-auto'} ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
+      <div className={`flex-1 min-h-0 relative mobile-bottom-content overflow-hidden ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
         {renderView()}
         
         {/* Floating Action Button - Only on Map and History views */}

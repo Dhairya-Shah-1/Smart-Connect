@@ -2,9 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { MapPin, AlertTriangle, Droplets, Flame, Car, Mountain, Sun, Moon, LogOut } from "lucide-react";
 import { isMobileOrTablet } from "../utils/deviceDetection";
 import { ASSETS } from '../config/assets';
-import { supabase } from './supabaseClient';
-import { notifyCurrentUserChanged } from "../App";
-import { APP_CACHE_PREFIXES, clearBrowserCache } from '../utils/browserCache';
+import { signOutAndClearAuth, isLoginExpired } from '../utils/authLifetime';
 
 import { useTheme } from "../App";
 
@@ -16,7 +14,7 @@ export function LandingPage() {
   
   // Check if user is logged in
   const user = localStorage.getItem('currentUser');
-  const isLoggedIn = !!user;
+  const isLoggedIn = !!user && !isLoginExpired();
 
   const issues = [
     {
@@ -60,20 +58,13 @@ export function LandingPage() {
   };
 
   const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.error('SignOut error (can be ignored):', error);
-    }
-    localStorage.removeItem('currentUser');
-    clearBrowserCache(APP_CACHE_PREFIXES);
-    notifyCurrentUserChanged();
+    await signOutAndClearAuth();
     navigate('/login', { replace: true });
   };
 
   return (
     <div 
-      className={`min-h-screen ${!isMobile ? "" : ""} ${isDark ? "bg-gradient-to-b from-slate-800 to-slate-900" : "bg-gradient-to-b from-slate-50 to-white"}`}
+      className={`landing-page hide-scrollbar min-h-screen ${isDark ? "bg-gradient-to-b from-slate-800 to-slate-900" : "bg-gradient-to-b from-slate-50 to-white"}`}
     >
       {/* Navigation */}
       <nav

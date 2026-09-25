@@ -15,7 +15,7 @@ import { MapView } from './components/MapView';
 import { CheckReports } from './components/CheckReports';
 import { processAllUnprocessedReports, getUnprocessedReportsCount } from './utils/aiVerification';
 import { toast } from 'sonner';
-import { APP_CACHE_PREFIXES, clearBrowserCache } from './utils/browserCache';
+import { enforceLoginLifetime, isLoginExpired, signOutAndClearAuth, CURRENT_USER_EVENT } from './utils/authLifetime';
 
 type Theme = 'light' | 'dark';
 
@@ -31,8 +31,6 @@ const ThemeContext = createContext<ThemeContextType>({
 
 export const useTheme = () => useContext(ThemeContext);
 
-const CURRENT_USER_EVENT = 'current-user-changed';
-
 export function notifyCurrentUserChanged() {
   window.dispatchEvent(new Event(CURRENT_USER_EVENT));
 }
@@ -41,7 +39,8 @@ export function notifyCurrentUserChanged() {
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const user = localStorage.getItem('currentUser');
   
-  if (!user) {
+  if (!user || isLoginExpired()) {
+    if (user) void signOutAndClearAuth();
     return <Navigate to="/login" replace />;
   }
   
@@ -52,7 +51,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const userStr = localStorage.getItem('currentUser');
   
-  if (!userStr) {
+  if (!userStr || isLoginExpired()) {
+    if (userStr) void signOutAndClearAuth();
     return <Navigate to="/login" replace />;
   }
   
@@ -68,7 +68,8 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 function SuperAdminRoute({ children }: { children: React.ReactNode }) {
   const userStr = localStorage.getItem('currentUser');
   
-  if (!userStr) {
+  if (!userStr || isLoginExpired()) {
+    if (userStr) void signOutAndClearAuth();
     return <Navigate to="/login" replace />;
   }
   
@@ -86,6 +87,26 @@ function AppContent() {
   const location = useLocation();
   const [theme, setTheme] = useState<Theme>('light');
   const [authRefreshKey, setAuthRefreshKey] = useState(0);
+
+  useEffect(() => {
+    void enforceLoginLifetime();
+    const lifetimeCheck = window.setInterval(() => {
+      void enforceLoginLifetime();
+    }, 60 * 1000);
+
+    return () => window.clearInterval(lifetimeCheck);
+  }, []);
+
+  useEffect(() => {
+    const isLandingRoute = location.pathname === '/';
+    document.documentElement.classList.toggle('landing-route', isLandingRoute);
+    document.body.classList.toggle('landing-route', isLandingRoute);
+
+    return () => {
+      document.documentElement.classList.remove('landing-route');
+      document.body.classList.remove('landing-route');
+    };
+  }, [location.pathname]);
 
   const getRedirectPath = (userStr: string | null) => {
     if (!userStr) return null;
@@ -228,14 +249,7 @@ function DashboardWrapper() {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.log('SignOut error (can be ignored):', error);
-    }
-    localStorage.removeItem('currentUser');
-    clearBrowserCache(APP_CACHE_PREFIXES);
-    notifyCurrentUserChanged();
+    await signOutAndClearAuth();
     navigate('/login', { replace: true });
   };
   
@@ -274,14 +288,7 @@ function ProfileWrapper() {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.log('SignOut error (can be ignored):', error);
-    }
-    localStorage.removeItem('currentUser');
-    clearBrowserCache(APP_CACHE_PREFIXES);
-    notifyCurrentUserChanged();
+    await signOutAndClearAuth();
     navigate('/login', { replace: true });
   };
   
@@ -326,14 +333,7 @@ function AdminDashboardWrapper() {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.log('SignOut error (can be ignored):', error);
-    }
-    localStorage.removeItem('currentUser');
-    clearBrowserCache(APP_CACHE_PREFIXES);
-    notifyCurrentUserChanged();
+    await signOutAndClearAuth();
     navigate('/login', { replace: true });
   };
   
@@ -344,14 +344,7 @@ function SuperAdminDashboardWrapper() {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.log('SignOut error (can be ignored):', error);
-    }
-    localStorage.removeItem('currentUser');
-    clearBrowserCache(APP_CACHE_PREFIXES);
-    notifyCurrentUserChanged();
+    await signOutAndClearAuth();
     navigate('/login', { replace: true });
   };
   

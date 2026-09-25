@@ -202,7 +202,7 @@ export function Profile({ onLogout }: ProfileProps) {
   };
 
   return (
-    <div className={`hide-scrollbar absolute inset-0 overflow-y-auto ${isDark ? 'bg-slate-900' : 'bg-slate-50'} p-4 pb-24 md:p-6 md:pb-28`}>
+    <div className={`mobile-scroll-content hide-scrollbar absolute inset-0 ${isDark ? 'bg-slate-900' : 'bg-slate-50'} p-4 pb-24 md:p-6 md:pb-28`}>
       <div className="max-w-2xl mx-auto space-y-6">
 
         {/* PROFILE CARD — ORIGINAL STRUCTURE PRESERVED */}

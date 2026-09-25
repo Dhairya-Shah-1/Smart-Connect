@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Clock, MapPin, Droplets, AlertTriangle, Flame, Car, Mountain, ShieldCheck, Building2, Flag, XCircle, CheckCircle } from 'lucide-react';
 import { supabase } from './supabaseClient';
+import { signOutAndClearAuth } from '../utils/authLifetime';
 import { useTheme } from '../App';
 import { BlurredVideoLoader } from './ui/blurred-video-loader';
 import {
+  clearBrowserCache,
+  getBrowserCache,
   loadCachedOrFresh,
   REPORT_HISTORY_CACHE_PREFIX,
   sanitizeCacheKeyPart,
 } from '../utils/browserCache';
+import { getAuthenticatedUser } from '../utils/authSession';
 
 const PAGE_SIZE = 5;
 
@@ -37,6 +42,7 @@ interface ReportHistoryCacheData {
 export function ReportHistory() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const navigate = useNavigate();
   const [userId, setUserId] = useState<string | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
   const [filter, setFilter] = useState('all');
@@ -44,6 +50,9 @@ export function ReportHistory() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  // True when the browser has a local `currentUser` but no usable Supabase
+  // session, so RLS cannot return this user's reports.
+  const [needsSignIn, setNeedsSignIn] = useState(false);
 
   const formatDisplayDate = (value: string) =>
     new Date(value).toLocaleDateString('en-GB', {
@@ -60,25 +69,52 @@ export function ReportHistory() {
     }
   };
 
+  const getCoordinates = (location: any) => {
+    if (typeof location === 'string') {
+      const point = location.match(/POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i);
+      if (point) return { lat: Number(point[2]), lng: Number(point[1]) };
+    }
+
+    if (location?.coordinates && Array.isArray(location.coordinates)) {
+      return { lat: Number(location.coordinates[1]), lng: Number(location.coordinates[0]) };
+    }
+
+    return { lat: null, lng: null };
+  };
+
   const mapReports = (data: any[], user: any): Report[] =>
-    data.map((r: any) => ({
-      id: r.report_id,
-      type: r.incident_type || 'Unknown',
-      severity: r.severity || 'low',
-      location: r.lat && r.lng ? `${r.lat.toFixed(4)}, ${r.lng.toFixed(4)}` : 'View on map',
-      lat: r.lat,
-      lng: r.lng,
-      description: r.incident_description || '',
-      photo: r.photo_url || null,
-      status: r.status || 'pending',
-      timestamp: r.timestamp || new Date().toISOString(),
-      userName: user.user_metadata?.full_name || user.name || user.email || 'User',
-      aiVerified: r.ai_interpretation ? !r.ai_interpretation.toLowerCase().includes('fake') : true,
-      aiConfidence: r.ai_interpretation ? 0.8 : undefined,
-      aiReason: r.ai_interpretation || '',
-      isFlagged: r.status === 'rejected',
-      departmentNotified: 'Municipal Authority',
-    }));
+    data.map((r: any) => {
+      const coordinates = getCoordinates(r.location);
+      // The view exposes `lat`/`lon`, the base table stores the geometry in
+      // `location`, so use whichever is available.
+      const lat = typeof r.lat === 'number' ? r.lat : coordinates.lat;
+      const lng = typeof r.lng === 'number'
+        ? r.lng
+        : typeof r.lon === 'number'
+          ? r.lon
+          : coordinates.lng;
+
+      return {
+        id: r.report_id,
+        type: r.incident_type || 'Unknown',
+        severity: r.severity || 'low',
+        location: typeof lat === 'number' && typeof lng === 'number'
+          ? `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+          : 'View on map',
+        lat,
+        lng,
+        description: r.incident_description || '',
+        photo: r.photo_url || null,
+        status: r.status || 'pending',
+        timestamp: r.timestamp || new Date().toISOString(),
+        userName: user.user_metadata?.full_name || user.name || user.email || 'User',
+        aiVerified: r.ai_interpretation ? !r.ai_interpretation.toLowerCase().includes('fake') : true,
+        aiConfidence: r.ai_interpretation ? 0.8 : undefined,
+        aiReason: r.ai_interpretation || '',
+        isFlagged: r.status === 'rejected',
+        departmentNotified: 'Municipal Authority',
+      };
+    });
 
   const getReportHistoryCacheKeys = (targetUserId: string, activeFilter: string) => {
     const suffix = sanitizeCacheKeyPart(`${targetUserId}_${activeFilter}`);
@@ -109,7 +145,7 @@ export function ReportHistory() {
   // Builds a Supabase query for one page of the signed-in user's reports.
   // `report_id` is used as a secondary sort key so the order (and therefore the
   // cache signature) stays deterministic even when two reports share a timestamp.
-  const runPageQuery = (targetUserId: string, pageIndex: number, activeFilter: string) => {
+  const runPageQuery = async (targetUserId: string, pageIndex: number, activeFilter: string) => {
     const from = pageIndex * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
 
@@ -129,7 +165,36 @@ export function ReportHistory() {
       }
     }
 
-    return query;
+    const result = await query;
+    if (!result.error && (result.data?.length ?? 0) > 0) return result;
+
+    // Either the view failed or it returned no rows for this user. Read the base
+    // table directly as a fallback. RLS still applies to both, which is why an
+    // EMPTY result with NO error usually means the browser is running as the
+    // `anon` role (no Supabase session) - `anon` receives `[]` with HTTP 200
+    // instead of a permission error.
+    console.warn(
+      result.error
+        ? 'Report history view failed; reading incident_reports instead.'
+        : 'Report history view returned no rows; reading incident_reports instead.',
+      result.error ?? undefined,
+    );
+
+    let fallbackQuery = supabase
+      .from('incident_reports')
+      .select('report_id,incident_type,incident_description,severity,status,timestamp,user_id,photo_url,location,ai_interpretation')
+      .eq('user_id', targetUserId)
+      .order('timestamp', { ascending: false })
+      .order('report_id', { ascending: false })
+      .range(from, to);
+
+    if (activeFilter !== 'all') {
+      fallbackQuery = activeFilter === 'pending'
+        ? fallbackQuery.or('status.eq.pending,status.is.null')
+        : fallbackQuery.eq('status', activeFilter);
+    }
+
+    return fallbackQuery;
   };
 
   // Cheap database call: only checks whether the user's reports changed.
@@ -150,7 +215,31 @@ export function ReportHistory() {
       }
     }
 
-    const { data, error } = await query;
+    let { data, error } = await query;
+    if (error || (data?.length ?? 0) === 0) {
+      console.warn(
+        error
+          ? 'Report signature view failed; reading incident_reports instead.'
+          : 'Report signature view returned no rows; reading incident_reports instead.',
+        error ?? undefined,
+      );
+      let fallbackQuery = supabase
+        .from('incident_reports')
+        .select('report_id,status,timestamp,severity,incident_type,user_id')
+        .eq('user_id', targetUserId)
+        .order('timestamp', { ascending: false })
+        .order('report_id', { ascending: false })
+        .range(0, PAGE_SIZE - 1);
+
+      fallbackQuery = activeFilter === 'pending'
+        ? fallbackQuery.or('status.eq.pending,status.is.null')
+        : activeFilter !== 'all'
+          ? fallbackQuery.eq('status', activeFilter)
+          : fallbackQuery;
+
+      ({ data, error } = await fallbackQuery);
+    }
+
     if (error) throw error;
 
     return buildReportsSignature(data || []);
@@ -158,8 +247,10 @@ export function ReportHistory() {
 
   // Full database call for the first page; applies it and returns snapshot + signature.
   const fetchFirstPageSnapshot = async (targetUserId: string, activeFilter: string) => {
-    const user = getCurrentUser();
-    if (!user?.id) return null;
+    // `targetUserId` comes from the authenticated Supabase session (see the
+    // user-resolution effect); the localStorage copy is only used for the
+    // display name, so it must not block the load.
+    const user = getCurrentUser() ?? {};
 
     const { data, error } = await runPageQuery(targetUserId, 0, activeFilter);
     if (error) {
@@ -192,8 +283,7 @@ export function ReportHistory() {
 
     setLoadingMore(true);
     try {
-      const user = getCurrentUser();
-      if (!user?.id) return;
+      const user = getCurrentUser() ?? {};
 
       const nextPage = page + 1;
       const { data, error } = await runPageQuery(targetUserId, nextPage, activeFilter);
@@ -215,6 +305,14 @@ export function ReportHistory() {
   const loadReportsFromCacheOrDatabase = async (targetUserId: string, activeFilter: string) => {
     const { cookieKey, storageKey } = getReportHistoryCacheKeys(targetUserId, activeFilter);
 
+    // An empty snapshot can be produced while the view is unavailable or while
+    // the session is still being established. Do not keep reusing that empty
+    // result, otherwise the database is never asked for the user's reports.
+    const cached = getBrowserCache<ReportHistoryCacheData>(cookieKey, storageKey);
+    if (cached && (!Array.isArray(cached.data.reports) || cached.data.reports.length === 0)) {
+      clearBrowserCache([cookieKey, storageKey]);
+    }
+
     // Policy implemented by loadCachedOrFresh:
     //  - first visit  → fetch from the database and store it in the browser,
     //  - next visits  → show the stored reports instantly and, ONLY if the
@@ -231,17 +329,46 @@ export function ReportHistory() {
     });
   };
 
-  // Resolve current user once
+  // Resolve the signed-in user once.
+  //
+  // `localStorage.currentUser` is NOT authoritative: Supabase evaluates every
+  // query with the real session, so a local user WITHOUT a session makes the
+  // view answer `[]` with HTTP 200 (no error) and the history silently looks
+  // empty. Ask Supabase - retrying with a refreshed token - instead.
   useEffect(() => {
-    const currentUser = getCurrentUser();
-    if (!currentUser?.id) {
-      setUserId(null);
-      setReports([]);
-      setLoading(false);
-      return;
-    }
+    let cancelled = false;
 
-    setUserId(currentUser.id);
+    (async () => {
+      const { userId: sessionUserId, state, errorMessage } = await getAuthenticatedUser();
+
+      if (cancelled) return;
+
+      if (!sessionUserId) {
+        const localUserId = getCurrentUser()?.id;
+
+        console.warn(
+          `[ReportHistory] No usable Supabase session (state: ${state}). ` +
+            (localUserId ? `Stored currentUser "${localUserId}" has no valid session. ` : '') +
+            'RLS returns an empty list for the anon role, so no query is attempted.',
+          errorMessage ?? '',
+        );
+
+        setUserId(null);
+        setReports([]);
+        setHasMore(false);
+        setPage(0);
+        setNeedsSignIn(true);
+        setLoading(false);
+        return;
+      }
+
+      setNeedsSignIn(false);
+      setUserId(sessionUserId);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Fetch first page whenever user/filter changes
@@ -308,7 +435,7 @@ export function ReportHistory() {
   }
 
   return (
-  <div className={`hide-scrollbar h-full w-full max-w-7xl mx-auto overflow-y-auto ${isDark ? 'bg-slate-900' : 'bg-gray-100'}`}>
+  <div className={`mobile-scroll-content hide-scrollbar h-full w-full max-w-7xl mx-auto ${isDark ? 'bg-slate-900' : 'bg-gray-100'}`}>
     <div className="w-full mx-auto p-4 md:p-6">
       <div className="mx-auto items-center justify-center">
         {/* Header - Mobile Optimized */}
@@ -341,7 +468,26 @@ export function ReportHistory() {
       </div>
         {/* List - Mobile Optimized */}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
-          {filteredReports.length === 0 ? (
+          {needsSignIn ? (
+            <div className={`p-6 rounded-xl border text-center ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
+              <p className={`text-sm font-semibold mb-1 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                Your session has expired
+              </p>
+              <p className={`text-xs mb-3 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                Reports are protected by Supabase row level security, so they can only be loaded
+                while you are signed in. Please sign in again to see your report history.
+              </p>
+              <button
+                onClick={async () => {
+                  await signOutAndClearAuth();
+                  navigate('/login', { replace: true });
+                }}
+                className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs hover:bg-blue-700"
+              >
+                Sign in again
+              </button>
+            </div>
+          ) : filteredReports.length === 0 ? (
             <div className={`p-6 rounded-xl border text-center ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
               <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>No reports found</p>
               {filter !== 'all' && (

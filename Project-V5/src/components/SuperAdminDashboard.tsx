@@ -20,7 +20,6 @@ type TabView = 'overview' | 'incidents' | 'admins' | 'analytics';
 
 const SUPER_ADMIN_CACHE_PREFIX = 'smart_connect_super_admin';
 const INCIDENT_PAGE_SIZE = 3;
-const INCIDENT_CACHE_PREFIX = 'smart_connect_incident_reports';
 
 interface SuperAdminCacheData {
   superAdminProfile: any | null;
@@ -182,12 +181,6 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
       `in-progress:${overviewStats.inProgressIncidents}`,
       `resolved:${overviewStats.resolvedIncidents}`,
     ].join('|');
-
-
-  // Builds a deterministic signature of the current incident query parameters
-  // so we can detect whether the data has changed in the database.
-  const buildIncidentSignature = (sortOrder: 'oldest' | 'newest', status: string, department: string) =>
-    [sortOrder, status, department].join('|');
 
   const fetchOverviewStats = async () => {
     const { count: adminCount, error: adminError } = await supabase
@@ -378,29 +371,6 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
   };
 
   const loadIncidentReports = async ({ reset = false, sortOrder = incidentSortOrder } = {}) => {
-    // If resetting, clear the cache and load fresh data
-    if (reset) {
-      const cookieKey = `${INCIDENT_CACHE_PREFIX}_${sanitizeCacheKeyPart(user?.id || 'unknown')}`;
-      const storageKey = `${cookieKey}_${sortOrder}_${filterStatus}_${filterDepartment}`;
-      
-      // Clear existing cache for this query combination
-      try {
-        const { clearBrowserCache } = await import('../utils/browserCache');
-        clearBrowserCache([cookieKey]);
-      } catch (clearError) {
-        console.warn('Failed to clear incident cache:', clearError);
-      }
-      
-      // Load fresh data from database
-      await loadIncidentReportsFromDb({ sortOrder, storageKey, cookieKey });
-      return;
-    }
-    
-    // Try to load from cache first
-    const cookieKey = `${INCIDENT_CACHE_PREFIX}_${sanitizeCacheKeyPart(user?.id || 'unknown')}`;
-    const storageKey = `${cookieKey}_${sortOrder}_${filterStatus}_${filterDepartment}`;
-    
-    await loadIncidentReportsFromDb({ sortOrder, storageKey, cookieKey });
     try {
       setIncidentLoading(true);
       setIncidentDataNotice(null);
@@ -451,113 +421,6 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
       } else if (dataSource === 'table') {
         console.warn('Super admin incidents are being shown from fallback incident_reports data because incident_reports_view returned no rows.');
       }
-    } catch (error: any) {
-      console.error('Error loading incident reports:', error);
-      toast.error('Failed to load incident reports');
-    } finally {
-      setIncidentLoading(false);
-    }
-  };
-
-  // Loads incident reports from the database with caching support
-  const loadIncidentReportsFromDb = async ({ sortOrder, storageKey, cookieKey }: { sortOrder: 'oldest' | 'newest', storageKey: string, cookieKey: string }) => {
-    try {
-      setIncidentLoading(true);
-
-      // Use loadCachedOrFresh to handle caching
-      await loadCachedOrFresh({
-        cookieKey,
-        storageKey,
-        fetchSignature: async () => {
-          // Build signature based on current filters and sort order
-          const sig = buildIncidentSignature(sortOrder, filterStatus, filterDepartment);
-          
-          // Count total incidents to include in signature
-          const { count, error: countError } = await supabase
-            .from('incident_reports_view')
-            .select('*', { count: 'exact', head: true })
-            .eq('a_id', user?.id)
-            .eq('status', filterStatus === 'all' ? null : filterStatus)
-            .eq('department', filterDepartment === 'all' ? null : filterDepartment);
-          
-          if (countError) {
-            console.error('Error counting incidents:', countError);
-            return sig;
-          }
-          
-          return `${sig}_total:${count || 0}`;
-        },
-        fetchFull: async () => {
-          // Calculate pagination range
-          const from = 0;
-          const to = from + INCIDENT_PAGE_SIZE - 1;
-          const ascending = sortOrder === 'oldest';
-
-          const { data: viewData, error: viewError, count: viewCount } = await supabase
-            .from('incident_reports_view')
-            .select('*', { count: 'exact' })
-            .eq('a_id', user?.id)
-            .order('timestamp', { ascending })
-            .order('report_id', { ascending })
-            .range(from, to);
-
-          if (viewError) throw viewError;
-
-          let dataSource: 'view' | 'table' = 'view';
-          let rawRows = viewData || [];
-          let totalRows = viewCount || 0;
-
-          if (totalRows === 0) {
-            console.warn('incident_reports_view returned no rows for super admin, trying base incident_reports fallback.');
-            const { data: tableData, error: tableError, count: tableCount } = await supabase
-              .from('incident_reports')
-              .select('report_id, incident_type, incident_description, severity, status, timestamp, user_id, photo_url, a_id, ai_interpretation', { count: 'exact' })
-              .order('timestamp', { ascending })
-              .order('report_id', { ascending })
-              .range(from, to);
-
-            if (tableError) throw tableError;
-            dataSource = 'table';
-            rawRows = tableData || [];
-            totalRows = tableCount || 0;
-          }
-
-          const mappedIncidents = await mapIncidentRows(rawRows, dataSource);
-          const departments = [...new Set(mappedIncidents.map((incident) => normalizeDepartment(incident.department)))];
-          
-          // Check if there are more incidents to load
-          const hasMore = mappedIncidents.length >= INCIDENT_PAGE_SIZE && (!totalRows || totalRows > INCIDENT_PAGE_SIZE);
-
-          return {
-            data: {
-              incidents: mappedIncidents,
-              departments,
-              hasMoreIncidents: hasMore,
-              filterStatus,
-              filterDepartment,
-              sortOrder,
-            },
-            signature: buildIncidentSignature(sortOrder, filterStatus, filterDepartment),
-          };
-        },
-        applyData: (data) => {
-          const { incidents, departments, hasMoreIncidents } = data;
-          
-          // For initial load (reset), just set the incidents directly
-          // For subsequent loads, append to existing incidents
-          const newIncidents = reset ? incidents : [...incidents, ...incidents];
-          
-          setIncidents(newIncidents);
-          setFilteredIncidents(newIncidents);
-          setDepartments(departments);
-          setHasMoreIncidents(hasMoreIncidents);
-          setIncidentDataLoaded(true);
-        },
-        onFinishedLoading: () => {
-          setIncidentLoading(false);
-        },
-        logLabel: 'SuperAdminIncidents',
-      });
     } catch (error: any) {
       console.error('Error loading incident reports:', error);
       toast.error('Failed to load incident reports');
@@ -701,13 +564,13 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
       </div>
     </header>
 
-    <div className={`w-full ${isMobile ? "px-3 py-4 overflow-x-hidden" : "max-w-7xl item-center justify-center mx-auto px-4 py-6"}`}>
+    <div className={`dashboard-content flex-1 min-h-0 overflow-y-auto hide-scrollbar w-full ${isMobile ? "px-3 py-4 overflow-x-hidden" : "max-w-7xl item-center justify-center mx-auto px-4 py-6"}`}>
       {/* Super Admin Info Card */}
       <div className={`${isMobile ? "mb-4 p-4" : "mb-6 p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
         <div className={`flex items-start ${isMobile ? "gap-3" : "gap-4"}`}>
-          <div className={`${isMobile ? "w-12 h-12 text-xl" : "w-16 h-16 text-3xl"} shrink-0 rounded-full flex items-center justify-center font-bold ${
+          <div className={`First_Chars ${isMobile ? "w-12 h-12 text-xl" : "w-16 h-16 text-3xl"} shrink-0 rounded-full flex items-center justify-center font-bold ${
             isDark ? 'bg-purple-600 text-purple-200' : 'bg-purple-200 text-purple-700'
-          }`} style={{ fontFamily: 'Mileast, Arial, Helvetica, sans-serif' }}>
+          }`}>
             {superAdminData?.sa_name?.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
@@ -738,7 +601,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
           {[
             { id: 'overview', label: 'Overview', icon: TrendingUp },
             { id: 'incidents', label: 'All Incidents', icon: AlertTriangle },
-            { id: 'admins', label: 'Admin Management', icon: Users },
+            { id: 'admins', label: 'Manage Admins', icon: Users },
             { id: 'analytics', label: 'Analytics', icon: BarChart3 },
           ].map((tab) => (
             <button
