@@ -23,7 +23,9 @@ export async function verifySingleIncident(reportId: string): Promise<{
   try {
     const { data: report, error } = await supabase
       .from('incident_reports_view')
-      .select('report_id, incident_type, photo_url, incident_url')
+      // Select * on purpose: a hard-coded column list broke this flow once
+      // (the view has no `incident_url` -> PostgREST 400 -> no AI review).
+      .select('*')
       .eq('report_id', reportId)
       .maybeSingle();
 
@@ -34,7 +36,7 @@ export async function verifySingleIncident(reportId: string): Promise<{
 
     const result = await reviewReportWithAI({
       reportId,
-      photoUrl: report.photo_url || report.incident_url,
+      photoUrl: report.photo_url || null,
       incidentType: report.incident_type || '',
     });
 
@@ -59,7 +61,9 @@ export async function processAllUnprocessedReports(): Promise<{
   try {
     const { data, error } = await supabase
       .from('incident_reports_view')
-      .select('report_id, incident_type, photo_url, incident_url, ai_interpretation')
+      // Select * - see the note in verifySingleIncident: hard-coded column
+      // lists against this view return 400 when the view changes.
+      .select('*')
       .or('status.eq.pending,status.eq.in-progress')
       .order('timestamp', { ascending: true })
       .limit(50);
@@ -78,7 +82,7 @@ export async function processAllUnprocessedReports(): Promise<{
     for (const row of unprocessed) {
       const result = await reviewReportWithAI({
         reportId: row.report_id,
-        photoUrl: row.photo_url || row.incident_url,
+        photoUrl: row.photo_url || null,
         incidentType: row.incident_type || '',
       });
 

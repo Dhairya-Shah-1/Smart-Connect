@@ -8,8 +8,7 @@ import { BlurredVideoLoader } from "./ui/blurred-video-loader";
 /* 🔹 ADDED */
 import { supabase } from "./supabaseClient";
 import { toast } from "sonner";
-import { parseAiVerdict, parseAiConfidence, AiVerdict, saveAiReviewToReport, summarizePredictions, isJunkDetection } from "../utils/aiReview";
-import { classifyIncidentImage, IncidentPrediction } from "../utils/incidentClassifier";
+import { parseAiVerdict, parseAiConfidence, AiVerdict } from "../utils/aiReview";
 
 interface Issue {
   id: string;
@@ -98,7 +97,6 @@ export function MapView({
   const [showFilters, setShowFilters] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [imageZoom, setImageZoom] = useState(1);
-  const [aiReview, setAiReview] = useState<{ reportId: string; predictions?: IncidentPrediction[]; error?: string; loading?: boolean } | null>(null);
   const isMobileTablet = isMobileOrTablet();
   
   // Check if user is admin or super_admin
@@ -141,36 +139,6 @@ export function MapView({
       toast.success("Report verified and resolved");
       fetchIssues();
       setSelectedIssue(null);
-    }
-  };
-
-  const handleAiReview = async (issue: Issue) => {
-    if (!issue.photo || aiReview?.loading) return;
-
-    setAiReview({ reportId: issue.id, loading: true });
-    try {
-      const predictions = await classifyIncidentImage(issue.photo);
-      setAiReview({ reportId: issue.id, predictions });
-
-      // Persist the review as plain text in incident_reports.ai_interpretation
-      // (txt format: "Run AI review: <label> <conf>%, ... Verdict: ...").
-      const saved = await saveAiReviewToReport(issue.id, predictions, issue.type);
-
-      if (saved.success) {
-        setSelectedIssue((prev) =>
-          prev && prev.id === issue.id
-            ? { ...prev, aiReason: saved.text, aiVerdict: parseAiVerdict(saved.text) }
-            : prev
-        );
-        toast.success('AI review completed and saved to the report');
-        fetchIssues({ showLoader: false });
-      } else {
-        toast.error(`AI review completed, but saving failed: ${saved.error}`);
-      }
-    } catch (error: any) {
-      const message = error?.message || 'AI classification failed.';
-      setAiReview({ reportId: issue.id, error: message });
-      toast.error(message);
     }
   };
 
@@ -989,78 +957,31 @@ const groupNearbyIssues = (issues: Issue[]) => {
                 {selectedIssue.description}
               </p>
               
-              {/*
-                Smart-Connect AI verdict panel - currently DISABLED (commented
-                out, not removed). The "Run AI review" button panel below has
-                been restored in its place. Uncomment this whole block to show
-                the stored ai_interpretation text instead.
-
-                Smart-Connect AI verdict (read from ai_interpretation):
-                {(() => {
-                  const verdict = selectedIssue.aiVerdict ?? parseAiVerdict(selectedIssue.aiReason);
-                  const chip =
-                    verdict === 'approved'
-                      ? { text: '✓ AI approved', cls: 'bg-green-100 text-green-800 border-green-200' }
-                      : verdict === 'rejected'
-                      ? { text: '✗ AI rejected', cls: 'bg-red-100 text-red-800 border-red-200' }
-                      : verdict === 'manual'
-                      ? { text: '⚠ Manual review required', cls: 'bg-amber-100 text-amber-800 border-amber-200' }
-                      : { text: 'Pending AI review', cls: 'bg-gray-100 text-gray-600 border-gray-200' };
-                  return (
-                    <div className={`mb-3 rounded-lg border p-3 ${isDark ? 'border-slate-600 bg-slate-700/40' : 'border-gray-200 bg-gray-50'}`}>
-                      <div className="flex items-center justify-between gap-2 mb-1.5">
-                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>Smart-Connect AI says:</p>
-                        <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold ${chip.cls}`}>{chip.text}</span>
-                      </div>
-                      <p className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                        {selectedIssue.aiReason && selectedIssue.aiReason.trim()
-                          ? selectedIssue.aiReason
-                          : 'This report has not been reviewed by the AI yet.'}
-                      </p>
+              {/* Smart-Connect AI verdict (read from ai_interpretation) */}
+              {(() => {
+                const verdict = selectedIssue.aiVerdict ?? parseAiVerdict(selectedIssue.aiReason);
+                const chip =
+                  verdict === 'approved'
+                    ? { text: '✓ AI approved', cls: 'bg-green-100 text-green-800 border-green-200' }
+                    : verdict === 'rejected'
+                    ? { text: '✗ AI rejected', cls: 'bg-red-100 text-red-800 border-red-200' }
+                    : verdict === 'manual'
+                    ? { text: '⚠ Manual review required', cls: 'bg-amber-100 text-amber-800 border-amber-200' }
+                    : { text: 'Pending AI review', cls: 'bg-gray-100 text-gray-600 border-gray-200' };
+                return (
+                  <div className={`mb-3 rounded-lg border p-3 ${isDark ? 'border-slate-600 bg-slate-700/40' : 'border-gray-200 bg-gray-50'}`}>
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <p className={`text-xs font-semibold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>Smart-Connect AI says:</p>
+                      <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold ${chip.cls}`}>{chip.text}</span>
                     </div>
-                  );
-                })()}
-              */}
-
-              {/* Render ONNX classifier review */}
-              <div className={`mb-3 rounded-lg border p-3 ${isDark ? 'border-cyan-800 bg-cyan-950/30' : 'border-cyan-200 bg-cyan-50'}`}>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className={`text-xs font-semibold ${isDark ? 'text-cyan-200' : 'text-cyan-800'}`}>AI image classification</p>
-                    <p className={`text-[11px] ${isDark ? 'text-cyan-300/70' : 'text-cyan-700/80'}`}>SmartConnect ONNX model</p>
+                    <p className={`text-xs whitespace-pre-line ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                      {selectedIssue.aiReason && selectedIssue.aiReason.trim()
+                        ? selectedIssue.aiReason
+                        : 'This report has not been reviewed by the AI yet.'}
+                    </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleAiReview(selectedIssue)}
-                    disabled={!selectedIssue.photo || aiReview?.loading === true}
-                    className="rounded-md bg-cyan-700 px-2.5 py-1.5 text-[11px] font-semibold text-white transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {aiReview?.reportId === selectedIssue.id && aiReview.loading ? 'Analyzing...' : 'Run AI review'}
-                  </button>
-                </div>
-                {aiReview?.reportId === selectedIssue.id && aiReview.predictions && (
-                  <div className={`mt-2 space-y-1 text-xs ${isDark ? 'text-cyan-100' : 'text-cyan-900'}`}>
-                    {(() => {
-                      const predictions = aiReview?.predictions ?? [];
-                      if (isJunkDetection(predictions)) {
-                        return <p>Image unrecognizable - no supported incident detected.</p>;
-                      }
-                      const top = summarizePredictions(predictions)[0];
-                      if (!top) return <p>No supported incident detected.</p>;
-                      return (
-                        <p>
-                          <span className="font-semibold">{top.label}</span>{' '}
-                          ({Math.round(top.confidence * 100)}% confidence)
-                        </p>
-                      );
-                    })()}
-                  </div>
-                )}
-                {aiReview?.reportId === selectedIssue.id && aiReview.error && (
-                  <p className={`mt-2 text-[11px] ${isDark ? 'text-red-300' : 'text-red-700'}`}>{aiReview.error}</p>
-                )}
-                {!selectedIssue.photo && <p className={`mt-2 text-[11px] ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>No incident image is available.</p>}
-              </div>
+                );
+              })()}
               
               {"reportCount" in selectedIssue && //added
                 selectedIssue.reportCount > 1 && (

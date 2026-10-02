@@ -14,7 +14,7 @@ import { classifyIncidentImage, IncidentPrediction } from './incidentClassifier'
  *
  * Thresholds are conservative: anything the model cannot confidently tie to
  * the reported incident type goes to a human, and any image the model cannot
- * read at all is rejected as fake / unrecognizable.
+ * read at all is rejected as fake or unrecognizable.
  */
 
 export type AiVerdict = 'approved' | 'rejected' | 'manual' | 'none';
@@ -111,7 +111,7 @@ export function isJunkDetection(predictions: IncidentPrediction[]): boolean {
  *
  * Rules (in order):
  *  1. No detections / max confidence < 45% / a spray of >=8 mid-confidence
- *     boxes -> the image is fake / unrecognizable -> auto-rejected.
+ *     boxes -> the image is fake or unrecognizable -> auto-rejected.
  *  2. Accident reports always go to a human, however confident the model is.
  *  3. Top label matches the reported type at >= 65% -> auto-approved.
  *  4. Top label confidently shows a DIFFERENT incident (>= 65%) -> auto-rejected.
@@ -132,7 +132,7 @@ export function buildInterpretation(
     return {
       verdict: 'rejected',
       status: 'rejected',
-      text: `The image is fake / unrecognizable - no supported incident could be confirmed (highest ${percent}% confidence). Verdict: auto-rejected.`,
+      text: `The image is fake or unrecognizable - no supported incident could be confirmed (highest ${percent}% confidence).\nVerdict: auto-rejected.`,
     };
   }
 
@@ -280,31 +280,29 @@ export async function reviewReportWithAI(
 }
 
 /**
- * Format a manual "Run AI review" result as plain text and persist it into
- * `incident_reports.ai_interpretation`.
+ * Persist an AI review as plain text into `incident_reports.ai_interpretation`.
  *
- * The text lists the deduplicated detections (label + confidence) followed by
- * the standard verdict sentence, so every consumer of the column
- * (map popup, CheckReports, ReportHistory, parseAiVerdict) reads one
- * consistent format. The report status is intentionally NOT touched here:
- * the automatic upload/login flows own the status transitions.
+ * The text is exactly the human-readable interpretation produced by
+ * {@link buildInterpretation} - no detection label lists and no
+ * "Run AI review:" prefix - so every consumer of the column (map popup,
+ * CheckReports, ReportHistory, parseAiVerdict) reads one consistent format.
+ * A rejected image therefore reads simply:
+ *   "The image is fake or unrecognizable - no supported incident could be
+ *    confirmed (highest 50% confidence).\nVerdict: auto-rejected."
+ *
+ * The report status is intentionally NOT touched here: the automatic
+ * upload/login flows own the status transitions.
+ *
+ * NOTE: currently unused - the manual "Run AI review" button was removed from
+ * the admin Map tab, so the upload/login flows in {@link reviewReportWithAI}
+ * are the only writers of the column. Kept so the button can be re-enabled.
  */
 export async function saveAiReviewToReport(
   reportId: string,
   predictions: IncidentPrediction[],
   incidentType: string
 ): Promise<{ success: boolean; text: string; error?: string }> {
-  const interpretation = buildInterpretation(predictions, incidentType);
-  const top = summarizePredictions(predictions)[0];
-
-  // Non-junk reviews list ONLY the top detection (the model's answer);
-  // junk reviews keep the interpretation text, which already says
-  // "The image is fake / unrecognizable - ...".
-  const text = isJunkDetection(predictions)
-    ? interpretation.text
-    : top
-    ? `Run AI review: ${top.label} ${Math.round(top.confidence * 100)}%. ${interpretation.text}`
-    : `Run AI review: no supported incident detected. ${interpretation.text}`;
+  const text = buildInterpretation(predictions, incidentType).text;
 
   try {
     const { error } = await supabase
