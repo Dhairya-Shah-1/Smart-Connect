@@ -1,12 +1,29 @@
+# Dependencies
 node_modules
-guidelines
+
+# Build output and caches
 build
-Attributions.md
+dist
+.vite/
+*.tsbuildinfo
+coverage/
+.eslintcache
+scripts/.cache/
+
+# Environment variables and local secrets
 .env
 .env.*
 !.env.example
-dist
-README.md
-scripts/.cache/
+
+# Automation browser profile (Chrome DevTools Protocol) - never commit
 _cdp
+
+# Local-only assets and docs
+# NOTE: README.md, IMPLEMENTATION_SUMMARY.md and public/_seed.html are
+# already tracked by git, so these entries only hide future untracked
+# copies - removing them from GitHub would need `git rm --cached`.
+public
+guidelines
+Attributions.md
+README.md
 IMPLEMENTATION_SUMMARY.md

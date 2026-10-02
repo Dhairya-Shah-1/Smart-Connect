@@ -13,6 +13,7 @@ import {
   sanitizeCacheKeyPart,
 } from '../utils/browserCache';
 import { getAuthenticatedUser } from '../utils/authSession';
+import { parseAiVerdict, parseAiConfidence } from '../utils/aiReview';
 
 const PAGE_SIZE = 5;
 
@@ -108,8 +109,8 @@ export function ReportHistory() {
         status: r.status || 'pending',
         timestamp: r.timestamp || new Date().toISOString(),
         userName: user.user_metadata?.full_name || user.name || user.email || 'User',
-        aiVerified: r.ai_interpretation ? !r.ai_interpretation.toLowerCase().includes('fake') : true,
-        aiConfidence: r.ai_interpretation ? 0.8 : undefined,
+        aiVerified: ['approved', 'none'].includes(parseAiVerdict(r.ai_interpretation)),
+        aiConfidence: parseAiConfidence(r.ai_interpretation),
         aiReason: r.ai_interpretation || '',
         isFlagged: r.status === 'rejected',
         departmentNotified: 'Municipal Authority',

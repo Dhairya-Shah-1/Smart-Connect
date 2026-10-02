@@ -244,6 +244,46 @@ function AppContent() {
   );
 }
 
+// ---- Smart-Connect ONNX backfill -----------------------------------------
+// Requirement: when a user logs in, any incident report whose
+// `ai_interpretation` column is still empty gets reviewed by the ONNX model.
+// The helper runs at most once per SPA session so the user dashboard and the
+// admin check-reports page cannot double-process the same reports.
+let aiBackfillStarted = false;
+
+async function runAiBackfillOnce() {
+  if (aiBackfillStarted) return;
+  aiBackfillStarted = true;
+
+  try {
+    const count = await getUnprocessedReportsCount(supabase);
+    if (count <= 0) return;
+
+    toast.info(
+      `Smart-Connect AI is reviewing ${count} unprocessed report(s)...`,
+      { duration: 3000 }
+    );
+
+    const result = await processAllUnprocessedReports();
+
+    if (result.success) {
+      toast.success(
+        `AI review complete! Processed: ${result.processed}, Failed: ${result.failed}`,
+        { duration: 5000 }
+      );
+    } else {
+      // Allow the next mount to retry.
+      aiBackfillStarted = false;
+      toast.error(result.error || 'Failed to process reports', {
+        duration: 5000,
+      });
+    }
+  } catch (error) {
+    aiBackfillStarted = false;
+    console.error('Auto AI processing error:', error);
+  }
+}
+
 // Wrapper components to pass required props
 function DashboardWrapper() {
   const navigate = useNavigate();
@@ -257,6 +297,12 @@ function DashboardWrapper() {
     navigate('/', { replace: true });
   };
   
+  // Requirement: on login the model reviews any report whose
+  // ai_interpretation column is still empty.
+  useEffect(() => {
+    runAiBackfillOnce();
+  }, []);
+
   return <Dashboard onLogout={handleLogout} onNavigateHome={handleNavigateHome} />;
 }
 
@@ -296,36 +342,12 @@ function ProfileWrapper() {
 }
 
 function CheckReportsWrapper() {
-  const [isProcessing, setIsProcessing] = useState(false);
-  
   useEffect(() => {
-    // Automatically process unprocessed reports when admin logs in
-    const autoProcessAI = async () => {
-      try {
-        const count = await getUnprocessedReportsCount(supabase);
-        
-        if (count > 0) {
-          setIsProcessing(true);
-          toast.info(`Processing ${count} unprocessed reports with AI...`, { duration: 3000 });
-          
-          const result = await processAllUnprocessedReports();
-          
-          if (result.success) {
-            toast.success(`AI processing complete! Processed: ${result.processed}, Failed: ${result.failed}`, { duration: 5000 });
-          } else {
-            toast.error(result.error || 'Failed to process reports', { duration: 5000 });
-          }
-        }
-      } catch (error: any) {
-        console.error('Auto AI processing error:', error);
-      } finally {
-        setIsProcessing(false);
-      }
-    };
-    
-    autoProcessAI();
+    // Automatically review unprocessed reports when the admin logs in
+    // (ONNX backfill, shared with the user dashboard via runAiBackfillOnce).
+    runAiBackfillOnce();
   }, []);
-  
+
   return <CheckReports />;
 }
 

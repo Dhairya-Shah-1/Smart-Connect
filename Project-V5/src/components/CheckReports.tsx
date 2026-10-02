@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { isMobileOrTablet } from "../utils/deviceDetection";
 import { supabase } from './supabaseClient';
 import { processAllUnprocessedReports, getUnprocessedReportsCount } from '../utils/aiVerification';
+import { parseAiVerdict, parseAiConfidence } from '../utils/aiReview';
 import { BlurredVideoLoader } from './ui/blurred-video-loader';
 import {
   getBrowserCache,
@@ -151,9 +152,9 @@ export function CheckReports() {
       ...report,
       reporter_name: userMap.get(report.user_id)?.u_name || 'Unknown User',
       reporter_email: userMap.get(report.user_id)?.u_email || 'Unknown Email',
-      ai_verified: report.ai_interpretation ? !report.ai_interpretation.toLowerCase().includes('fake') : true,
+      ai_verified: ['approved', 'none'].includes(parseAiVerdict(report.ai_interpretation)),
       ai_reason: report.ai_interpretation || '',
-      ai_confidence: report.ai_interpretation ? 0.8 : undefined,
+      ai_confidence: parseAiConfidence(report.ai_interpretation),
     }));
   };
 

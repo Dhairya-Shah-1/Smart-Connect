@@ -564,7 +564,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
       </div>
     </header>
 
-    <div className={`dashboard-content flex-1 min-h-0 overflow-y-auto hide-scrollbar w-full ${isMobile ? "px-3 py-4 overflow-x-hidden" : "max-w-7xl item-center justify-center mx-auto px-4 py-6"}`}>
+    <div className={`w-full ${isMobile ? "px-3 py-4 overflow-x-hidden" : "max-w-7xl item-center justify-center mx-auto px-4 py-6"}`}>
       {/* Super Admin Info Card */}
       <div className={`${isMobile ? "mb-4 p-4" : "mb-6 p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
         <div className={`flex items-start ${isMobile ? "gap-3" : "gap-4"}`}>

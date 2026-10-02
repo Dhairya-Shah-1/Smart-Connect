@@ -290,26 +290,27 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
       // History tab so the next visit loads the updated list immediately.
       clearBrowserCache([REPORT_HISTORY_CACHE_PREFIX]);
 
-      // Trigger AI verification using the saved report id so the API can
-      // fetch the canonical incident record, analyze it, and persist the result.
-      try {
-        toast.info('Verifying incident with AI...');
-
-        if (!data?.report_id) {
-          throw new Error('The report was saved, but its ID could not be returned for AI verification.');
-        }
-
-        const aiResult = await verifySingleIncident(data.report_id);
-
-        if (!aiResult.success) {
-          throw new Error(aiResult.error || 'AI verification failed');
-        }
-
-        console.log('AI Verification Result:', aiResult.data);
-        toast.success('AI verification completed.');
-      } catch (aiError: any) {
-        console.error('AI verification error:', aiError);
-        toast.error(aiError.message || 'AI verification could not be completed right now.');
+      // Start the Smart-Connect ONNX AI review for the saved report. It is
+      // intentionally NOT awaited: a Render cold start can take up to 120s and
+      // must not block the form from resetting. The result (auto-approved /
+      // auto-rejected / manual review required) is persisted in the
+      // ai_interpretation column of incident_reports.
+      if (!data?.report_id) {
+        toast.error('The report was saved, but its ID could not be returned for AI review.');
+      } else {
+        toast.info('Smart-Connect AI is reviewing the image...');
+        verifySingleIncident(data.report_id)
+          .then((aiResult) => {
+            if (!aiResult.success) {
+              throw new Error(aiResult.error || 'AI review failed');
+            }
+            console.log('AI review result:', aiResult.data);
+            toast.success('Smart-Connect AI review completed.');
+          })
+          .catch((aiError: any) => {
+            console.error('AI review error:', aiError);
+            toast.error(aiError.message || 'AI review could not be completed right now.');
+          });
       }
 
       // Dispatch events to update ReportHistory

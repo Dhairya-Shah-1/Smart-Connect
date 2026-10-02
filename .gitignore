@@ -7,6 +7,10 @@ dist/
 .vite/
 *.tsbuildinfo
 
+# Test coverage and tool caches
+coverage/
+.eslintcache
+
 # Environment variables and local secrets
 .env
 .env.*
@@ -19,6 +23,9 @@ dist/
 *.log
 logs/
 
+# Automation browser profile (Chrome DevTools Protocol) - never commit
+_cdp/
+
 # Editor and operating-system files
 .vscode/
 .idea/
@@ -27,3 +34,4 @@ logs/
 *~
 .DS_Store
 Thumbs.db
+desktop.ini

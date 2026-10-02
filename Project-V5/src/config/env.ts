@@ -11,6 +11,7 @@ function getRequiredEnv(name: string): string {
 export const env = {
   supabaseUrl: getRequiredEnv("VITE_SUPABASE_URL"),
   supabaseAnonKey: getRequiredEnv("VITE_SUPABASE_ANON_KEY"),
+  incidentAiUrl: import.meta.env.VITE_INCIDENT_AI_URL || "",
 };
 
 export const appAssetBaseUrl = `${env.supabaseUrl}/storage/v1/object/public/app-assets`;

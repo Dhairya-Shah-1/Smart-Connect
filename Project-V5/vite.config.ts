@@ -1,11 +1,57 @@
 
-  import { defineConfig } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
   import react from '@vitejs/plugin-react';
   import tailwindcss from '@tailwindcss/vite';
-  import path from 'path';
+import path from 'path';
 
-  export default defineConfig({
-    plugins: [react(), tailwindcss()],
+function localVercelApiPlugin(): Plugin {
+  return {
+    name: 'local-vercel-api',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/api/verify-incident', async (req, res, next) => {
+        if (req.method !== 'POST' && req.method !== 'OPTIONS') {
+          next();
+          return;
+        }
+
+        try {
+          const chunks: Buffer[] = [];
+          for await (const chunk of req) {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+          }
+
+          const request = new Request('http://localhost/api/verify-incident', {
+            method: req.method,
+            headers: Object.entries(req.headers).flatMap(([key, value]) =>
+              value === undefined ? [] : [[key, Array.isArray(value) ? value.join(', ') : value]]
+            ),
+            body: req.method === 'POST' ? Buffer.concat(chunks) : undefined,
+          });
+          const apiModule = await server.ssrLoadModule('/api/verify-incident.ts');
+          const response = await apiModule.default(request);
+
+          res.statusCode = response.status;
+          response.headers.forEach((value: string, key: string) => res.setHeader(key, value));
+          res.end(Buffer.from(await response.arrayBuffer()));
+        } catch (error) {
+          console.error('[local-vercel-api] verify-incident failed:', error);
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: error instanceof Error ? error.message : 'Local API failed' }));
+        }
+      });
+    },
+  };
+}
+
+  export default defineConfig(({ mode }) => {
+    // Vercel injects server environment variables automatically. During local
+    // Vite development, expose .env values to the server-side API bridge only.
+    Object.assign(process.env, loadEnv(mode, process.cwd(), ''));
+
+    return {
+    plugins: [react(), tailwindcss(), localVercelApiPlugin()],
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       alias: {
@@ -58,4 +104,5 @@
       port: 3000,
       open: true,
     },
+    };
   });

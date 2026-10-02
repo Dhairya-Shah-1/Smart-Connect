@@ -8,6 +8,8 @@ import { BlurredVideoLoader } from "./ui/blurred-video-loader";
 /* 🔹 ADDED */
 import { supabase } from "./supabaseClient";
 import { toast } from "sonner";
+import { parseAiVerdict, parseAiConfidence, AiVerdict, saveAiReviewToReport, summarizePredictions, isJunkDetection } from "../utils/aiReview";
+import { classifyIncidentImage, IncidentPrediction } from "../utils/incidentClassifier";
 
 interface Issue {
   id: string;
@@ -23,6 +25,7 @@ interface Issue {
   aiVerified: boolean;
   aiConfidence?: number;
   aiReason?: string;
+  aiVerdict?: AiVerdict;
   departmentNotified: string;
 }
 
@@ -95,13 +98,14 @@ export function MapView({
   const [showFilters, setShowFilters] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [imageZoom, setImageZoom] = useState(1);
+  const [aiReview, setAiReview] = useState<{ reportId: string; predictions?: IncidentPrediction[]; error?: string; loading?: boolean } | null>(null);
   const isMobileTablet = isMobileOrTablet();
   
   // Check if user is admin or super_admin
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
   
   // Admin filter state
-  const [adminFilter, setAdminFilter] = useState<'pending' | 'in-progress'>('pending');
+  const [adminFilter, setAdminFilter] = useState<'pending' | 'in-progress' | 'rejected'>('pending');
   
   // Get user on mount
   useEffect(() => {
@@ -137,6 +141,36 @@ export function MapView({
       toast.success("Report verified and resolved");
       fetchIssues();
       setSelectedIssue(null);
+    }
+  };
+
+  const handleAiReview = async (issue: Issue) => {
+    if (!issue.photo || aiReview?.loading) return;
+
+    setAiReview({ reportId: issue.id, loading: true });
+    try {
+      const predictions = await classifyIncidentImage(issue.photo);
+      setAiReview({ reportId: issue.id, predictions });
+
+      // Persist the review as plain text in incident_reports.ai_interpretation
+      // (txt format: "Run AI review: <label> <conf>%, ... Verdict: ...").
+      const saved = await saveAiReviewToReport(issue.id, predictions, issue.type);
+
+      if (saved.success) {
+        setSelectedIssue((prev) =>
+          prev && prev.id === issue.id
+            ? { ...prev, aiReason: saved.text, aiVerdict: parseAiVerdict(saved.text) }
+            : prev
+        );
+        toast.success('AI review completed and saved to the report');
+        fetchIssues({ showLoader: false });
+      } else {
+        toast.error(`AI review completed, but saving failed: ${saved.error}`);
+      }
+    } catch (error: any) {
+      const message = error?.message || 'AI classification failed.';
+      setAiReview({ reportId: issue.id, error: message });
+      toast.error(message);
     }
   };
 
@@ -272,13 +306,14 @@ const groupNearbyIssues = (issues: Issue[]) => {
         issue.timestamp,
         issue.severity,
         issue.type,
+        issue.aiReason,
       ].join(":"))
       .join("|");
 
   const getIssuesSignature = async () => {
     let query = supabase
       .from("incident_reports_view")
-      .select("report_id,status,timestamp,severity,incident_type")
+      .select("report_id,status,timestamp,severity,incident_type,ai_interpretation")
       .order("timestamp", { ascending: false });
 
     if (isAdmin) {
@@ -302,6 +337,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
         report.timestamp,
         report.severity,
         report.incident_type,
+        report.ai_interpretation,
       ].join(":"))
       .join("|");
   };
@@ -335,6 +371,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
 
       const mappedIssues: Issue[] = (data || []).map((report: any) => {
         const aiInterpretation = report.ai_interpretation || '';
+        const aiVerdict = parseAiVerdict(aiInterpretation);
 
         return {
           id: report.report_id,
@@ -347,11 +384,10 @@ const groupNearbyIssues = (issues: Issue[]) => {
           description: report.incident_description,
           timestamp: report.timestamp,
           photo: report.photo_url,
-          aiVerified: aiInterpretation
-            ? !aiInterpretation.toLowerCase().includes('fake')
-            : false,
-          aiConfidence: undefined,
+          aiVerified: aiVerdict === 'approved',
+          aiConfidence: parseAiConfidence(aiInterpretation),
           aiReason: aiInterpretation,
+          aiVerdict,
           departmentNotified: "Central Control",
         };
       });
@@ -823,6 +859,21 @@ const groupNearbyIssues = (issues: Issue[]) => {
               <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
               <span className="text-xs font-medium">Verified Reports</span>
             </button>
+            <button
+              onClick={() => setAdminFilter('rejected')}
+              className={`px-3 py-2 rounded-lg border flex items-center gap-2 ${
+                adminFilter === 'rejected'
+                  ? isDark
+                    ? "bg-red-900 border-red-700 text-red-200"
+                    : "bg-red-50 border-red-200 text-red-800"
+                  : isDark
+                    ? "bg-slate-800 border-slate-700 text-gray-300"
+                    : "bg-white border-gray-300 text-gray-700"
+              }`}
+            >
+              <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+              <span className="text-xs font-medium">AI rejected</span>
+            </button>
           </div>
         ) : (
           /* Urgent Indicator - Only show for non-admins */
@@ -859,7 +910,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
         {!showFilters && (
           <button
             onClick={() => setShowFilters(true)}
-            className={`absolute ${isAdmin ? "top-25 sm:top-15 left-4" : urgentCount && urgentCount > 0 ? "top-4 left-28" : "top-4 left-4"} z-10 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 transition-colors 
+            className={`absolute ${isAdmin ? "top-36 sm:top-15 left-4" : urgentCount && urgentCount > 0 ? "top-4 left-28" : "top-4 left-4"} z-10 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 transition-colors 
             ${isDark ? "bg-slate-800 hover:bg-slate-700 text-gray-200" : "bg-white hover:bg-gray-50 text-gray-700"}
           `}
           >
@@ -938,35 +989,78 @@ const groupNearbyIssues = (issues: Issue[]) => {
                 {selectedIssue.description}
               </p>
               
-              {/* AI Interpretation Display */}
-              {selectedIssue.aiReason && (
-                <div className={`mb-3 p-2 rounded-lg text-xs ${
-                  selectedIssue.aiReason.includes('Potentially Real')
-                    ? 'bg-green-50 border border-green-200'
-                    : selectedIssue.aiReason.includes('Potentially Fake')
-                    ? 'bg-red-50 border border-red-200'
-                    : 'bg-yellow-50 border border-yellow-200'
-                }`}>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className={`font-semibold ${
-                      selectedIssue.aiReason.includes('Potentially Real') ? 'text-green-700'
-                      : selectedIssue.aiReason.includes('Potentially Fake') ? 'text-red-700'
-                      : 'text-yellow-700'
-                    }`}>
-                      {selectedIssue.aiReason.includes('Potentially Real') && '✓ Potentially Real'}
-                      {selectedIssue.aiReason.includes('Potentially Fake') && '✗ Potentially Fake'}
-                      {!selectedIssue.aiReason.includes('Potentially Real') && !selectedIssue.aiReason.includes('Potentially Fake') && '🤖 AI Interpretation'}
-                    </span>
+              {/*
+                Smart-Connect AI verdict panel - currently DISABLED (commented
+                out, not removed). The "Run AI review" button panel below has
+                been restored in its place. Uncomment this whole block to show
+                the stored ai_interpretation text instead.
+
+                Smart-Connect AI verdict (read from ai_interpretation):
+                {(() => {
+                  const verdict = selectedIssue.aiVerdict ?? parseAiVerdict(selectedIssue.aiReason);
+                  const chip =
+                    verdict === 'approved'
+                      ? { text: '✓ AI approved', cls: 'bg-green-100 text-green-800 border-green-200' }
+                      : verdict === 'rejected'
+                      ? { text: '✗ AI rejected', cls: 'bg-red-100 text-red-800 border-red-200' }
+                      : verdict === 'manual'
+                      ? { text: '⚠ Manual review required', cls: 'bg-amber-100 text-amber-800 border-amber-200' }
+                      : { text: 'Pending AI review', cls: 'bg-gray-100 text-gray-600 border-gray-200' };
+                  return (
+                    <div className={`mb-3 rounded-lg border p-3 ${isDark ? 'border-slate-600 bg-slate-700/40' : 'border-gray-200 bg-gray-50'}`}>
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>Smart-Connect AI says:</p>
+                        <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold ${chip.cls}`}>{chip.text}</span>
+                      </div>
+                      <p className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        {selectedIssue.aiReason && selectedIssue.aiReason.trim()
+                          ? selectedIssue.aiReason
+                          : 'This report has not been reviewed by the AI yet.'}
+                      </p>
+                    </div>
+                  );
+                })()}
+              */}
+
+              {/* Render ONNX classifier review */}
+              <div className={`mb-3 rounded-lg border p-3 ${isDark ? 'border-cyan-800 bg-cyan-950/30' : 'border-cyan-200 bg-cyan-50'}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className={`text-xs font-semibold ${isDark ? 'text-cyan-200' : 'text-cyan-800'}`}>AI image classification</p>
+                    <p className={`text-[11px] ${isDark ? 'text-cyan-300/70' : 'text-cyan-700/80'}`}>SmartConnect ONNX model</p>
                   </div>
-                  <p className={`text-xs ${
-                    selectedIssue.aiReason.includes('Potentially Real') ? 'text-green-600'
-                    : selectedIssue.aiReason.includes('Potentially Fake') ? 'text-red-600'
-                    : 'text-yellow-600'
-                  }`}>
-                    {selectedIssue.aiReason}
-                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleAiReview(selectedIssue)}
+                    disabled={!selectedIssue.photo || aiReview?.loading === true}
+                    className="rounded-md bg-cyan-700 px-2.5 py-1.5 text-[11px] font-semibold text-white transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {aiReview?.reportId === selectedIssue.id && aiReview.loading ? 'Analyzing...' : 'Run AI review'}
+                  </button>
                 </div>
-              )}
+                {aiReview?.reportId === selectedIssue.id && aiReview.predictions && (
+                  <div className={`mt-2 space-y-1 text-xs ${isDark ? 'text-cyan-100' : 'text-cyan-900'}`}>
+                    {(() => {
+                      const predictions = aiReview?.predictions ?? [];
+                      if (isJunkDetection(predictions)) {
+                        return <p>Image unrecognizable - no supported incident detected.</p>;
+                      }
+                      const top = summarizePredictions(predictions)[0];
+                      if (!top) return <p>No supported incident detected.</p>;
+                      return (
+                        <p>
+                          <span className="font-semibold">{top.label}</span>{' '}
+                          ({Math.round(top.confidence * 100)}% confidence)
+                        </p>
+                      );
+                    })()}
+                  </div>
+                )}
+                {aiReview?.reportId === selectedIssue.id && aiReview.error && (
+                  <p className={`mt-2 text-[11px] ${isDark ? 'text-red-300' : 'text-red-700'}`}>{aiReview.error}</p>
+                )}
+                {!selectedIssue.photo && <p className={`mt-2 text-[11px] ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>No incident image is available.</p>}
+              </div>
               
               {"reportCount" in selectedIssue && //added
                 selectedIssue.reportCount > 1 && (
