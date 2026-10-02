@@ -13,9 +13,9 @@ import { ReportIssue } from './components/ReportIssue';
 import { ReportHistory } from './components/ReportHistory';
 import { MapView } from './components/MapView';
 import { CheckReports } from './components/CheckReports';
-import { processAllUnprocessedReports, getUnprocessedReportsCount } from './utils/aiVerification';
+import { processAllUnprocessedReports, processPendingUnreviewedReports, getUnprocessedReportsCount } from './utils/aiVerification';
 import { toast } from 'sonner';
-import { enforceLoginLifetime, isLoginExpired, signOutAndClearAuth, CURRENT_USER_EVENT } from './utils/authLifetime';
+import { enforceLoginLifetime, isLoginExpired, signOutAndClearAuth, getLoginTime, CURRENT_USER_EVENT } from './utils/authLifetime';
 
 type Theme = 'light' | 'dark';
 
@@ -244,27 +244,75 @@ function AppContent() {
   );
 }
 
-// ---- Smart-Connect ONNX backfill -----------------------------------------
-// Requirement: when a user logs in, any incident report whose
-// `ai_interpretation` column is still empty gets reviewed by the ONNX model.
-// The helper runs at most once per SPA session so the user dashboard and the
-// admin check-reports page cannot double-process the same reports.
-let aiBackfillStarted = false;
+// ---- Smart-Connect ONNX login review -------------------------------------
+// Requirements:
+//   * any user login -> every report whose `ai_interpretation` column is still
+//     NULL / empty is reviewed by the ONNX model;
+//   * admin / super admin login -> same, restricted to reports that are still
+//     'pending' (never reviewed and not yet acted on).
+//
+// The work is claimed per LOGIN, not per page. `recordLoginTime()` stamps a
+// fresh timestamp on every login, so the key below changes on each login and
+// the review runs again, while repeated mounts inside one login (user
+// dashboard, admin dashboard, check-reports) share the claim and therefore
+// cannot double-process the same reports.
 
-async function runAiBackfillOnce() {
-  if (aiBackfillStarted) return;
-  aiBackfillStarted = true;
+function currentLoginReviewKey(): string | null {
+  try {
+    const user = JSON.parse(localStorage.getItem('currentUser') || 'null');
+    if (!user) return null;
+    return `${user.id ?? user.email ?? 'user'}:${getLoginTime() ?? 0}`;
+  } catch {
+    return null;
+  }
+}
+
+let aiBackfillLoginKey: string | null = null;
+
+/** True when this login has not started the review yet. */
+function claimLoginReview(): boolean {
+  const key = currentLoginReviewKey();
+  if (!key) return false;
+  if (aiBackfillLoginKey === key) return false;
+  aiBackfillLoginKey = key;
+  return true;
+}
+
+/** Let a failed run retry on the next mount of the same login. */
+function releaseLoginReview() {
+  aiBackfillLoginKey = null;
+}
+
+async function runAiReviewBackfill({
+  run,
+  countStatuses,
+  label,
+}: {
+  /** Performs the reviews (writes `ai_interpretation`). */
+  run: () => Promise<{
+    success: boolean;
+    processed?: number;
+    failed?: number;
+    error?: string;
+  }>;
+  /** Optional status filter used for the "N report(s) to review" count. */
+  countStatuses?: string[];
+  label: string;
+}) {
+  if (!claimLoginReview()) return;
 
   try {
-    const count = await getUnprocessedReportsCount(supabase);
+    const count = await getUnprocessedReportsCount(
+      supabase,
+      countStatuses ? { statuses: countStatuses } : {}
+    );
     if (count <= 0) return;
 
-    toast.info(
-      `Smart-Connect AI is reviewing ${count} unprocessed report(s)...`,
-      { duration: 3000 }
-    );
+    toast.info(`Smart-Connect AI is reviewing ${count} ${label} report(s)...`, {
+      duration: 3000,
+    });
 
-    const result = await processAllUnprocessedReports();
+    const result = await run();
 
     if (result.success) {
       toast.success(
@@ -272,16 +320,37 @@ async function runAiBackfillOnce() {
         { duration: 5000 }
       );
     } else {
-      // Allow the next mount to retry.
-      aiBackfillStarted = false;
+      releaseLoginReview();
       toast.error(result.error || 'Failed to process reports', {
         duration: 5000,
       });
     }
   } catch (error) {
-    aiBackfillStarted = false;
+    releaseLoginReview();
     console.error('Auto AI processing error:', error);
   }
+}
+
+/** Any user login: never-reviewed reports in every open status. */
+async function runAiBackfillOnce() {
+  return runAiReviewBackfill({
+    label: 'unprocessed',
+    run: () => processAllUnprocessedReports(),
+  });
+}
+
+/**
+ * Admin / super admin login: only reports whose `ai_interpretation` is still
+ * NULL / empty AND whose status is still 'pending' are sent for AI review, and
+ * the answer is written back into that report's `ai_interpretation` column by
+ * `reviewReportWithAI`.
+ */
+async function runAdminPendingAiBackfillOnce() {
+  return runAiReviewBackfill({
+    label: 'pending',
+    countStatuses: ['pending'],
+    run: () => processPendingUnreviewedReports(),
+  });
 }
 
 // Wrapper components to pass required props
@@ -343,9 +412,9 @@ function ProfileWrapper() {
 
 function CheckReportsWrapper() {
   useEffect(() => {
-    // Automatically review unprocessed reports when the admin logs in
-    // (ONNX backfill, shared with the user dashboard via runAiBackfillOnce).
-    runAiBackfillOnce();
+    // Admin-only page: same rule as the admin dashboard - review reports whose
+    // ai_interpretation is still empty and whose status is still 'pending'.
+    runAdminPendingAiBackfillOnce();
   }, []);
 
   return <CheckReports />;
@@ -358,7 +427,13 @@ function AdminDashboardWrapper() {
     await signOutAndClearAuth();
     navigate('/login', { replace: true });
   };
-  
+
+  // Requirement: on admin login, review every never-reviewed ('pending',
+  // ai_interpretation NULL) report and store the answer in that column.
+  useEffect(() => {
+    runAdminPendingAiBackfillOnce();
+  }, []);
+
   return <AdminDashboard onLogout={handleLogout} />;
 }
 
@@ -369,7 +444,13 @@ function SuperAdminDashboardWrapper() {
     await signOutAndClearAuth();
     navigate('/login', { replace: true });
   };
-  
+
+  // Requirement: on super admin login, review every never-reviewed ('pending',
+  // ai_interpretation NULL) report and store the answer in that column.
+  useEffect(() => {
+    runAdminPendingAiBackfillOnce();
+  }, []);
+
   return <SuperAdminDashboard onLogout={handleLogout} />;
 }
 

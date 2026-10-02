@@ -14,7 +14,9 @@ import { classifyIncidentImage, IncidentPrediction } from './incidentClassifier'
  *
  * Thresholds are conservative: anything the model cannot confidently tie to
  * the reported incident type goes to a human, and any image the model cannot
- * read at all is rejected as fake or unrecognizable.
+ * read at all is rejected as fake or unrecognizable. Garbage, accident and
+ * landslide reports use a lowered 35% bar, because the detector is weaker on
+ * those classes (see LOW_CONFIDENCE_TYPES).
  */
 
 export type AiVerdict = 'approved' | 'rejected' | 'manual' | 'none';
@@ -40,6 +42,24 @@ const JUNK_DETECTION_COUNT = 8;
 const JUNK_LABEL_COMPETITION = 3;
 /** Label competition only counts when the best label is below this. */
 const JUNK_SOUP_MAX_CONF = 0.60;
+
+/**
+ * The detector is noticeably weaker on these three incident types, so they run
+ * with a lowered confidence bar: 35% instead of the default 45% floor / 65%
+ * confirmation.
+ *
+ * Without this, genuine reports get auto-rejected - the model returns a real
+ * Garbage box at ~56% next to a few ~50% noise labels, and the label-soup rule
+ * below treated that mix as an unrecognizable image.
+ */
+export const LOW_CONFIDENCE_TYPES: Record<string, number> = {
+  garbage: 0.35,
+  accident: 0.35,
+  landslide: 0.35,
+};
+
+/** Floor used for every report type that has no override above. */
+const DEFAULT_CONFIDENCE_FLOOR = MIN_USEFUL_CONFIDENCE;
 
 /** Model labels (normalised) that count as a match for each report type. */
 const MATCH_GROUPS: Record<string, string[]> = {
@@ -82,15 +102,61 @@ export function summarizePredictions(
 }
 
 /**
- * True when detections look like model noise rather than a real incident:
- * nothing found, everything weak, a spray of boxes, or several DIFFERENT
- * incident types all hovering in the unsure band.
+ * Lowest confidence that still counts as "the model saw something" for a
+ * report type: 35% for garbage / accident / landslide, 45% for the rest.
  */
-export function isJunkDetection(predictions: IncidentPrediction[]): boolean {
+export function confidenceFloor(incidentType?: string): number {
+  const override = incidentType
+    ? LOW_CONFIDENCE_TYPES[normalize(incidentType)]
+    : undefined;
+  return override ?? DEFAULT_CONFIDENCE_FLOOR;
+}
+
+/**
+ * Confidence needed to accept (or reject) a detection without a human for a
+ * report type: 35% for garbage / accident / landslide, 65% for the rest.
+ */
+export function confirmConfidence(incidentType?: string): number {
+  const override = incidentType
+    ? LOW_CONFIDENCE_TYPES[normalize(incidentType)]
+    : undefined;
+  return override ?? CONFIRM_CONFIDENCE;
+}
+
+/**
+ * True when detections look like model noise rather than a real incident:
+ * nothing found, everything below the type's confidence floor, a spray of
+ * boxes, or several DIFFERENT incident types all hovering in the unsure band.
+ *
+ * Passing `incidentType` applies that type's floor and - more importantly -
+ * stops the "label soup" rule from rejecting a real detection: when the
+ * reported incident is itself detected at or above its floor, the image is
+ * accepted even if a few weak ~50% labels ride along. That is what keeps a
+ * genuine garbage report detected at 56% from being auto-rejected as
+ * unrecognizable.
+ */
+export function isJunkDetection(
+  predictions: IncidentPrediction[],
+  incidentType?: string
+): boolean {
   const summary = summarizePredictions(predictions);
   const top = summary[0];
   if (!top) return true;
-  if (top.confidence < MIN_USEFUL_CONFIDENCE) return true;
+
+  const floor = confidenceFloor(incidentType);
+  if (top.confidence < floor) return true;
+
+  if (
+    incidentType &&
+    summary.some(
+      (prediction) =>
+        matchesIncidentType(prediction.label, incidentType) &&
+        prediction.confidence >= floor
+    )
+  ) {
+    return false;
+  }
+
   if (
     predictions.length >= JUNK_DETECTION_COUNT &&
     top.confidence < CONFIRM_CONFIDENCE
@@ -110,10 +176,15 @@ export function isJunkDetection(predictions: IncidentPrediction[]): boolean {
  * Decide the verdict for one report from its detections.
  *
  * Rules (in order):
- *  1. No detections / max confidence < 45% / a spray of >=8 mid-confidence
- *     boxes -> the image is fake or unrecognizable -> auto-rejected.
+ *  1. No detections / max confidence below the type's floor (35% for garbage,
+ *     accident and landslide, 45% otherwise) / a spray of >=8 mid-confidence
+ *     boxes / several competing ~50% labels -> the image is fake or
+ *     unrecognizable -> auto-rejected.
  *  2. Accident reports always go to a human, however confident the model is.
- *  3. Top label matches the reported type at >= 65% -> auto-approved.
+ *     The lowered 35% bar above still applies, so an accident image is no
+ *     longer rejected as unrecognizable - it says "Manual review required".
+ *  3. Top label matches the reported type at >= its confirmation bar (35% for
+ *     garbage / accident / landslide, 65% otherwise) -> auto-approved.
  *  4. Top label confidently shows a DIFFERENT incident (>= 65%) -> auto-rejected.
  *  5. Everything else ("the model is a bit confused") -> manual review.
  */
@@ -125,8 +196,11 @@ export function buildInterpretation(
   const top = summary[0];
   const topConfidence = top?.confidence ?? 0;
   const percent = Math.round(topConfidence * 100);
+  // Garbage / accident / landslide run with a lowered 35% bar (see
+  // LOW_CONFIDENCE_TYPES); every other type keeps the 45% / 65% defaults.
+  const confirmBar = confirmConfidence(incidentType);
 
-  const isJunk = isJunkDetection(predictions);
+  const isJunk = isJunkDetection(predictions, incidentType);
 
   if (isJunk) {
     return {
@@ -148,7 +222,7 @@ export function buildInterpretation(
 
   const isMatch = matchesIncidentType(top.label, incidentType);
 
-  if (isMatch && topConfidence >= CONFIRM_CONFIDENCE) {
+  if (isMatch && topConfidence >= confirmBar) {
     return {
       verdict: 'approved',
       status: 'in-progress',

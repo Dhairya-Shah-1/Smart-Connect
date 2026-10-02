@@ -47,24 +47,48 @@ export async function verifySingleIncident(reportId: string): Promise<{
   }
 }
 
+/** Report statuses the login-time backfill considers "still open". */
+const DEFAULT_REVIEW_STATUSES = ['pending', 'in-progress'];
+
+export interface UnprocessedReportFilter {
+  /** Statuses to look at. Defaults to pending + in-progress. */
+  statuses?: string[];
+}
+
+/** Build the PostgREST `or` expression for a list of statuses. */
+function statusOrExpression(statuses: string[]): string {
+  return statuses.map((status) => `status.eq.${status}`).join(',');
+}
+
 /**
- * Review every pending/in-progress report whose ai_interpretation is still
- * NULL or an empty string (the login-time backfill).
+ * Review every report whose ai_interpretation is still NULL or an empty string
+ * (the login-time backfill).
+ *
+ * `options.statuses` narrows the scan: the admin / super admin login flow only
+ * looks at 'pending' reports, while the user dashboard keeps the wider
+ * pending + in-progress default.
  */
-export async function processAllUnprocessedReports(): Promise<{
+export async function processAllUnprocessedReports(
+  options: UnprocessedReportFilter = {}
+): Promise<{
   success: boolean;
   processed?: number;
   failed?: number;
   errors?: string[];
   error?: string;
 }> {
+  const statuses =
+    options.statuses && options.statuses.length > 0
+      ? options.statuses
+      : DEFAULT_REVIEW_STATUSES;
+
   try {
     const { data, error } = await supabase
       .from('incident_reports_view')
       // Select * - see the note in verifySingleIncident: hard-coded column
       // lists against this view return 400 when the view changes.
       .select('*')
-      .or('status.eq.pending,status.eq.in-progress')
+      .or(statusOrExpression(statuses))
       .order('timestamp', { ascending: true })
       .limit(50);
 
@@ -101,11 +125,35 @@ export async function processAllUnprocessedReports(): Promise<{
 }
 
 /**
- * Get count of reports pending AI review (ai_interpretation NULL or '').
+ * Requirement (admin / super admin login): look at the reports whose
+ * `ai_interpretation` column is still NULL / empty, keep the ones whose status
+ * is still 'pending', send each one to the ONNX model and write the answer back
+ * into that report's `ai_interpretation` column.
+ *
+ * This is the pending-only subset of {@link processAllUnprocessedReports}, so
+ * already work-in-progress rows are left alone.
  */
-export async function getUnprocessedReportsCount(client: any): Promise<number> {
+export async function processPendingUnreviewedReports() {
+  return processAllUnprocessedReports({ statuses: ['pending'] });
+}
+
+/**
+ * Get count of reports pending AI review (ai_interpretation NULL or '').
+ *
+ * Pass `options.statuses` to narrow the count the same way
+ * {@link processAllUnprocessedReports} does (the admin login flow counts
+ * 'pending' only).
+ */
+export async function getUnprocessedReportsCount(
+  client: any,
+  options: UnprocessedReportFilter = {}
+): Promise<number> {
   try {
-    const statusFilter = 'status.eq.pending,status.eq.in-progress';
+    const statuses =
+      options.statuses && options.statuses.length > 0
+        ? options.statuses
+        : DEFAULT_REVIEW_STATUSES;
+    const statusFilter = statusOrExpression(statuses);
 
     const [nullRes, emptyRes] = await Promise.all([
       client
