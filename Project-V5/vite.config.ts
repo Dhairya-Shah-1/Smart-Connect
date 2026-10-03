@@ -4,42 +4,54 @@ import { defineConfig, loadEnv, type Plugin } from 'vite';
   import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 
-function localVercelApiPlugin(): Plugin {
+function localVercelApiPlugin(mode: string): Plugin {
+  // Every Vercel serverless route in /api that the frontend calls during local
+  // development needs a matching bridge here (Vite does not serve /api natively).
+  const routes = ['/api/verify-incident', '/api/manage-admin'];
+
   return {
     name: 'local-vercel-api',
     apply: 'serve',
     configureServer(server) {
-      server.middlewares.use('/api/verify-incident', async (req, res, next) => {
-        if (req.method !== 'POST' && req.method !== 'OPTIONS') {
-          next();
-          return;
-        }
-
-        try {
-          const chunks: Buffer[] = [];
-          for await (const chunk of req) {
-            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      routes.forEach((route) => {
+        server.middlewares.use(route, async (req, res, next) => {
+          if (req.method !== 'POST' && req.method !== 'OPTIONS') {
+            next();
+            return;
           }
 
-          const request = new Request('http://localhost/api/verify-incident', {
-            method: req.method,
-            headers: Object.entries(req.headers).flatMap(([key, value]) =>
-              value === undefined ? [] : [[key, Array.isArray(value) ? value.join(', ') : value]]
-            ),
-            body: req.method === 'POST' ? Buffer.concat(chunks) : undefined,
-          });
-          const apiModule = await server.ssrLoadModule('/api/verify-incident.ts');
-          const response = await apiModule.default(request);
+          try {
+            // Re-read .env on every request so that adding/editing secrets (for
+            // example SUPABASE_SERVICE_ROLE_KEY) takes effect without having to
+            // restart the dev server. Vite otherwise copies .env into
+            // process.env only once, at startup.
+            Object.assign(process.env, loadEnv(mode, process.cwd(), ''));
 
-          res.statusCode = response.status;
-          response.headers.forEach((value: string, key: string) => res.setHeader(key, value));
-          res.end(Buffer.from(await response.arrayBuffer()));
-        } catch (error) {
-          console.error('[local-vercel-api] verify-incident failed:', error);
-          res.statusCode = 500;
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ error: error instanceof Error ? error.message : 'Local API failed' }));
-        }
+            const chunks: Buffer[] = [];
+            for await (const chunk of req) {
+              chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+            }
+
+            const request = new Request(`http://localhost${route}`, {
+              method: req.method,
+              headers: Object.entries(req.headers).flatMap(([key, value]) =>
+                value === undefined ? [] : [[key, Array.isArray(value) ? value.join(', ') : value]]
+              ),
+              body: req.method === 'POST' ? Buffer.concat(chunks) : undefined,
+            });
+            const apiModule = await server.ssrLoadModule(`${route}.ts`);
+            const response = await apiModule.default(request);
+
+            res.statusCode = response.status;
+            response.headers.forEach((value: string, key: string) => res.setHeader(key, value));
+            res.end(Buffer.from(await response.arrayBuffer()));
+          } catch (error) {
+            console.error(`[local-vercel-api] ${route} failed:`, error);
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: error instanceof Error ? error.message : 'Local API failed' }));
+          }
+        });
       });
     },
   };
@@ -51,7 +63,7 @@ function localVercelApiPlugin(): Plugin {
     Object.assign(process.env, loadEnv(mode, process.cwd(), ''));
 
     return {
-    plugins: [react(), tailwindcss(), localVercelApiPlugin()],
+    plugins: [react(), tailwindcss(), localVercelApiPlugin(mode)],
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       alias: {

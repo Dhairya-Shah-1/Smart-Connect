@@ -23,7 +23,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
     "Pothole",
     "Garbage",
     "Flood",
-    "Water Leakage",
+    "Water Logging",
     "Accident",
     "Landslide",
     "Fire",
@@ -215,7 +215,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         else if (type === "Fire") { setSeverity("critical"); }
         else if (type === "Landslide") { setSeverity("critical"); }
         else if (type === "Garbage") { setSeverity("low"); }
-        else if (type === "Water Leakage") { setSeverity("medium"); }
+        else if (type === "Water Logging") { setSeverity("medium"); }
         else { setSeverity("medium"); }
         }
 

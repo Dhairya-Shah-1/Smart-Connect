@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle, Clock, MapPin, Mail, Building2, LogOut, Sun
 import { AdminList } from './AdminList';
 import { toast } from 'sonner';
 import { ASSETS } from '../config/assets';
+import { DEPARTMENT_OPTIONS, withDefaultDepartments } from '../config/departments';
 import { isMobileOrTablet } from '../utils/deviceDetection';
 import { BlurredVideoLoader } from './ui/blurred-video-loader';
 import {
@@ -98,7 +99,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
     totalAdmins: 0,
     totalUsers: 0,
   });
-  const [departments, setDepartments] = useState<string[]>([]);
+  const [departments, setDepartments] = useState<string[]>([...DEPARTMENT_OPTIONS]);
   const [incidentDataNotice, setIncidentDataNotice] = useState<string | null>(null);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [imageZoom, setImageZoom] = useState(1);
@@ -213,6 +214,16 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
       totalAdmins: adminCount || 0,
       totalUsers: userCount || 0,
     };
+  };
+
+  // Called by the "Manage Admins" tab after an admin is added or removed so the
+  // "Total Admins" stat stays in sync without a full dashboard reload.
+  const refreshOverviewStats = async () => {
+    try {
+      setStats(await fetchOverviewStats());
+    } catch (error: any) {
+      console.error('Error refreshing overview stats:', error);
+    }
   };
 
   // Cheap database call: only asks whether anything changed.
@@ -412,7 +423,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
 
       setIncidents(nextIncidents);
       setFilteredIncidents(nextIncidents);
-      setDepartments([...new Set(nextIncidents.map((incident) => normalizeDepartment(incident.department)))]);
+      setDepartments(withDefaultDepartments(nextIncidents.map((incident) => normalizeDepartment(incident.department))));
       setHasMoreIncidents(nextIncidents.length < totalRows);
       setIncidentDataLoaded(true);
 
@@ -434,7 +445,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
     setIncidentSortOrder(nextSortOrder);
     setIncidents([]);
     setFilteredIncidents([]);
-    setDepartments([]);
+    setDepartments([...DEPARTMENT_OPTIONS]);
     setHasMoreIncidents(false);
     setIncidentDataLoaded(false);
     loadIncidentReports({ reset: true, sortOrder: nextSortOrder });
@@ -526,7 +537,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
   }
 
   return (
-  <div className={`min-h-screen dashboard-container ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
+  <div className={`dashboard-container ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
     {/* Header */}
     <header className={`sticky top-0 z-50 dashboard-header ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200 shadow-lg'} border-b`}>
       <div className={`${isMobile ? "px-3 py-3 w-full" : "max-w-7xl item-center justify-center mx-auto px-4 py-4"}`}>
@@ -564,7 +575,8 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
       </div>
     </header>
 
-    <div className={`w-full ${isMobile ? "px-3 py-4 overflow-x-hidden" : "max-w-7xl item-center justify-center mx-auto px-4 py-6"}`}>
+    {/* Tab content scrolls inside the locked dashboard viewport (hidden scrollbar). */}
+    <div className={`w-full super-admin-scroll overflow-y-auto overflow-x-hidden hide-scrollbar ${isMobile ? "px-3 py-4" : "max-w-7xl item-center justify-center mx-auto px-4 py-6"}`}>
       {/* Super Admin Info Card */}
       <div className={`${isMobile ? "mb-4 p-4" : "mb-6 p-6"} rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
         <div className={`flex items-start ${isMobile ? "gap-3" : "gap-4"}`}>
@@ -802,8 +814,8 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
           </div>
 
           {/* Incidents List */}
-          <div className={`h-full flex flex-col ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
-            <div className="max-w-7xl mx-auto w-full h-full flex flex-col">
+          <div className={`flex flex-col ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
+            <div className="max-w-7xl mx-auto w-full flex flex-col">
               <div className="mb-4 md:mb-6">
                 <div className={`flex ${isMobile ? "flex-col gap-3" : "items-start justify-between gap-4"}`}>
                   <div>
@@ -829,7 +841,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto pb-20 md:pb-6 hide-scrollbar">
+              <div className="pb-20 md:pb-6">
                 {incidentLoading && incidents.length === 0 ? (
                   <div className={`rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg`}>
                     <BlurredVideoLoader
@@ -979,7 +991,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
         </>
       )}
 
-      {currentTab === 'admins' && <AdminList />}
+      {currentTab === 'admins' && <AdminList onAdminsChanged={refreshOverviewStats} />}
 
       {currentTab === 'analytics' && (
         <div className={`p-12 rounded-xl ${isDark ? 'bg-slate-800' : 'bg-white'} shadow-lg text-center`}>
