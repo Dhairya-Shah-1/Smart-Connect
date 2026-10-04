@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Bell, CheckCircle, Clock, AlertCircle, AlertTriangle, MapPin } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { useTheme } from '../App';
+import { canDepartmentViewIncident, getAdminScopedDepartment } from '../config/departments';
 import { BlurredVideoLoader } from './ui/blurred-video-loader';
 import {
   getBrowserCache,
@@ -42,7 +43,8 @@ export function Notifications() {
   };
 
   const getNotificationsCacheKeys = (user: any) => {
-    const suffix = sanitizeCacheKeyPart(`${user.role || 'user'}_${user.id}`);
+    const department = getAdminScopedDepartment(user) ?? 'all';
+    const suffix = sanitizeCacheKeyPart(`${user.role || 'user'}_${user.id}_${department}`);
 
     return {
       cookieKey: `${NOTIFICATIONS_CACHE_PREFIX}_meta_${suffix}`,
@@ -63,7 +65,13 @@ export function Notifications() {
       .join('|');
 
   const buildNotifications = (allReports: any[], user: any) => {
-    const userReports = allReports.filter(
+    // A departmental officer (admin) only sees incidents from their department.
+    const scopedDepartment = getAdminScopedDepartment(user);
+    const visibleReports = allReports.filter((r: any) =>
+      canDepartmentViewIncident(r.incident_type, scopedDepartment)
+    );
+
+    const userReports = visibleReports.filter(
       (r: any) => r.user_id === user.id
     );
 
@@ -106,7 +114,7 @@ export function Notifications() {
     });
 
     // 3. Nearby critical incidents (other users)
-    const criticalNearby = allReports
+    const criticalNearby = visibleReports
       .filter(
         (r: any) =>
           (r.severity === 'critical' || r.severity === 'high') &&

@@ -9,6 +9,7 @@ import { BlurredVideoLoader } from "./ui/blurred-video-loader";
 import { supabase } from "./supabaseClient";
 import { toast } from "sonner";
 import { parseAiVerdict, parseAiConfidence, AiVerdict } from "../utils/aiReview";
+import { canDepartmentViewIncident, getAdminScopedDepartment, getDepartmentsForIncidentType } from "../config/departments";
 
 interface Issue {
   id: string;
@@ -101,6 +102,10 @@ export function MapView({
   
   // Check if user is admin or super_admin
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
+
+  // A departmental officer (admin) only sees incidents that belong to their own
+  // department. Super admins resolve to null -> every incident is visible.
+  const scopedDepartment = getAdminScopedDepartment(currentUser);
   
   // Admin filter state
   const [adminFilter, setAdminFilter] = useState<'pending' | 'in-progress' | 'rejected'>('pending');
@@ -298,7 +303,12 @@ const groupNearbyIssues = (issues: Issue[]) => {
       ? (data || []).filter((report: any) => report.status === adminFilter)
       : data || [];
 
-    return visibleRows
+    // Scope the signature too, so a department change refreshes the cache.
+    const scopedRows = visibleRows.filter((report: any) =>
+      canDepartmentViewIncident(report.incident_type, scopedDepartment),
+    );
+
+    return scopedRows
       .map((report: any) => [
         report.report_id,
         report.status,
@@ -356,7 +366,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
           aiConfidence: parseAiConfidence(aiInterpretation),
           aiReason: aiInterpretation,
           aiVerdict,
-          departmentNotified: "Central Control",
+          departmentNotified: getDepartmentsForIncidentType(report.incident_type).join(" & ") || "Unassigned",
         };
       });
 
@@ -365,6 +375,11 @@ const groupNearbyIssues = (issues: Issue[]) => {
       if (isAdmin) {
         filteredIssues = mappedIssues.filter(issue => issue.status === adminFilter);
       }
+
+      // Departmental officers only ever see their own department's incidents.
+      filteredIssues = filteredIssues.filter((issue) =>
+        canDepartmentViewIncident(issue.type, scopedDepartment),
+      );
 
       cacheIssues(filteredIssues, buildIssuesSignature(filteredIssues));
       applyIssues(filteredIssues);

@@ -42,6 +42,36 @@ const json = (body: unknown, status = 200) =>
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Canonical department names. Keep in sync with src/config/departments.ts
+// (DEPARTMENT_OPTIONS) - this endpoint runs as a Vercel/Deno function and cannot
+// import the front-end config module directly.
+const DEPARTMENT_OPTIONS = [
+  'Public Works Department',
+  'Solid Waste Management',
+  'Disaster Management',
+  'Storm Water Drains',
+  'Traffic Police',
+  'Fire Department',
+];
+
+// Older free-text department names are still accepted (and mapped onto the
+// canonical list) so admins created before the list existed keep working.
+const LEGACY_DEPARTMENT_ALIASES: Record<string, string> = {
+  'sanitation department': 'Solid Waste Management',
+  'roads & infrastructure': 'Public Works Department',
+  'road and infrastructure': 'Public Works Department',
+  'water management': 'Storm Water Drains',
+  'public works': 'Public Works Department',
+};
+
+function normalizeDepartmentName(value: string): string {
+  const trimmed = value.trim();
+  const lower = trimmed.toLowerCase();
+  const canonical = DEPARTMENT_OPTIONS.find((option) => option.toLowerCase() === lower);
+  if (canonical) return canonical;
+  return LEGACY_DEPARTMENT_ALIASES[lower] || trimmed;
+}
+
 // Finds an existing auth user by email. Used when the email is already
 // registered (for example a normal user that is being promoted to admin) so we
 // never surface a hard "user already registered" error.
@@ -189,7 +219,7 @@ export default async function handler(req: Request): Promise<Response> {
     const email = (body.email || '').trim().toLowerCase();
     const password = (body.password || '').trim();
     const name = (body.name || '').trim();
-    const departmentName = (body.department_name || '').trim();
+    const departmentName = normalizeDepartmentName(body.department_name || '');
     const location = (body.location || '').trim();
 
     if (!email || !EMAIL_PATTERN.test(email)) {
@@ -206,6 +236,13 @@ export default async function handler(req: Request): Promise<Response> {
 
     if (!departmentName) {
       return json({ error: "Admin's department name is required." }, 400);
+    }
+
+    if (!DEPARTMENT_OPTIONS.includes(departmentName)) {
+      return json(
+        { error: `Department must be one of: ${DEPARTMENT_OPTIONS.join(', ')}.` },
+        400,
+      );
     }
 
     if (!location) {

@@ -6,6 +6,7 @@ import { isMobileOrTablet } from "../utils/deviceDetection";
 import { supabase } from './supabaseClient';
 import { processAllUnprocessedReports, getUnprocessedReportsCount } from '../utils/aiVerification';
 import { parseAiVerdict, parseAiConfidence } from '../utils/aiReview';
+import { canDepartmentViewIncident, getAdminScopedDepartment, UNASSIGNED_DEPARTMENT } from '../config/departments';
 import { BlurredVideoLoader } from './ui/blurred-video-loader';
 import {
   getBrowserCache,
@@ -65,9 +66,15 @@ export function CheckReports() {
     }
   };
 
+  // A departmental officer (admin) only ever sees the incidents that belong to
+  // their own department. Super admins resolve to null -> never scoped.
+  const scopedDepartment = getAdminScopedDepartment(getCurrentUser());
+
   const getCheckReportsCacheKeys = (activeFilter: Category) => {
     const currentUser = getCurrentUser();
-    const suffix = sanitizeCacheKeyPart(`${currentUser.role || 'admin'}_${currentUser.id || 'anonymous'}_${activeFilter}`);
+    const suffix = sanitizeCacheKeyPart(
+      `${currentUser.role || 'admin'}_${currentUser.id || 'anonymous'}_${scopedDepartment ?? 'all'}_${activeFilter}`,
+    );
 
     return {
       cookieKey: `${CHECK_REPORTS_CACHE_PREFIX}_meta_${suffix}`,
@@ -99,18 +106,52 @@ export function CheckReports() {
   const getCheckReportsSignature = async () => {
     const { data, error } = await supabase
       .from('incident_reports_view')
-      .select('report_id,status,severity,timestamp,ai_interpretation')
+      .select('report_id,status,severity,timestamp,ai_interpretation,incident_type')
       .eq('status', 'in-progress')
       .order('timestamp', { ascending: true })
       .order('report_id', { ascending: true });
 
     if (error) throw error;
 
+    // Keep the signature scoped: a change to the admin's department (or to the
+    // incidents visible to that department) must invalidate the cache.
+    const visibleRows = (data || []).filter((row: any) =>
+      canDepartmentViewIncident(row.incident_type, scopedDepartment),
+    );
+
     const nextUnprocessedCount = await getUnprocessedReportsCount(supabase);
-    return buildCheckReportsSignature(data || [], nextUnprocessedCount);
+    return `${scopedDepartment ?? 'all'}|${buildCheckReportsSignature(visibleRows, nextUnprocessedCount)}`;
   };
 
   const fetchCounts = async () => {
+    // A departmental officer gets counts computed from the incidents that are
+    // actually visible to their department.
+    if (scopedDepartment) {
+      const { data, error } = await supabase
+        .from('incident_reports')
+        .select('report_id,incident_type,severity')
+        .eq('status', 'in-progress');
+
+      if (error) {
+        console.error('Error fetching scoped report counts:', error);
+      }
+
+      const scopedRows = (data || []).filter((row: any) =>
+        canDepartmentViewIncident(row.incident_type, scopedDepartment),
+      );
+
+      const nextCounts: Record<Category, number> = {
+        all: scopedRows.length,
+        critical: scopedRows.filter((row: any) => row.severity === 'critical').length,
+        high: scopedRows.filter((row: any) => row.severity === 'high').length,
+        medium: scopedRows.filter((row: any) => row.severity === 'medium').length,
+        low: scopedRows.filter((row: any) => row.severity === 'low').length,
+      };
+
+      setCounts(nextCounts);
+      return nextCounts;
+    }
+
     const [allRes, criticalRes, highRes, mediumRes, lowRes] = await Promise.all([
       supabase.from('incident_reports').select('*', { count: 'exact', head: true }).eq('status', 'in-progress'),
       supabase.from('incident_reports').select('*', { count: 'exact', head: true }).eq('status', 'in-progress').eq('severity', 'critical'),
@@ -166,15 +207,23 @@ export function CheckReports() {
       .select('*')
       .eq('status', 'in-progress')
       .order('timestamp', { ascending: true })
-      .order('report_id', { ascending: true })
-      .limit(PAGE_SIZE + 1);
+      .order('report_id', { ascending: true });
 
-    if (activeFilter !== 'all') {
-      query = query.eq('severity', activeFilter);
-    }
+    // Without a department scope the server pages the results exactly as
+    // before. A departmental officer's department is derived from the incident
+    // type (a computed value, not a stored column), so the whole result set is
+    // fetched and paged here - otherwise server-side paging could hand back a
+    // page full of another department's incidents.
+    if (!scopedDepartment) {
+      query = query.limit(PAGE_SIZE + 1);
 
-    if (afterTimestamp) {
-      query = query.gt('timestamp', afterTimestamp);
+      if (activeFilter !== 'all') {
+        query = query.eq('severity', activeFilter);
+      }
+
+      if (afterTimestamp) {
+        query = query.gt('timestamp', afterTimestamp);
+      }
     }
 
     const { data: reportsData, error: reportsError } = await query;
@@ -186,7 +235,21 @@ export function CheckReports() {
       return null;
     }
 
-    const rows = reportsData || [];
+    // Departmental officers must never receive another department's incident.
+    let rows = (reportsData || []).filter((report: any) =>
+      canDepartmentViewIncident(report.incident_type, scopedDepartment),
+    );
+
+    if (scopedDepartment) {
+      if (activeFilter !== 'all') {
+        rows = rows.filter((report: any) => report.severity === activeFilter);
+      }
+
+      if (afterTimestamp) {
+        rows = rows.filter((report: any) => report.timestamp > afterTimestamp);
+      }
+    }
+
     const canLoadMore = rows.length > PAGE_SIZE;
     const pageRows = canLoadMore ? rows.slice(0, PAGE_SIZE) : rows;
     const reportsWithUsers = await enrichWithUsers(pageRows);
@@ -427,9 +490,11 @@ export function CheckReports() {
     setImageZoom(1);
   };
 
-  const filteredReports = [...reports].sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  );
+  // Departmental officers must only ever see their own department's incidents,
+  // even if a stale cache still holds another department's reports.
+  const filteredReports = [...reports]
+    .filter((report) => canDepartmentViewIncident(report.incident_type, scopedDepartment))
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
   return (
     <div className={`h-full flex flex-col ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
@@ -440,7 +505,11 @@ export function CheckReports() {
           <div>
             <h2 className={`text-xl md:text-2xl font-bold ${isDark ? 'text-indigo-300' : 'text-indigo-900'}`}>Verified Reports</h2>
             <p className={`text-xs md:text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              Resolve the pending incident reports
+              {scopedDepartment === UNASSIGNED_DEPARTMENT
+                ? 'No department is assigned to your admin account'
+                : scopedDepartment
+                  ? `Showing only ${scopedDepartment} incidents`
+                  : 'Resolve the pending incident reports'}
             </p>
           </div>
           

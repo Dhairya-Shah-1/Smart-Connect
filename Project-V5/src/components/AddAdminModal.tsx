@@ -236,8 +236,7 @@ export function AddAdminModal({ open, onClose, onCreated }: AddAdminModalProps) 
         />
       </div>
       <p className={`mt-2 text-xs leading-relaxed ${mutedClass}`}>
-        Leave this blank if the admin will sign in with Google using this email. A password is only needed for
-        email/password sign-in.
+        If you keep password empty, then admin can only login via Google.
       </p>
     </div>
   );

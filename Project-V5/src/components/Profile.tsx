@@ -10,6 +10,7 @@ import {
   sanitizeCacheKeyPart,
   setBrowserCache,
 } from '../utils/browserCache';
+import { normalizeDepartmentName, UNASSIGNED_DEPARTMENT } from '../config/departments';
 
 const PROFILE_CACHE_PREFIX = 'smart_connect_profile';
 
@@ -122,7 +123,8 @@ export function Profile({ onLogout }: ProfileProps) {
             .single();
 
           if (!adminError && adminData) {
-            currentDepartmentName = adminData.department_name;
+            currentDepartmentName =
+              normalizeDepartmentName(adminData.department_name) || UNASSIGNED_DEPARTMENT;
             setDepartmentName(currentDepartmentName);
           }
 

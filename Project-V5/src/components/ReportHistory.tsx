@@ -14,6 +14,7 @@ import {
 } from '../utils/browserCache';
 import { getAuthenticatedUser } from '../utils/authSession';
 import { parseAiVerdict, parseAiConfidence } from '../utils/aiReview';
+import { getDepartmentsForIncidentType } from '../config/departments';
 
 const PAGE_SIZE = 5;
 
@@ -113,7 +114,7 @@ export function ReportHistory() {
         aiConfidence: parseAiConfidence(r.ai_interpretation),
         aiReason: r.ai_interpretation || '',
         isFlagged: r.status === 'rejected',
-        departmentNotified: 'Municipal Authority',
+        departmentNotified: getDepartmentsForIncidentType(r.incident_type).join(' & ') || 'Unassigned',
       };
     });
 

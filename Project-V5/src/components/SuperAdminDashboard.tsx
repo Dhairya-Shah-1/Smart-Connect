@@ -5,7 +5,7 @@ import { AlertTriangle, CheckCircle, Clock, MapPin, Mail, Building2, LogOut, Sun
 import { AdminList } from './AdminList';
 import { toast } from 'sonner';
 import { ASSETS } from '../config/assets';
-import { DEPARTMENT_OPTIONS, withDefaultDepartments } from '../config/departments';
+import { DEPARTMENT_OPTIONS, UNASSIGNED_DEPARTMENT, getDepartmentsForIncidentType, normalizeDepartmentName } from '../config/departments';
 import { isMobileOrTablet } from '../utils/deviceDetection';
 import { BlurredVideoLoader } from './ui/blurred-video-loader';
 import {
@@ -54,22 +54,15 @@ interface IncidentReport {
 const normalizeStatus = (status?: string | null) => (status || 'pending').toLowerCase().replace(/_/g, '-');
 
 const normalizeDepartment = (department?: string | null) => {
-  const value = department?.trim();
-  return value && value.length > 0 ? value : 'General';
+  const value = normalizeDepartmentName(department) || department?.trim();
+  return value && value.length > 0 ? value : UNASSIGNED_DEPARTMENT;
 };
 
-const inferDepartmentFromIncidentType = (incidentType?: string | null) => {
-  const type = incidentType?.trim().toLowerCase() || '';
-
-  if (type.includes('fire')) return 'Fire Department';
-  if (type.includes('accident')) return 'Traffic Police';
-  if (type.includes('flood') || type.includes('water') || type.includes('leak')) return 'Water Management';
-  if (type.includes('landslide')) return 'Disaster Management';
-  if (type.includes('garbage') || type.includes('waste')) return 'Sanitation Department';
-  if (type.includes('pothole') || type.includes('road')) return 'Roads & Infrastructure';
-
-  return 'Municipal Authority';
-};
+// An incident's department is derived from its incident type
+// (Potholes -> Public Works Department, Fire -> Fire Department, ...).
+// src/config/departments.ts holds the single source of truth for the mapping.
+const inferDepartmentFromIncidentType = (incidentType?: string | null) =>
+  getDepartmentsForIncidentType(incidentType)[0] ?? '';
 
 const getIncidentDepartment = (incident: any) =>
   normalizeDepartment(
@@ -99,7 +92,6 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
     totalAdmins: 0,
     totalUsers: 0,
   });
-  const [departments, setDepartments] = useState<string[]>([...DEPARTMENT_OPTIONS]);
   const [incidentDataNotice, setIncidentDataNotice] = useState<string | null>(null);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [imageZoom, setImageZoom] = useState(1);
@@ -333,10 +325,10 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
     let mappedIncidents = (rows || []).map((inc: any) => {
       const adminInfo = adminDepartmentMap.get(inc.a_id);
       const department = normalizeDepartment(
-        inc.department_name ??
-        adminInfo?.departmentName ??
-        inc.department ??
-        inferDepartmentFromIncidentType(inc.incident_type)
+        inferDepartmentFromIncidentType(inc.incident_type) ||
+        inc.department_name ||
+        adminInfo?.departmentName ||
+        inc.department
       );
 
       return {
@@ -423,7 +415,6 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
 
       setIncidents(nextIncidents);
       setFilteredIncidents(nextIncidents);
-      setDepartments(withDefaultDepartments(nextIncidents.map((incident) => normalizeDepartment(incident.department))));
       setHasMoreIncidents(nextIncidents.length < totalRows);
       setIncidentDataLoaded(true);
 
@@ -445,7 +436,6 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
     setIncidentSortOrder(nextSortOrder);
     setIncidents([]);
     setFilteredIncidents([]);
-    setDepartments([...DEPARTMENT_OPTIONS]);
     setHasMoreIncidents(false);
     setIncidentDataLoaded(false);
     loadIncidentReports({ reset: true, sortOrder: nextSortOrder });
@@ -773,42 +763,26 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
               </div>
 
               <div>
-                <label className={`block ${isMobile ? "text-xs" : "text-sm"} font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label className={`block ${isMobile ? "text-xs" : "text-sm"} font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`} htmlFor="department-filter">
                   Department Filter
                 </label>
-                <div className="flex gap-2 flex-wrap">
-                  <button
-                    onClick={() => setFilterDepartment('all')}
-                    className={`${isMobile ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"} rounded-lg font-medium transition-colors ${
-                      filterDepartment === 'all'
-                        ? isDark
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-purple-600 text-white'
-                        : isDark
-                        ? 'bg-slate-700 text-gray-300 hover:bg-slate-600'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    All Departments
-                  </button>
-                  {departments.map((dept) => (
-                    <button
-                      key={dept}
-                      onClick={() => setFilterDepartment(dept)}
-                      className={`${isMobile ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"} rounded-lg font-medium transition-colors ${
-                        filterDepartment === dept
-                          ? isDark
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-purple-600 text-white'
-                          : isDark
-                          ? 'bg-slate-700 text-gray-300 hover:bg-slate-600'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
+                <select
+                  id="department-filter"
+                  value={filterDepartment}
+                  onChange={(event) => setFilterDepartment(event.target.value)}
+                  className={`w-full ${isMobile ? "px-3 py-2 text-xs" : "px-4 py-2.5 text-sm"} rounded-lg border font-medium focus:outline-none focus:ring-2 focus:ring-purple-600 ${
+                    isDark
+                      ? 'border-slate-600 bg-slate-700 text-gray-100'
+                      : 'border-gray-300 bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  <option value="all">All Departments</option>
+                  {DEPARTMENT_OPTIONS.map((dept) => (
+                    <option key={dept} value={dept}>
                       {dept}
-                    </button>
+                    </option>
                   ))}
-                </div>
+                </select>
               </div>
             </div>
           </div>
