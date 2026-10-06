@@ -10,7 +10,9 @@
 //      was placed in `reports/anonymous/...` (no user id available).
 //
 // The helper must therefore report `userId === null` (and never throw) whenever
-// the browser only has a localStorage `currentUser` without a session.
+// the browser has no session-scoped Supabase session - and a token left in
+// localStorage (a leftover that survived a browser restart) must never be
+// turned into a session either.
 //
 // Run with:
 //   node scripts/verify-auth-session.test.mjs
@@ -100,7 +102,10 @@ assert.equal(signedOut.userId, null, 'a session-less browser must not report a u
 assert.equal(signedOut.state, 'missing', 'a session-less browser must be reported as missing');
 
 // --- 2. valid stored session → resolved from storage (no network needed) ----
-globalThis.localStorage = createStorage({
+// supabaseClient.tsx persists the session in sessionStorage, so that is where
+// the stub lives; localStorage stays empty on purpose.
+globalThis.localStorage = createStorage();
+globalThis.sessionStorage = createStorage({
   [STORAGE_KEY]: JSON.stringify(makeSession(nowSeconds + 3600)),
 });
 
@@ -114,7 +119,8 @@ assert.equal(signedIn.state, 'valid', 'a stored, unexpired session must be repor
 assert.equal(signedIn.userId, 'test-user-uuid', 'the session user id must be returned');
 
 // --- 3. expired session that cannot be refreshed → still no user id ---------
-globalThis.localStorage = createStorage({
+globalThis.localStorage = createStorage();
+globalThis.sessionStorage = createStorage({
   [STORAGE_KEY]: JSON.stringify(makeSession(nowSeconds - 60)),
 });
 
@@ -130,4 +136,30 @@ assert.ok(
   `expired/unrefreshable sessions must not be reported as valid (got ${expired.state})`,
 );
 
+// --- 4. a localStorage-only token is a browser-restart leftover -------------
+// The Supabase session is session-scoped, so a token that only exists in
+// localStorage (old build / before this change) must never be revived.
+globalThis.localStorage = createStorage({
+  [STORAGE_KEY]: JSON.stringify(makeSession(nowSeconds + 3600)),
+});
+globalThis.sessionStorage = createStorage();
+
+const { getAuthenticatedUser: getAuthenticatedUserLegacy } = await import(
+  './.cache/authSession.mjs?legacy-local'
+);
+const legacy = await getAuthenticatedUserLegacy();
+
+console.log('localStorage-only ->', legacy);
+assert.equal(legacy.userId, null, 'a localStorage-only session must not survive a restart');
+assert.notEqual(legacy.state, 'valid', 'a localStorage-only session must never be reported valid');
+assert.equal(
+  globalThis.localStorage.getItem(STORAGE_KEY),
+  null,
+  'the legacy localStorage token must be purged',
+);
+
 console.log('\nAll auth-session checks passed.');
+
+// supabase-js starts an auto-refresh interval as soon as a session is stored,
+// which would otherwise keep this script alive forever.
+process.exit(0);

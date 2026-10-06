@@ -3,6 +3,7 @@ import { MapPin, AlertTriangle, Droplets, Flame, Car, Mountain, Sun, Moon, LogOu
 import { isMobileOrTablet } from "../utils/deviceDetection";
 import { ASSETS } from '../config/assets';
 import { signOutAndClearAuth, isLoginExpired } from '../utils/authLifetime';
+import { readCurrentUserRaw } from '../utils/authStorage';
 
 import { useTheme } from "../App";
 
@@ -12,8 +13,8 @@ export function LandingPage() {
   const isDark = theme === "dark";
   const isMobile = isMobileOrTablet();
   
-  // Check if user is logged in
-  const user = localStorage.getItem('currentUser');
+  // Check if user is logged in (currentUser is session-scoped - authStorage.ts)
+  const user = readCurrentUserRaw();
   const isLoggedIn = !!user && !isLoginExpired();
 
   const issues = [
@@ -51,7 +52,22 @@ export function LandingPage() {
 
   const handleStartReporting = () => {
     if (isLoggedIn) {
-      navigate("/dashboard");
+      // Send each role to its own dashboard - an admin returning to the
+      // landing page must not be dropped on the normal user dashboard.
+      let role: string | null = null;
+      try {
+        role = user ? JSON.parse(user)?.role ?? null : null;
+      } catch {
+        role = null;
+      }
+
+      if (role === 'super_admin') {
+        navigate("/super-admin");
+      } else if (role === 'admin') {
+        navigate("/admin");
+      } else {
+        navigate("/dashboard");
+      }
     } else {
       navigate("/signup");
     }

@@ -11,6 +11,7 @@ import {
   setBrowserCache,
 } from '../utils/browserCache';
 import { normalizeDepartmentName, UNASSIGNED_DEPARTMENT } from '../config/departments';
+import { readCurrentUserRaw } from '../utils/authStorage';
 
 const PROFILE_CACHE_PREFIX = 'smart_connect_profile';
 
@@ -78,7 +79,7 @@ export function Profile({ onLogout }: ProfileProps) {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        const currentUser = JSON.parse(readCurrentUserRaw() || '{}');
         setUser(currentUser);
         const { cookieKey, storageKey } = getProfileCacheKeys(currentUser);
         const cached = getBrowserCache<ProfileCacheData>(cookieKey, storageKey);

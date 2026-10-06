@@ -313,14 +313,49 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     // -----------------------------
-    // 6. Link the auth user to the admins table
+    // 6. Ensure the public.users profile row exists
     // -----------------------------
+    // admins.a_id has a foreign key to users.u_id (verified: admins_a_id_fkey).
+    // Auth users created here - and existing Google users who never logged in
+    // before - do not have a profile row yet, so the admins insert below would
+    // fail the FK. Only insert when missing; never overwrite an existing
+    // profile (sign-up/login may already have created one).
+    const { data: existingProfile, error: profileLookupError } = await supabaseAdmin
+      .from('users')
+      .select('u_id')
+      .eq('u_id', userId)
+      .maybeSingle();
+
+    if (profileLookupError) {
+      return json({ error: `Failed to check the admin profile: ${profileLookupError.message}` }, 500);
+    }
+
+    if (!existingProfile) {
+      const { error: profileInsertError } = await supabaseAdmin
+        .from('users')
+        .insert([{ u_id: userId, u_name: name, u_email: email }]);
+
+      if (profileInsertError) {
+        return json({ error: `Failed to save the admin profile: ${profileInsertError.message}` }, 500);
+      }
+    }
+
+    // -----------------------------
+    // 7. Link the auth user to the admins table
+    // -----------------------------
+    // `admins.location` is a PostGIS geography(Point,4326) column, so a plain
+    // text value like "Vadodara, Gujarat" is rejected by PostGIS with
+    // "parse error - invalid geometry". The free-text place the super admin
+    // enters is stored in the `station` text column instead: that is what the
+    // dashboard renders (AdminList's MapPin line and the incident location
+    // fallback in SuperAdminDashboard) and it matches how every existing admin
+    // row is stored. The geography column stays NULL.
     const { data: adminRow, error: insertError } = await insertAdminRow(supabaseAdmin, {
       a_id: userId,
       a_email: email,
       a_name: name,
       department_name: departmentName,
-      location,
+      station: location,
     });
 
     if (insertError) {

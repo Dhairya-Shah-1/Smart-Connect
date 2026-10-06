@@ -3,15 +3,18 @@
   <head><meta charset="utf-8" /><title>seed</title></head>
   <body>
     <script>
-      // Seed the localStorage auth gate (App.tsx ProtectedRoute reads currentUser)
-      // and force dark theme so the dashboard renders in dark mode.
+      // Seed the session-scoped auth gate (App.tsx ProtectedRoute reads
+      // currentUser from sessionStorage - see src/utils/authStorage.ts - and
+      // isLoginExpired() needs a fresh login stamp) and force dark theme so
+      // the dashboard renders in dark mode.
       localStorage.setItem('theme', 'dark');
-      localStorage.setItem('currentUser', JSON.stringify({
+      sessionStorage.setItem('currentUser', JSON.stringify({
         id: 'probe-user',
         role: 'user',
         name: 'Probe User',
         email: 'probe@example.com'
       }));
+      sessionStorage.setItem('smart_connect_login_at', String(Date.now()));
       location.replace('/dashboard');
     </script>
   </body>

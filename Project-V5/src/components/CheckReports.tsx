@@ -6,6 +6,7 @@ import { isMobileOrTablet } from "../utils/deviceDetection";
 import { supabase } from './supabaseClient';
 import { processAllUnprocessedReports, getUnprocessedReportsCount } from '../utils/aiVerification';
 import { parseAiVerdict, parseAiConfidence } from '../utils/aiReview';
+import { readCurrentUserRaw } from '../utils/authStorage';
 import { canDepartmentViewIncident, getAdminScopedDepartment, UNASSIGNED_DEPARTMENT } from '../config/departments';
 import { BlurredVideoLoader } from './ui/blurred-video-loader';
 import {
@@ -60,7 +61,7 @@ export function CheckReports() {
 
   const getCurrentUser = () => {
     try {
-      return JSON.parse(localStorage.getItem('currentUser') || '{}');
+      return JSON.parse(readCurrentUserRaw() || '{}');
     } catch {
       return {};
     }
@@ -410,7 +411,7 @@ export function CheckReports() {
   }, [filter, isInitialized]);
 
   const handleMarkResolved = async (id: string) => {
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const currentUser = JSON.parse(readCurrentUserRaw() || '{}');
       
       const { error } = await supabase
         .from('incident_reports')

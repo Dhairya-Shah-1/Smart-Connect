@@ -5,6 +5,12 @@ import { ArrowLeft, Mail, CheckCircle, Loader2, Moon, Sun } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { notifyCurrentUserChanged, useTheme } from '../App';
 import { recordLoginTime } from '../utils/authLifetime';
+import {
+  clearOAuthPending,
+  isAuthRedirectInProgress,
+  markOAuthPending,
+  writeCurrentUser,
+} from '../utils/authStorage';
 
 type LoginView = 'login' | 'forgot-password' | 'email-sent' | 'update-password';
 
@@ -224,6 +230,12 @@ export function LoginPage() {
         setView('update-password');
       }
       if (event === 'SIGNED_IN' && session?.user && view === 'login') {
+        // Only complete sign-ins this tab started (Google round-trip) or that
+        // arrived as an explicit auth redirect. A Supabase session merely
+        // restored from browser storage must NOT become an app login - a
+        // returning admin has to enter credentials again, and a stale session
+        // must never downgrade the role when its lookups fail.
+        if (!isAuthRedirectInProgress()) return;
         void resolveRoleAndRedirect(session.user).catch((err: any) => {
           console.error('OAuth Sign-In Processing Error:', err);
           setError(err.message || 'Failed to complete sign in');
@@ -240,21 +252,33 @@ export function LoginPage() {
     let role: 'user' | 'admin' | 'super_admin' = 'user';
     let profileData: any = null;
 
-    const { data: sa } = await supabase
+    const { data: sa, error: saError } = await supabase
       .from('super_admins')
       .select('*')
       .eq('sa_id', user.id)
       .maybeSingle();
 
+    // A failed lookup must never silently fall through to role 'user' - that
+    // is how a returning admin ended up on the normal-user dashboard. Fail
+    // the login loudly instead; the next attempt retries the lookup.
+    if (saError) {
+      throw new Error(`Could not verify account role: ${saError.message}`);
+    }
+
     if (sa) {
       role = 'super_admin';
       profileData = sa;
     } else {
-      const { data: admin } = await supabase
+      const { data: admin, error: adminError } = await supabase
         .from('admins')
         .select('*')
         .eq('a_id', user.id)
         .maybeSingle();
+
+      // See the super_admins lookup above: never downgrade on error.
+      if (adminError) {
+        throw new Error(`Could not verify account role: ${adminError.message}`);
+      }
 
       if (admin) {
         role = 'admin';
@@ -307,7 +331,10 @@ export function LoginPage() {
       profile: profileData,
     };
 
-    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+    // Every role is written to sessionStorage (closed browser/tab = logged
+    // out) - never localStorage. See authStorage.ts.
+    writeCurrentUser(currentUser);
+    clearOAuthPending();
     recordLoginTime();
     notifyCurrentUserChanged();
 
@@ -331,6 +358,12 @@ export function LoginPage() {
     }
 
     const finalizeOAuthLogin = async () => {
+      // Only finish a login this tab started (Google round-trip) or one that
+      // arrived with explicit auth-redirect params (e.g. recovery link). An
+      // ambient Supabase session restored from browser storage is left alone:
+      // the visitor must sign in with credentials again.
+      if (!isAuthRedirectInProgress()) return;
+
       try {
         const { data, error: sessionError } = await supabase.auth.getSession();
         if (sessionError || !data.session?.user) return;
@@ -374,6 +407,9 @@ export function LoginPage() {
   const handleGoogleSignIn = async () => {
     setError('');
     setGoogleLoading(true);
+    // Tab-scoped marker: after the redirect back, only THIS tab may complete
+    // the login from the resulting session (see finalizeOAuthLogin).
+    markOAuthPending();
 
     try {
       const { error: oauthError } = await supabase.auth.signInWithOAuth({

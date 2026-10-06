@@ -102,6 +102,34 @@ export const getDepartmentsForIncidentType = (incidentType?: string | null): str
 };
 
 /**
+ * Representative incident type used when an incident is transferred INTO a
+ * department and the AI model's predicted label does not already route there.
+ *
+ * These are the canonical types the INCIDENT_DEPARTMENT_RULES keywords are
+ * built around, so writing one of these as the new `incident_type` is what
+ * makes the report belong to that department (department membership in this
+ * app is derived from the incident type - there is no stored department
+ * column on incident_reports).
+ */
+export const DEPARTMENT_CANONICAL_INCIDENT_TYPE: Record<string, string> = {
+  'Public Works Department': 'Pothole',
+  'Solid Waste Management': 'Garbage',
+  'Disaster Management': 'Flood',
+  'Storm Water Drains': 'Water Logging',
+  'Traffic Police': 'Accident',
+  'Fire Department': 'Fire',
+};
+
+/**
+ * Departments an incident can be transferred to: every canonical department
+ * except the ones it already belongs to ("a different department").
+ */
+export const getTransferableDepartments = (incidentType?: string | null): string[] => {
+  const current = getDepartmentsForIncidentType(incidentType);
+  return DEPARTMENT_OPTIONS.filter((department) => !current.includes(department));
+};
+
+/**
  * Whether a departmental officer (admin) with the given department may see the
  * incident. The Super Admin must bypass this (pass no department / null).
  *

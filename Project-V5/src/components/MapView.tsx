@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { MapPin, Filter, Search, X, ShieldCheck, ZoomIn, ZoomOut } from "lucide-react";
+import { MapPin, Filter, Search, X, ShieldCheck, ZoomIn, ZoomOut, User, Calendar } from "lucide-react";
 import { useTheme } from "../App";
 import { OpenLayersMap } from "./OpenLayersMap";
 import { isMobileOrTablet } from "../utils/deviceDetection";
@@ -8,8 +8,9 @@ import { BlurredVideoLoader } from "./ui/blurred-video-loader";
 /* 🔹 ADDED */
 import { supabase } from "./supabaseClient";
 import { toast } from "sonner";
-import { parseAiVerdict, parseAiConfidence, AiVerdict } from "../utils/aiReview";
-import { canDepartmentViewIncident, getAdminScopedDepartment, getDepartmentsForIncidentType } from "../config/departments";
+import { parseAiVerdict, parseAiConfidence, parseAiPredictedLabel, matchesIncidentType, AiVerdict } from "../utils/aiReview";
+import { canDepartmentViewIncident, getAdminScopedDepartment, getDepartmentsForIncidentType, getTransferableDepartments, DEPARTMENT_CANONICAL_INCIDENT_TYPE } from "../config/departments";
+import { readCurrentUserRaw } from "../utils/authStorage";
 
 interface Issue {
   id: string;
@@ -27,6 +28,8 @@ interface Issue {
   aiReason?: string;
   aiVerdict?: AiVerdict;
   departmentNotified: string;
+  /** Display name of the user who filed the report (users.u_name). */
+  reporterName?: string | null;
 }
 
 interface MapViewProps {
@@ -48,7 +51,7 @@ const getStoredCurrentUser = () => {
   if (typeof window === "undefined") return null;
 
   try {
-    const userStr = localStorage.getItem("currentUser");
+    const userStr = readCurrentUserRaw();
     return userStr ? JSON.parse(userStr) : null;
   } catch {
     return null;
@@ -109,12 +112,21 @@ export function MapView({
   
   // Admin filter state
   const [adminFilter, setAdminFilter] = useState<'pending' | 'in-progress' | 'rejected'>('pending');
-  
+
+  // Department transfer state (only used by the gated transfer control below)
+  const [transferDepartment, setTransferDepartment] = useState<string>('');
+  const [transferring, setTransferring] = useState(false);
+
   // Get user on mount
   useEffect(() => {
     setCurrentUser(getStoredCurrentUser());
   }, []);
-  
+
+  // A new card always starts with a clean department selection.
+  useEffect(() => {
+    setTransferDepartment('');
+  }, [selectedIssue?.id]);
+
   // Handle reject action
   const handleReject = async (reportId: string) => {
     const { error } = await supabase
@@ -144,6 +156,58 @@ export function MapView({
       toast.success("Report verified and resolved");
       fetchIssues();
       setSelectedIssue(null);
+    }
+  };
+
+  // Handle transfer to a different department.
+  //
+  // Department membership in this app is derived from `incident_type` (there is
+  // no stored department column), so a transfer re-categorises the incident
+  // type to one that routes to the chosen department:
+  //   - prefer the AI model's predicted label when it already belongs to the
+  //     target department (the transfer control only appears on AI-mismatch,
+  //     so this is the common case and it keeps the detection the model saw),
+  //   - otherwise fall back to the department's canonical incident type.
+  const handleTransfer = async (
+    reportId: string,
+    department: string,
+    predictedLabel: string | null,
+  ) => {
+    if (!department || transferring) return;
+    setTransferring(true);
+
+    try {
+      const predictedType = predictedLabel
+        ? predictedLabel.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+        : '';
+      const predictedRoutesToDepartment =
+        predictedType &&
+        getDepartmentsForIncidentType(predictedType).includes(department);
+
+      const nextType = predictedRoutesToDepartment
+        ? predictedType
+        : DEPARTMENT_CANONICAL_INCIDENT_TYPE[department] || predictedType;
+
+      if (!nextType) {
+        throw new Error(`No incident type is mapped to ${department}.`);
+      }
+
+      const { error } = await supabase
+        .from('incident_reports')
+        .update({ incident_type: nextType })
+        .eq('report_id', reportId);
+
+      if (error) throw new Error(error.message);
+
+      toast.success(`Report transferred to ${department}`);
+      setTransferDepartment('');
+      await fetchIssues();
+      setSelectedIssue(null);
+    } catch (err: any) {
+      console.error('Transfer failed:', err);
+      toast.error(`Failed to transfer report: ${err?.message || 'unknown error'}`);
+    } finally {
+      setTransferring(false);
     }
   };
 
@@ -241,6 +305,14 @@ const groupNearbyIssues = (issues: Issue[]) => {
       if (!Array.isArray(cachedIssues) || metadata.storageKey !== storageKey) {
         return null;
       }
+
+      // Entries written before reporter names existed would keep rendering
+      // "Unknown User" forever (the refresh signature never changes for them),
+      // so treat them as a miss and refetch once.
+      const missingReporterName = cachedIssues.some(
+        (issue) => !Object.prototype.hasOwnProperty.call(issue, "reporterName"),
+      );
+      if (missingReporterName) return null;
 
       return { metadata, issues: cachedIssues };
     } catch {
@@ -347,6 +419,32 @@ const groupNearbyIssues = (issues: Issue[]) => {
 
       if (error) throw error;
 
+      // Resolve the reporter's display name for the popup with one batch
+      // lookup (same users.u_id -> u_name pattern as CheckReports /
+      // SuperAdminDashboard). Failures leave the name unresolved and the UI
+      // falls back to "Unknown User".
+      const reporterNames = new Map<string, string>();
+      const userIds = [
+        ...new Set((data || []).map((report: any) => report.user_id).filter(Boolean)),
+      ];
+
+      if (userIds.length > 0) {
+        const { data: usersData, error: usersError } = await supabase
+          .from("users")
+          .select("u_id, u_name")
+          .in("u_id", userIds);
+
+        if (usersError) {
+          console.warn("Failed to resolve reporter names", usersError);
+        } else {
+          (usersData || []).forEach((user: any) => {
+            if (user?.u_id && user?.u_name) {
+              reporterNames.set(user.u_id, user.u_name);
+            }
+          });
+        }
+      }
+
       const mappedIssues: Issue[] = (data || []).map((report: any) => {
         const aiInterpretation = report.ai_interpretation || '';
         const aiVerdict = parseAiVerdict(aiInterpretation);
@@ -367,6 +465,9 @@ const groupNearbyIssues = (issues: Issue[]) => {
           aiReason: aiInterpretation,
           aiVerdict,
           departmentNotified: getDepartmentsForIncidentType(report.incident_type).join(" & ") || "Unassigned",
+          reporterName: report.user_id
+            ? reporterNames.get(report.user_id) ?? null
+            : null,
         };
       });
 
@@ -968,9 +1069,27 @@ const groupNearbyIssues = (issues: Issue[]) => {
                   {selectedIssue.severity.toUpperCase()}
                 </span>
               </div>
-              <p className={`text-sm mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                {selectedIssue.description}
-              </p>
+              <div className="mb-2">
+                <div className={`flex items-start gap-2 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <User size={15} className="mt-0.5 shrink-0" />
+                  <p className="flex-1">
+                    {selectedIssue.reporterName || 'Unknown User'} - {selectedIssue.description}
+                  </p>
+                </div>
+                <div className={`flex items-center gap-2 text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <Calendar size={15} className="shrink-0" />
+                  <span>
+                    {new Date(selectedIssue.timestamp).toLocaleDateString('en-GB')} at{' '}
+                    {new Date(selectedIssue.timestamp)
+                      .toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true,
+                      })
+                      .toLowerCase()}
+                  </span>
+                </div>
+              </div>
               
               {/* Smart-Connect AI verdict (read from ai_interpretation) */}
               {(() => {
@@ -984,7 +1103,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
                     ? { text: '⚠ Manual review required', cls: 'bg-amber-100 text-amber-800 border-amber-200' }
                     : { text: 'Pending AI review', cls: 'bg-gray-100 text-gray-600 border-gray-200' };
                 return (
-                  <div className={`mb-3 rounded-lg border p-3 ${isDark ? 'border-slate-600 bg-slate-700/40' : 'border-gray-200 bg-gray-50'}`}>
+                  <div className={`mb-3 rounded-lg border p-2 ${isDark ? 'border-slate-500 bg-slate-700/40' : 'border-gray-200 bg-gray-50'}`}>
                     <div className="flex items-center justify-between gap-2 mb-1.5">
                       <p className={`text-xs font-semibold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>Smart-Connect AI says:</p>
                       <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold ${chip.cls}`}>{chip.text}</span>
@@ -1004,8 +1123,8 @@ const groupNearbyIssues = (issues: Issue[]) => {
                     Reported by {selectedIssue.reportCount} people
                   </div>
               )}
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className={`rounded-lg p-3 border ${isDark ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-300'}`}>
+              <div className="grid grid-cols-2 gap-3 mb-2">
+                <div className={`rounded-lg p-2 border ${isDark ? 'bg-slate-700 border-slate-500' : 'bg-gray-50 border-gray-300'}`}>
                   <p className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                     Status
                   </p>
@@ -1020,7 +1139,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
                         selectedIssue.status.slice(1)}
                   </span>
                 </div>
-                <div className={`rounded-lg p-3 border ${isDark ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-300'}`}>
+                <div className={`rounded-lg p-3 border ${isDark ? 'bg-slate-700 border-slate-500' : 'bg-gray-50 border-gray-300'}`}>
                   <p className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                     Department
                   </p>
@@ -1042,6 +1161,80 @@ const groupNearbyIssues = (issues: Issue[]) => {
                   </span>
                 </div>
               )}
+
+              {/* Transfer to a different department - admin only, and ONLY when
+                  the AI model predicts something else while the incident type
+                  is something else (a real prediction/type mismatch). Reports
+                  the model confirmed, reports with no AI review yet, and
+                  unrecognizable images never show this control. */}
+              {isAdmin && (() => {
+                const predictedLabel = parseAiPredictedLabel(selectedIssue.aiReason);
+                const aiPredictsSomethingElse =
+                  !!predictedLabel &&
+                  !matchesIncidentType(predictedLabel, selectedIssue.type);
+                const transferTargets = getTransferableDepartments(selectedIssue.type);
+
+                if (!aiPredictsSomethingElse || transferTargets.length === 0) return null;
+
+                const prettyLabel = predictedLabel!.replace(/_/g, ' ');
+
+                return (
+                  <div className={`mb-3 rounded-lg border p-3 ${
+                    isDark ? 'border-amber-700 bg-amber-900/20' : 'border-amber-300 bg-amber-50'
+                  }`}>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <p className={`text-xs font-semibold ${isDark ? 'text-amber-200' : 'text-amber-800'}`}>
+                        AI predicts a different incident type
+                      </p>
+                      <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                        isDark ? 'border-amber-600 text-amber-300' : 'border-amber-400 text-amber-700'
+                      }`}>
+                        {prettyLabel}
+                      </span>
+                    </div>
+                    <p className={`text-[11px] leading-relaxed mb-2 ${isDark ? 'text-amber-300/80' : 'text-amber-700'}`}>
+                      The model detected <span className="font-semibold">{prettyLabel}</span>{' '}
+                      but this report is filed as{' '}
+                      <span className="font-semibold">{selectedIssue.type}</span>. Transfer it to
+                      the correct department.
+                    </p>
+                    <div className="flex gap-2">
+                      <select
+                        value={transferDepartment}
+                        onChange={(e) => setTransferDepartment(e.target.value)}
+                        disabled={transferring}
+                        aria-label="Transfer to department"
+                        className={`flex-1 min-w-0 px-2 py-2 rounded-lg border text-xs focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-60 ${
+                          isDark
+                            ? 'bg-slate-800 border-slate-600 text-gray-100'
+                            : 'bg-white border-gray-300 text-gray-900'
+                        }`}
+                      >
+                        <option value="">Select department...</option>
+                        {transferTargets.map((department) => (
+                          <option key={department} value={department}>
+                            {department}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={!transferDepartment || transferring}
+                        onClick={() =>
+                          handleTransfer(selectedIssue.id, transferDepartment, predictedLabel)
+                        }
+                        className={`whitespace-nowrap px-3 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                          isDark
+                            ? 'bg-amber-600 text-white hover:bg-amber-500'
+                            : 'bg-amber-500 text-white hover:bg-amber-600'
+                        }`}
+                      >
+                        {transferring ? 'Transferring...' : 'Transfer'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
               
               {/* Admin Action Buttons - Only show for admins */}
               {isAdmin && (
@@ -1064,17 +1257,6 @@ const groupNearbyIssues = (issues: Issue[]) => {
                   </button>
                 </div>
               )}
-              
-              <p className={`text-sm pt-2 text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                Reported by Anonymous on{" "}
-                {new Date(
-                  selectedIssue.timestamp,
-                ).toLocaleDateString('en-GB')}{" "}
-                at{" "}
-                {new Date(
-                  selectedIssue.timestamp,
-                ).toLocaleTimeString()}
-              </p>
             </div>
           </div>
         )}

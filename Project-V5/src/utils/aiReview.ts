@@ -12,6 +12,10 @@ import { classifyIncidentImage, IncidentPrediction } from './incidentClassifier'
  *   - auto-rejected -> status 'rejected'     (shows under AI rejected)
  *   - manual review -> status unchanged      (stays under Check Reports)
  *
+ * A reported-type / detected-type mismatch (user filed A, the model
+ * confidently sees B) is never auto-rejected: it is kept for admin review so
+ * a human can re-categorise instead of losing a genuine report.
+ *
  * Thresholds are conservative: anything the model cannot confidently tie to
  * the reported incident type goes to a human, and any image the model cannot
  * read at all is rejected as fake or unrecognizable. Garbage, accident and
@@ -61,21 +65,44 @@ export const LOW_CONFIDENCE_TYPES: Record<string, number> = {
 /** Floor used for every report type that has no override above. */
 const DEFAULT_CONFIDENCE_FLOOR = MIN_USEFUL_CONFIDENCE;
 
-/** Model labels (normalised) that count as a match for each report type. */
+/**
+ * Model labels (normalised) that count as a match for each report type.
+ *
+ * NOTE: the model only emits the labels below plus 'waterlogging'. Labels the
+ * model has never seen (for example a 'water logging' report row) are matched
+ * through the RAW label, so a confident Flood box on a Water Logging report is
+ * still a MATCH - and conversely a confident wrong-class box on any report is
+ * a mismatch that must be kept for human review, never auto-rejected.
+ */
 const MATCH_GROUPS: Record<string, string[]> = {
   pothole: ['pothole'],
   garbage: ['garbage'],
   flood: ['flood', 'waterlogging'],
-  waterleakage: ['waterlogging', 'flood'],
+  // Report rows are stored as "Water Logging" while the model emits
+  // "waterlogging" - match the raw label too but ALSO accept flood (standing
+  // water and flood boxes look the same), so a confident Flood box on a Water
+  // Logging report stays a MATCH.
+  waterlogging: ['waterlogging', 'flood'],
   accident: ['accident'],
   landslide: ['landslide'],
   fire: ['fire'],
 };
 
+/** Model labels the detector can actually emit (normalised). */
+const KNOWN_MODEL_LABELS = new Set<string>([
+  'pothole',
+  'garbage',
+  'flood',
+  'waterlogging',
+  'accident',
+  'landslide',
+  'fire',
+]);
+
 const normalize = (value: string): string =>
   (value || '').toLowerCase().replace(/[^a-z]/g, '');
 
-function matchesIncidentType(label: string, incidentType: string): boolean {
+export function matchesIncidentType(label: string, incidentType: string): boolean {
   const normalizedType = normalize(incidentType);
   const normalizedLabel = normalize(label);
   const group = MATCH_GROUPS[normalizedType];
@@ -274,6 +301,52 @@ export function parseAiConfidence(
 ): number | undefined {
   const match = text?.match(/(\d+(?:\.\d+)?)\s*%\s*confidence/i);
   return match ? Number(match[1]) / 100 : undefined;
+}
+
+/**
+ * Extract the model's predicted incident label from a stored
+ * `ai_interpretation` string, or null when the text contains no prediction
+ * (AI still pending, "fake / unrecognizable" images, legacy Gemini texts).
+ *
+ * Handles every format buildInterpretation can emit:
+ *   - "The image shows Garbage (70% confidence), which does not match ..."
+ *   - "The model is unsure: detected Landslide at 56% confidence ..."
+ *   - "Accident reports always need a human decision: Pothole detected at ..."
+ *   - "Pothole confirmed at 70% confidence. ..." (incl. the legacy
+ *     "Run AI review: ..." prefix, which is why the pattern is unanchored)
+ * The returned label is the raw model label (e.g. "Water_Logging"); callers
+ * that compare it against an incident type must go through
+ * matchesIncidentType so case/underscore differences do not read as a
+ * mismatch.
+ */
+export function parseAiPredictedLabel(
+  text: string | null | undefined
+): string | null {
+  if (!text || !text.trim()) return null;
+
+  const shows = text.match(
+    /The image shows ([A-Za-z_ ]+?) \(\d+(?:\.\d+)?% confidence\)/i
+  );
+  if (shows) return shows[1].trim();
+
+  const detected = text.match(
+    /detected ([A-Za-z_ ]+?) at \d+(?:\.\d+)?% confidence/i
+  );
+  if (detected) return detected[1].trim();
+
+  // The accident branch words it the other way around:
+  // "Pothole detected at 49% confidence" (label BEFORE "detected").
+  const labelDetected = text.match(
+    /([A-Za-z_ ]+?) detected at \d+(?:\.\d+)?% confidence/i
+  );
+  if (labelDetected) return labelDetected[1].trim();
+
+  const confirmed = text.match(
+    /([A-Za-z_ ]+?) confirmed at \d+(?:\.\d+)?% confidence/i
+  );
+  if (confirmed) return confirmed[1].trim();
+
+  return null;
 }
 
 export interface AiReviewTarget {

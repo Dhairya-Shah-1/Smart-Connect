@@ -3,6 +3,7 @@ import { Bell, CheckCircle, Clock, AlertCircle, AlertTriangle, MapPin } from 'lu
 import { supabase } from './supabaseClient';
 import { useTheme } from '../App';
 import { canDepartmentViewIncident, getAdminScopedDepartment } from '../config/departments';
+import { readCurrentUserRaw } from '../utils/authStorage';
 import { BlurredVideoLoader } from './ui/blurred-video-loader';
 import {
   getBrowserCache,
@@ -32,7 +33,7 @@ export function Notifications() {
   const [loading, setLoading] = useState(true);
 
   const getCurrentUser = () => {
-    const userStr = localStorage.getItem('currentUser');
+    const userStr = readCurrentUserRaw();
     if (!userStr) return null;
 
     try {

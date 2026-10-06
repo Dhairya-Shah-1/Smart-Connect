@@ -9,6 +9,7 @@ import { useTheme } from '../App';
 import { ASSETS } from '../config/assets';
 import { canReportIncident } from '../utils/deviceDetection';
 import { supabase } from './supabaseClient';
+import { readCurrentUserRaw } from '../utils/authStorage';
 import {
   getBrowserCache,
   isBrowserCacheFresh,
@@ -105,8 +106,8 @@ export function Dashboard({ onLogout, onNavigateHome }: DashboardProps) {
   useEffect(() => {
   const loadDashboardStats = async () => {
     try {
-      // Get logged-in user (still from localStorage)
-      const userStr = localStorage.getItem('currentUser');
+      // Get logged-in user (session-scoped - see authStorage.ts)
+      const userStr = readCurrentUserRaw();
       const user = userStr ? JSON.parse(userStr) : {};
       setUserName(user.name || 'User');
       const { cookieKey, storageKey } = getDashboardStatsCacheKeys(user);

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ASSETS } from '../config/assets';
 import { ArrowLeft, Loader2, Mail, CheckCircle, Moon, Sun } from 'lucide-react';
 import { supabase } from './supabaseClient';
+import { markOAuthPending } from '../utils/authStorage';
 import { useTheme } from '../App';
 
 const authPageClass = 'hide-scrollbar relative min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900 flex items-center justify-center px-4 py-8';
@@ -98,6 +99,8 @@ export function SignUpPage() {
   const handleGoogleSignUp = async () => {
     setError('');
     setGoogleLoading(true);
+    // Tab-scoped marker so LoginPage may complete the login after redirect.
+    markOAuthPending();
 
     try {
       const { error: oauthError } = await supabase.auth.signInWithOAuth({

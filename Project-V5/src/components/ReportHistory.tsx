@@ -13,6 +13,7 @@ import {
   sanitizeCacheKeyPart,
 } from '../utils/browserCache';
 import { getAuthenticatedUser } from '../utils/authSession';
+import { readCurrentUserRaw } from '../utils/authStorage';
 import { parseAiVerdict, parseAiConfidence } from '../utils/aiReview';
 import { getDepartmentsForIncidentType } from '../config/departments';
 
@@ -65,7 +66,7 @@ export function ReportHistory() {
 
   const getCurrentUser = () => {
     try {
-      return JSON.parse(localStorage.getItem('currentUser') || '{}');
+      return JSON.parse(readCurrentUserRaw() || '{}');
     } catch {
       return {};
     }
@@ -333,7 +334,7 @@ export function ReportHistory() {
 
   // Resolve the signed-in user once.
   //
-  // `localStorage.currentUser` is NOT authoritative: Supabase evaluates every
+  // `currentUser` is NOT authoritative: Supabase evaluates every
   // query with the real session, so a local user WITHOUT a session makes the
   // view answer `[]` with HTTP 200 (no error) and the history silently looks
   // empty. Ask Supabase - retrying with a refreshed token - instead.

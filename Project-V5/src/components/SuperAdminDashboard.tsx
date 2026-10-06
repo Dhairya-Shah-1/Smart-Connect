@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { ASSETS } from '../config/assets';
 import { DEPARTMENT_OPTIONS, UNASSIGNED_DEPARTMENT, getDepartmentsForIncidentType, normalizeDepartmentName } from '../config/departments';
 import { isMobileOrTablet } from '../utils/deviceDetection';
+import { readCurrentUserRaw } from '../utils/authStorage';
 import { BlurredVideoLoader } from './ui/blurred-video-loader';
 import {
   loadCachedOrFresh,
@@ -443,7 +444,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
 
   const loadSuperAdminData = async () => {
     try {
-      const userStr = localStorage.getItem('currentUser');
+      const userStr = readCurrentUserRaw();
       const user = userStr ? JSON.parse(userStr) : null;
 
       if (!user || user.role !== 'super_admin') {
@@ -770,7 +771,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                   id="department-filter"
                   value={filterDepartment}
                   onChange={(event) => setFilterDepartment(event.target.value)}
-                  className={`w-full ${isMobile ? "px-3 py-2 text-xs" : "px-4 py-2.5 text-sm"} rounded-lg border font-medium focus:outline-none focus:ring-2 focus:ring-purple-600 ${
+                  className={`w-45 ${isMobile ? "px-3 py-2 text-xs" : "px-4 py-2.5 text-sm"} rounded-lg border font-medium focus:outline-none focus:ring-2 focus:ring-purple-600 ${
                     isDark
                       ? 'border-slate-600 bg-slate-700 text-gray-100'
                       : 'border-gray-300 bg-gray-100 text-gray-700'

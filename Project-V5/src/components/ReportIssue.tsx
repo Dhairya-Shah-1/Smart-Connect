@@ -91,7 +91,7 @@ export function ReportIssue({ onSuccess }: ReportIssueProps) {
         reader.readAsDataURL(file);
 
         // 2. Storage writes are evaluated by RLS using the REAL Supabase
-        //    session. `currentUser` in localStorage is not enough: without a
+        //    session. The local `currentUser` record is not enough: without a
         //    session the request runs as the `anon` role and the bucket rejects
         //    the insert with "new row violates row-level security policy".
         //    That is why we never fall back to a placeholder folder (the old

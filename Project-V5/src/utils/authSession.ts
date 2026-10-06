@@ -1,12 +1,14 @@
 import { supabase } from '../components/supabaseClient';
 import { isLoginExpired, signOutAndClearAuth } from './authLifetime';
+import { readCurrentUserRaw } from './authStorage';
 
 /**
  * Shared Supabase session helper.
  *
- * The app keeps a copy of the signed-in user in localStorage (`currentUser`)
- * and App.tsx guards every private route with it. Supabase, however, does not
- * trust localStorage: every query and every Storage write is evaluated with the
+ * The app keeps a copy of the signed-in user in session-scoped browser
+ * storage (`currentUser`) and App.tsx guards every private route with it.
+ * Supabase, however, does not trust that record: every query and every
+ * Storage write is evaluated with the
  * `anon` role unless the client is holding a valid session. That mismatch is
  * exactly what produces these symptoms while the UI still looks "logged in":
  *
@@ -57,7 +59,7 @@ const isExpired = (expiresAt?: number | null) =>
 export async function getAuthenticatedUser(): Promise<AuthenticatedUser> {
   // A Supabase session may be restored before the app has resolved its local
   // profile. Enforce the six-hour app lifetime once that local user exists.
-  if (localStorage.getItem('currentUser') && isLoginExpired()) {
+  if (readCurrentUserRaw() && isLoginExpired()) {
     await signOutAndClearAuth();
     return { userId: null, state: 'missing', errorMessage: 'The six-hour login period has expired.' };
   }

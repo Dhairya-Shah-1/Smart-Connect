@@ -16,6 +16,7 @@ import { CheckReports } from './components/CheckReports';
 import { processAllUnprocessedReports, processPendingUnreviewedReports, getUnprocessedReportsCount } from './utils/aiVerification';
 import { toast } from 'sonner';
 import { enforceLoginLifetime, isLoginExpired, signOutAndClearAuth, getLoginTime, CURRENT_USER_EVENT } from './utils/authLifetime';
+import { readCurrentUserRaw } from './utils/authStorage';
 
 type Theme = 'light' | 'dark';
 
@@ -37,7 +38,7 @@ export function notifyCurrentUserChanged() {
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const user = localStorage.getItem('currentUser');
+  const user = readCurrentUserRaw();
   
   if (!user || isLoginExpired()) {
     if (user) void signOutAndClearAuth();
@@ -49,7 +50,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 // Admin Route Component
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  const userStr = localStorage.getItem('currentUser');
+  const userStr = readCurrentUserRaw();
   
   if (!userStr || isLoginExpired()) {
     if (userStr) void signOutAndClearAuth();
@@ -66,7 +67,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 
 // Super Admin Route Component
 function SuperAdminRoute({ children }: { children: React.ReactNode }) {
-  const userStr = localStorage.getItem('currentUser');
+  const userStr = readCurrentUserRaw();
   
   if (!userStr || isLoginExpired()) {
     if (userStr) void signOutAndClearAuth();
@@ -131,7 +132,7 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    const redirectPath = getRedirectPath(localStorage.getItem('currentUser'));
+    const redirectPath = getRedirectPath(readCurrentUserRaw());
     const isAuthRoute = location.pathname === '/login' || location.pathname === '/signup';
 
     if (redirectPath && isAuthRoute) {
@@ -259,7 +260,7 @@ function AppContent() {
 
 function currentLoginReviewKey(): string | null {
   try {
-    const user = JSON.parse(localStorage.getItem('currentUser') || 'null');
+    const user = JSON.parse(readCurrentUserRaw() || 'null');
     if (!user) return null;
     return `${user.id ?? user.email ?? 'user'}:${getLoginTime() ?? 0}`;
   } catch {
