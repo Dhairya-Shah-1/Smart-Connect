@@ -44,11 +44,32 @@ This repo is configured so that:
 Supabase pauses **free** projects after **1 week of inactivity** (see
 [supabase.com/pricing](https://supabase.com/pricing)) — a paused project stops
 serving API requests until it is restored from the Supabase dashboard. The app
-only touches the database while somebody is actively using it, so the repo ships
-a scheduled GitHub Actions workflow
-(`.github/workflows/supabase-keep-alive.yml`) that sends one lightweight,
-authenticated REST request every day. Any successful API request counts as
-activity, so the inactivity window is never reached.
+only touches the database while somebody is actively using it, so the repo
+ships two keep-alive layers. Any successful API request counts as activity,
+so the inactivity window is never reached.
+
+### Layer A — Vercel Cron (immune to the GitHub 60-day rule, recommended)
+
+`api/keep-alive.ts` + the `crons` entry in `vercel.json` pings Supabase
+daily at 07:00 UTC (`0 7 * * *`) using the **public anon key**. Vercel Cron
+runs as long as the deployment exists — it is **not** disabled after 60 days
+of no commits, unlike GitHub scheduled workflows.
+
+One-time setup: in the Vercel dashboard → project → **Settings →
+Environment Variables**, make sure `SUPABASE_URL` and `SUPABASE_ANON_KEY`
+(or the existing `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`) are set for
+the Production environment, then redeploy. The handler follows the same
+convention as the other `/api` routes, so either naming works.
+
+Verify: `node --experimental-strip-types scripts/e2e-keep-alive.test.mjs`
+runs the real handler against Supabase and asserts a 200 + ok response.
+You can also open `https://<your-app>.vercel.app/api/keep-alive` in a
+browser — `{"ok":true,"supabaseStatus":200,...}` means the ping path works.
+
+### Layer B — GitHub Actions (backup)
+
+The scheduled workflow (`.github/workflows/supabase-keep-alive.yml`) sends
+one lightweight, authenticated REST request every day.
 
 ### One-time setup
 
