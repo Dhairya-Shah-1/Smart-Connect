@@ -17,6 +17,7 @@ import { processAllUnprocessedReports, processPendingUnreviewedReports, getUnpro
 import { toast } from 'sonner';
 import { enforceLoginLifetime, isLoginExpired, signOutAndClearAuth, getLoginTime, CURRENT_USER_EVENT } from './utils/authLifetime';
 import { readCurrentUserRaw } from './utils/authStorage';
+import { Toaster } from './components/ui/sonner';
 
 type Theme = 'light' | 'dark';
 
@@ -161,6 +162,9 @@ function AppContent() {
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
       <div className={`min-h-screen ${theme === 'dark' ? 'dark' : ''}`}>
+        {/* Mounted once at the root: every toast.* call in the app (including
+            the Add Admin success/error feedback) only renders through this. */}
+        <Toaster richColors />
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />

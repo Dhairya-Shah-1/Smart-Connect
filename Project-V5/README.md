@@ -39,6 +39,49 @@ This repo is configured so that:
 - `.env` files are excluded from git
 - `.env.example` documents the required configuration for new contributors
 
+## Keeping Supabase awake (keep-alive)
+
+Supabase pauses **free** projects after **1 week of inactivity** (see
+[supabase.com/pricing](https://supabase.com/pricing)) — a paused project stops
+serving API requests until it is restored from the Supabase dashboard. The app
+only touches the database while somebody is actively using it, so the repo ships
+a scheduled GitHub Actions workflow
+(`.github/workflows/supabase-keep-alive.yml`) that sends one lightweight,
+authenticated REST request every day. Any successful API request counts as
+activity, so the inactivity window is never reached.
+
+### One-time setup
+
+1. Open the GitHub repo → **Settings → Secrets and variables → Actions**.
+2. Add these repository secrets:
+
+   | Secret | Value |
+   | --- | --- |
+   | `SUPABASE_URL` | same as `VITE_SUPABASE_URL`, e.g. `https://your-project.supabase.co` |
+   | `SUPABASE_ANON_KEY` | same as `VITE_SUPABASE_ANON_KEY` (the **public anon key** — safe here; never put the service role key in this workflow) |
+   | `INCIDENT_AI_URL` | *(optional)* the Render service URL, same as `VITE_INCIDENT_AI_URL` — the workflow also wakes the AI service and verifies it responds |
+
+3. Commit the workflow file to the default branch — scheduled workflows only
+   run from the default branch. It runs daily at 07:00 UTC and can also be run
+   manually from the **Actions** tab (the *Run workflow* button).
+
+### Notes
+
+- If the project is already paused, the workflow fails with a clear error
+  message. Restore the project in the Supabase dashboard, then re-run the
+  workflow from the Actions tab to confirm recovery.
+- GitHub automatically **disables scheduled workflows after 60 days without
+  repository activity**. Any push to the repo resets that timer; if the
+  workflow has been disabled, re-enable it from the Actions tab.
+- Normal app usage also counts as activity — the workflow is the safety net
+  for quiet periods, not a replacement for usage.
+- Local equivalent: `node scripts/keep-alive.mjs` reads `.env` and performs
+  the same checks from your machine — handy to verify credentials, or as a
+  manual fallback if the GitHub workflow is disabled.
+- The Render AI step is a wake-up/smoke test: Render free services spin down
+  after ~15 minutes regardless (waking them takes a cold start of 30–60 s on
+  the first request).
+
 ## Adding admins (Super Admin)
 
 On the Super Admin dashboard -> Manage Admins tab -> **+ Add Admin**, the super admin can register a new admin

@@ -24,9 +24,26 @@ export function AdminList({ onAdminsChanged }: AdminListProps) {
 
   const fetchAdmins = async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('admins').select('*');
-    if (!error && data) setAdmins(data);
-    setLoading(false);
+    try {
+      // Bounded so the list loader can never spin forever when the query
+      // stalls (the same class of hang that used to freeze the Add Admin modal).
+      const { data, error } = await Promise.race([
+        supabase.from('admins').select('*'),
+        new Promise<never>((_, reject) =>
+          window.setTimeout(() => reject(new Error('Timed out while loading admins')), 15_000),
+        ),
+      ]);
+
+      if (error) {
+        toast.error(`Could not load admins: ${error.message}`);
+      } else if (data) {
+        setAdmins(data);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not load admins');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchAdmins(); }, []);

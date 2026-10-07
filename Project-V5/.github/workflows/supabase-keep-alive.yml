@@ -1,0 +1,79 @@
+name: Supabase Keep-Alive
+
+# Supabase pauses FREE projects after 1 week of inactivity
+# (https://supabase.com/pricing), which stops all API requests until the
+# project is restored from the dashboard. The app only reaches the database
+# while somebody is actively using it, so this workflow sends one lightweight
+# PostgREST request per day - any successful API request counts as activity
+# and resets Supabase's inactivity window. It can also wake the Render
+# Incident AI service so its free-tier cold start happens on our terms.
+on:
+  schedule:
+    # Daily at 07:00 UTC. GitHub cron can drift a few minutes when the
+    # platform is busy; a daily cadence still leaves a ~6 day safety margin.
+    - cron: '0 7 * * *'
+  # Allows "Run workflow" from the Actions tab (e.g. after restoring a
+  # paused project or to verify the secrets are configured correctly).
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  keep-alive:
+    name: Ping Supabase (+ optional Render AI)
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      INCIDENT_AI_URL: ${{ secrets.INCIDENT_AI_URL }}
+    steps:
+      - name: Verify configuration
+        run: |
+          if [ -z "${SUPABASE_URL}" ] || [ -z "${SUPABASE_ANON_KEY}" ]; then
+            echo "::error::Missing SUPABASE_URL and/or SUPABASE_ANON_KEY repository secrets. Add them under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+      # Any authenticated PostgREST request registers as project activity.
+      # A SELECT against incident_reports with the public anon key exercises
+      # the real database path (RLS filters rows, it does not error, so an
+      # empty result is still HTTP 200).
+      - name: Ping Supabase REST API
+        run: |
+          set -eu
+          target="${SUPABASE_URL%/}/rest/v1/incident_reports?select=report_id&limit=1"
+          curl_exit=0
+          http_code=$(curl -sS --max-time 30 -o /tmp/supabase-ping.json -w '%{http_code}' \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            -H "Accept: application/json" \
+            "${target}") || curl_exit=$?
+          if [ "${curl_exit}" -ne 0 ]; then
+            echo "::error::Could not reach Supabase (curl exit ${curl_exit}). The project is probably paused - restore it from the Supabase dashboard, then re-run this workflow."
+            exit 1
+          fi
+          echo "Supabase responded with HTTP ${http_code}: $(cat /tmp/supabase-ping.json)"
+          if [ "${http_code}" != "200" ]; then
+            echo "::error::Expected HTTP 200 from the REST ping (got ${http_code}). The project may be paused - restore it from the Supabase dashboard."
+            exit 1
+          fi
+
+      # Optional: Render free web services spin down after ~15 minutes of
+      # inactivity. This ping does not keep it permanently warm (that would
+      # need a ping every <15 min), but it wakes the service up and proves
+      # the AI backend is reachable before a user needs it.
+      - name: Wake Render Incident AI service (optional)
+        run: |
+          set -eu
+          if [ -z "${INCIDENT_AI_URL}" ]; then
+            echo "INCIDENT_AI_URL secret not set - skipping Render wake-up ping."
+            exit 0
+          fi
+          curl_exit=0
+          http_code=$(curl -sS --max-time 120 -o /dev/null -w '%{http_code}' "${INCIDENT_AI_URL%/}/") || curl_exit=$?
+          if [ "${curl_exit}" -ne 0 ]; then
+            echo "::error::Could not reach the Render Incident AI service (curl exit ${curl_exit})."
+            exit 1
+          fi
+          echo "Render responded with HTTP ${http_code} (any HTTP response means the service is awake)."

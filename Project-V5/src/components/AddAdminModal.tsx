@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Loader2, UserPlus, Mail, Lock, User, Building2, MapPin, X } from 'lucide-react';
 import { useTheme } from '../App';
 import { supabase } from './supabaseClient';
+import { env } from '../config/env';
 import { toast } from 'sonner';
 import { DEPARTMENT_OPTIONS } from '../config/departments';
 
@@ -12,6 +13,67 @@ interface AddAdminModalProps {
 }
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// The submit flow must never be able to buffer forever. Both awaits inside it
+// can block indefinitely in the browser:
+//
+//  - supabase.auth.getSession() may queue behind the auth refresh lock (another
+//    tab refreshing, or a refresh request that stalled on a flaky network), and
+//  - fetch('/api/manage-admin') never settles when the connection dies or the
+//    server wedges (browsers can wait minutes before erroring).
+//
+// Either one used to leave the button on "Adding..." with every close path
+// (Cancel, Escape, backdrop click) disabled - an eternal spinner. Both are
+// bounded here so the modal always ends in success or a visible error.
+const SESSION_LOOKUP_TIMEOUT_MS = 15_000;
+const SUBMIT_TIMEOUT_MS = 60_000;
+
+/**
+ * Resolves the caller's Supabase access token, bounded in time.
+ *
+ * `getSession()` itself is raced against a timeout so a blocked refresh lock
+ * can never hang the modal. If that happens while the stored session is still
+ * valid, the token is read straight from storage so a perfectly healthy login
+ * still succeeds instead of failing with a confusing error.
+ */
+async function getAccessTokenWithTimeout(): Promise<string | null> {
+  let timer: number | undefined;
+
+  try {
+    const sessionPromise = supabase.auth
+      .getSession()
+      .then(({ data }) => data.session?.access_token ?? null);
+
+    const token = await Promise.race([
+      sessionPromise,
+      new Promise<null>((resolve) => {
+        timer = window.setTimeout(() => resolve(null), SESSION_LOOKUP_TIMEOUT_MS);
+      }),
+    ]);
+
+    if (token) return token;
+  } catch {
+    // Fall through to the stored-session fallback below.
+  } finally {
+    window.clearTimeout(timer);
+  }
+
+  // getSession() timed out (or failed). The session in sessionStorage is still
+  // authoritative for the token itself, so use it while it is not expired.
+  try {
+    const projectRef = new URL(env.supabaseUrl).hostname.split('.')[0];
+    const raw = sessionStorage.getItem(`sb-${projectRef}-auth-token`);
+    if (!raw) return null;
+
+    const session = JSON.parse(raw) as { access_token?: string; expires_at?: number };
+    if (!session.access_token) return null;
+    if (typeof session.expires_at === 'number' && session.expires_at * 1000 <= Date.now()) return null;
+
+    return session.access_token;
+  } catch {
+    return null;
+  }
+}
 
 // Viewport based check (< 768px = phone-sized screen). Deliberately not based on
 // the user agent: the card must switch between the two-column desktop layout and
@@ -131,37 +193,55 @@ export function AddAdminModal({ open, onClose, onCreated }: AddAdminModalProps) 
     setError('');
     setLoading(true);
 
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+    // Bounds the whole request: aborts the fetch (and its response body read)
+    // so the "Adding..." spinner can never outlive this timeout.
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), SUBMIT_TIMEOUT_MS);
 
-      if (!session?.access_token) {
+    try {
+      const accessToken = await getAccessTokenWithTimeout();
+      if (!accessToken) {
         throw new Error('Your session has expired. Please log in again.');
       }
 
-      const response = await fetch('/api/manage-admin', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          email: email.trim().toLowerCase(),
-          password: password.trim() || undefined,
-          name: name.trim(),
-          department_name: department.trim(),
-          location: location.trim(),
-        }),
-      });
+      let response: Response;
+      try {
+        response = await fetch('/api/manage-admin', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            email: email.trim().toLowerCase(),
+            password: password.trim() || undefined,
+            name: name.trim(),
+            department_name: department.trim(),
+            location: location.trim(),
+          }),
+          signal: controller.signal,
+        });
+      } catch {
+        if (controller.signal.aborted) {
+          throw new Error(
+            `The server did not respond within ${Math.round(SUBMIT_TIMEOUT_MS / 1000)} seconds. Please try again.`,
+          );
+        }
+        throw new Error('Could not reach the server. Please check your connection and try again.');
+      }
 
-      const payload = (await response.json().catch(() => ({}))) as {
-        error?: string;
-        message?: string;
-      };
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string; message?: string; success?: boolean }
+        | null;
 
       if (!response.ok) {
-        throw new Error(payload?.error || 'Failed to add the admin');
+        throw new Error(payload?.error || `Failed to add the admin (server responded with ${response.status}).`);
+      }
+
+      // Guards against a misrouted/misconfigured server replying 200 with
+      // non-JSON (for example the index.html fallback): never claim success.
+      if (!payload?.success) {
+        throw new Error('The server returned an unexpected response. Please try again.');
       }
 
       toast.success(payload?.message || 'Admin added successfully');
@@ -171,6 +251,7 @@ export function AddAdminModal({ open, onClose, onCreated }: AddAdminModalProps) 
       console.error('Add admin error:', err);
       setError(err?.message || 'Failed to add the admin');
     } finally {
+      window.clearTimeout(timeoutId);
       setLoading(false);
     }
   };
