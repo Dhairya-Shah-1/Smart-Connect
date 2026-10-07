@@ -14,6 +14,7 @@ import { defaults as defaultInteractions } from "ol/interaction/defaults";
 import { unByKey } from "ol/Observable";
 import { ZoomIn, ZoomOut } from "lucide-react";
 import { useTheme } from "../App";
+import { isMobileOrTablet } from "../utils/deviceDetection";
 
 // Define the shape of an Issue based on your project
 interface Issue {
@@ -39,6 +40,7 @@ export function OpenLayersMap({
   const [zoomLevel, setZoomLevel] = useState(12);
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const isMobileTablet = isMobileOrTablet();
 
   // Keep the latest onMarkerClick callback in a ref so the map (initialized
   // once) never calls a stale closure without having to re-create the map.
@@ -173,8 +175,10 @@ export function OpenLayersMap({
 
   return (
     <div className="relative w-full h-full z-0">
-      {/* Zoom Controls */}
-      <div className="absolute top-4 right-2 z-10 flex flex-col gap-1.5">
+      {/* Zoom Controls - hidden when device detection says mobile/tablet or
+          the viewport/pointer isn't desktop-sized; pinch-to-zoom covers both. */}
+      {!isMobileTablet && (
+        <div className="absolute top-4 right-2 z-10 hidden lg:pointer-fine:flex flex-col gap-1.5">
         <button
           onClick={handleZoomIn}
           className="w-9 h-9 bg-white dark:bg-slate-800 rounded-lg shadow-lg flex items-center justify-center hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors border border-gray-200 dark:border-slate-700"
@@ -190,7 +194,8 @@ export function OpenLayersMap({
         >
           <ZoomOut size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
-      </div>
+        </div>
+      )}
 
       {/* Map Container.
           Theme-aware canvas: a dark background in dark mode so the map area

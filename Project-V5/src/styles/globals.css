@@ -49,6 +49,25 @@
   display: none;
 }
 
+/* Slim, theme-friendly scrollbar for scrollable cards/popups. */
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.6) transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 116, 139, 0.6);
+  border-radius: 9999px;
+}
+
 /* Dashboard tabs scroll inside the locked mobile viewport without showing a bar. */
 .mobile-scroll-content {
   overflow-y: auto;

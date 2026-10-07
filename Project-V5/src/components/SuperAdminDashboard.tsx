@@ -1006,7 +1006,10 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
             <X size={20} className="text-gray-800" />
           </button>
 
-          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-3 bg-white/90 rounded-full px-4 py-3 shadow-2xl">
+          {/* Control Panel - dual gate: hidden when device detection says
+              mobile/tablet or the viewport/pointer isn't desktop-sized. */}
+          {!isMobile && (
+          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 hidden lg:pointer-fine:flex items-center gap-3 bg-white/90 rounded-full px-4 py-3 shadow-2xl">
             <button
               className="p-2 hover:bg-gray-200 rounded-full transition-all disabled:opacity-30 disabled:cursor-not-allowed"
               onClick={() => setImageZoom((prev) => Math.max(prev - 0.25, 0.5))}
@@ -1027,6 +1030,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
               <ZoomIn size={20} className="text-gray-700" />
             </button>
           </div>
+          )}
         </div>
       </div>
     )}

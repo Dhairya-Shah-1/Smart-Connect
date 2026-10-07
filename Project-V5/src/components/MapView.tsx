@@ -912,10 +912,12 @@ const groupNearbyIssues = (issues: Issue[]) => {
 
         {/* Admin Filter Buttons - Only show for admins */}
         {isAdmin ? (
-          <div className="absolute top-4 left-4 right-4 z-10 flex flex-col items-start gap-2 sm:right-auto sm:flex-row">
+          // pointer-events-none: empty gaps pass clicks to the map pins
+          // underneath; each button re-enables its own hit area.
+          <div className="absolute top-4 left-4 right-4 z-10 flex flex-col items-start gap-2 sm:right-auto sm:flex-row pointer-events-none">
             <button
               onClick={() => setAdminFilter('pending')}
-              className={`px-3 py-2 rounded-lg border flex items-center gap-2 ${
+              className={`pointer-events-auto px-3 py-2 rounded-lg border flex items-center gap-2 ${
                 adminFilter === 'pending'
                   ? isDark
                     ? "bg-yellow-900 border-yellow-700 text-yellow-200"
@@ -930,7 +932,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
             </button>
             <button
               onClick={() => setAdminFilter('in-progress')}
-              className={`px-3 py-2 rounded-lg border flex items-center gap-2 ${
+              className={`pointer-events-auto px-3 py-2 rounded-lg border flex items-center gap-2 ${
                 adminFilter === 'in-progress'
                   ? isDark
                     ? "bg-blue-900 border-blue-700 text-blue-200"
@@ -945,7 +947,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
             </button>
             <button
               onClick={() => setAdminFilter('rejected')}
-              className={`px-3 py-2 rounded-lg border flex items-center gap-2 ${
+              className={`pointer-events-auto px-3 py-2 rounded-lg border flex items-center gap-2 ${
                 adminFilter === 'rejected'
                   ? isDark
                     ? "bg-red-900 border-red-700 text-red-200"
@@ -1006,7 +1008,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
         {/* Stats - Hide on mobile/tablet when filters panel is open */}
         {!(isMobileTablet && showFilters) && (
           <div
-            className={`absolute top-4 right-14 rounded-lg shadow-lg p-3 z-10 ${
+            className={`pointer-events-none absolute top-4 rounded-lg shadow-lg p-3 z-10 ${!isMobileTablet ? "right-14" : "right-4" } ${
               isDark ? "bg-slate-800" : "bg-white"
             }`}
           >
@@ -1023,25 +1025,24 @@ const groupNearbyIssues = (issues: Issue[]) => {
           </div>
         )}
 
-        {/* Selected Issue Popup */}
+        {/* Selected Issue Popup - the image lives in its own card OUTSIDE the
+            popup: side by side (image on the left) on desktop, stacked above
+            the popup on small screens. */}
         {selectedIssue && (
-          <div className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-xl shadow-2xl max-w-md w-[calc(100%-2rem)] md:w-full z-30 border overflow-hidden ${
-            isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'
-          }`}>
-            <button
-              onClick={() => setSelectedIssue(null)}
-              className={`absolute top-3 right-3 rounded-full p-1 z-40 transition-colors ${
-                isDark ? 'text-gray-300 hover:text-white bg-slate-700' : 'text-gray-400 hover:text-gray-600 bg-gray-100'
-              }`}
-            >
-              <X size={18} />
-            </button>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30 flex flex-col gap-3 w-[calc(100%-2rem)] max-w-md max-h-[min(90vh,calc(100%_-_2rem))] lg:flex-row lg:items-stretch lg:w-auto lg:max-w-[calc(100%_-_2rem)] lg:max-h-none pointer-events-none">
+            {/* Image segment - matches the popup: equal height on desktop via
+                stretch, same width as the popup from xl upwards. */}
             {selectedIssue.photo && (
-              <div className="relative group cursor-pointer" onClick={() => openFullscreenImage(selectedIssue.photo!)}>
+              <div
+                className={`pointer-events-auto relative group overflow-hidden rounded-xl border shadow-2xl cursor-pointer shrink-0 lg:shrink h-40 sm:h-44 lg:h-auto lg:w-72 lg:min-w-0 xl:w-[28rem] ${
+                  isDark ? 'border-slate-700 bg-slate-700' : 'border-gray-200 bg-slate-200'
+                }`}
+                onClick={() => openFullscreenImage(selectedIssue.photo!)}
+              >
                 <img
                   src={selectedIssue.photo}
                   alt="Incident"
-                  className="w-full h-48 md:h-52 object-contain bg-gray-100 bg-slate-200 dark:bg-slate-700 transition-transform"
+                  className="absolute inset-0 w-full h-full object-cover"
                 />
                 <div className={`absolute inset-0 flex flex-col items-center justify-center ${isMobileTablet ? "bg-slate-700/50" : "opacity-0 group-hover:opacity-100 transition-opacity bg-slate-500 duration-300"}`}>
                   <ZoomIn className="text-white mb-2" size={32} />
@@ -1049,8 +1050,22 @@ const groupNearbyIssues = (issues: Issue[]) => {
                 </div>
               </div>
             )}
-            <div className="px-5 pt-4 pb-5">
-              <div className="flex items-start justify-between mb-2">
+            {/* The popup itself: same size as before, minus the image segment. */}
+            <div className={`pointer-events-auto relative flex flex-col min-h-0 overflow-hidden rounded-xl shadow-2xl border max-w-md w-full lg:w-[28rem] lg:max-w-full ${
+              isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'
+            }`}>
+              <button
+                onClick={() => setSelectedIssue(null)}
+                className={`absolute top-3 right-3 rounded-full p-1 z-40 transition-colors ${
+                  isDark ? 'text-gray-300 hover:text-white bg-slate-700' : 'text-gray-400 hover:text-gray-600 bg-gray-100'
+                }`}
+              >
+                <X size={18} />
+              </button>
+              {/* Body: scrolls only while the card is height-constrained (small
+                  screens); on desktop it renders in full without a scrollbar. */}
+              <div className="px-5 pt-4 pb-5 min-h-0 min-w-0 overflow-y-auto overscroll-contain thin-scrollbar lg:overflow-y-visible">
+                <div className="flex items-start justify-between mb-2 pr-7">
                 <div>
                   <h3 className={`text-lg ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
                     {selectedIssue.type}
@@ -1096,7 +1111,17 @@ const groupNearbyIssues = (issues: Issue[]) => {
                 const verdict = selectedIssue.aiVerdict ?? parseAiVerdict(selectedIssue.aiReason);
                 const chip =
                   verdict === 'approved'
-                    ? { text: '✓ AI approved', cls: 'bg-green-100 text-green-800 border-green-200' }
+                    ? {
+                        // Green shield replaces the old ✓ tick - the shield
+                        // only ever appears for an approved verdict.
+                        text: (
+                          <>
+                            <ShieldCheck size={12} className="inline-block align-[-2px] mr-1" />
+                            AI approved
+                          </>
+                        ),
+                        cls: 'bg-green-100 text-green-800 border-green-200',
+                      }
                     : verdict === 'rejected'
                     ? { text: '✗ AI rejected', cls: 'bg-red-100 text-red-800 border-red-200' }
                     : verdict === 'manual'
@@ -1149,7 +1174,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
                 </div>
               </div>
               {selectedIssue.aiVerified && (
-                <div className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2 mb-3 ${
+                <div className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2 mb-3 ${isAdmin ? 'hidden' : ''} ${
                   isDark ? 'bg-green-900/30 border border-green-700' : 'bg-green-100 border border-green-200'
                 }`}>
                   <ShieldCheck
@@ -1157,7 +1182,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
                     size={16}
                   />
                   <span className={`text-xs ${isDark ? 'text-green-200' : 'text-green-800'}`}>
-                    Verified by authorized personnel
+                    Verified by Smart Connect AI
                   </span>
                 </div>
               )}
@@ -1257,6 +1282,7 @@ const groupNearbyIssues = (issues: Issue[]) => {
                   </button>
                 </div>
               )}
+              </div>
             </div>
           </div>
         )}
@@ -1290,8 +1316,11 @@ const groupNearbyIssues = (issues: Issue[]) => {
                 <X size={20} className="text-gray-800" />
               </button>
 
-              {/* Control Panel */}
-              <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-3 bg-white/90 rounded-full px-4 py-3 shadow-2xl">
+              {/* Control Panel - dual gate: hidden when device detection says
+                  mobile/tablet OR the viewport/pointer isn't desktop-sized.
+                  Touch devices keep pinch-to-zoom instead. */}
+              {!isMobileTablet && (
+                <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 hidden lg:pointer-fine:flex items-center gap-3 bg-white/90 rounded-full px-4 py-3 shadow-2xl">
                 {/* Zoom Out */}
                 <button
                   className="p-2 hover:bg-gray-200 rounded-full transition-all disabled:opacity-30 disabled:cursor-not-allowed"
@@ -1314,7 +1343,8 @@ const groupNearbyIssues = (issues: Issue[]) => {
                 >
                   <ZoomIn size={20} className="text-gray-700" />
                 </button>
-              </div>
+                </div>
+              )}
             </div>
           </div>
         )}
